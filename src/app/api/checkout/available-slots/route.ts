@@ -5,6 +5,9 @@ import { AppSettings, FirestoreService, FirestoreSubCategory, TimeSlotCategoryLi
 import { defaultAppSettings } from '@/config/appDefaults';
 import { getZonedDate, formatZonedDateToISO, convertWallClockToUTC } from '@/lib/utils';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface CartEntry {
   serviceId: string;
   quantity: number;
@@ -20,10 +23,10 @@ const DEFAULT_HOURS_WHEN_LIMIT_ENABLED = defaultAppSettings.limitLateBookingHour
 const BUSY_MAP_CACHE = new Map<string, Map<string, Record<string, number>>>();
 const MAX_CACHE_SIZE = 100;
 
-// Config caching to prevent fetching settings on every click
+// Config caching to prevent fetching settings on every click (2s TTL for instant admin reflection)
 let CACHED_APP_CONFIG: AppSettings | null = null;
 let CACHED_APP_CONFIG_TIME = 0;
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const CACHE_TTL_MS = 2000; // 2 seconds for real-time updates
 
 // --- Helper Functions ---
 

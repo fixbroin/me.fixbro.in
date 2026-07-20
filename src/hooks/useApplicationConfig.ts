@@ -55,6 +55,7 @@ export function useApplicationConfig(): UseApplicationConfigReturn {
       if (docSnap.exists()) {
         const processed = processData(docSnap.data());
         setConfig(processed);
+        setCache(CACHE_KEY, processed);
       }
       setIsLoading(false);
     }, (err: any) => {

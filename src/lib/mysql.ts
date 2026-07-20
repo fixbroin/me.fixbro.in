@@ -98,6 +98,28 @@ export async function getPool(): Promise<mysql.Pool> {
 }
 
 /**
+ * Creates a specific table on the fly if it does not exist.
+ */
+export async function ensureTableExists(conn: mysql.Pool | mysql.PoolConnection, tableName: string) {
+  const cleanName = tableName.replace(/[^a-zA-Z0-9_]/g, '');
+  if (!cleanName) return;
+
+  const createTableQuery = `
+    CREATE TABLE IF NOT EXISTS \`${cleanName}\` (
+      \`id\` VARCHAR(255) NOT NULL,
+      \`parent_id\` VARCHAR(255) DEFAULT NULL,
+      \`data\` JSON NOT NULL,
+      \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      INDEX \`idx_created_at\` (\`createdAt\`),
+      INDEX \`idx_parent_id\` (\`parent_id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `;
+  await conn.query(createTableQuery);
+}
+
+/**
  * Creates any missing tables with the standardized JSON document schema.
  */
 async function initializeDatabase(p: mysql.Pool) {
@@ -105,19 +127,7 @@ async function initializeDatabase(p: mysql.Pool) {
 
   try {
     for (const table of TABLES) {
-      const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS \`${table}\` (
-          \`id\` VARCHAR(255) NOT NULL,
-          \`parent_id\` VARCHAR(255) DEFAULT NULL,
-          \`data\` JSON NOT NULL,
-          \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          PRIMARY KEY (\`id\`),
-          INDEX \`idx_created_at\` (\`createdAt\`),
-          INDEX \`idx_parent_id\` (\`parent_id\`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-      `;
-      await p.query(createTableQuery);
+      await ensureTableExists(p, table);
     }
     isInitialized = true;
     console.log("MySQL Database & Tables initialized successfully.");
@@ -440,10 +450,20 @@ export async function getDocInternal(conn: mysql.PoolConnection | mysql.Pool, pa
     return { exists: false, data: null };
   }
 
-  const [rows]: any = await conn.query(
-    `SELECT \`data\` FROM \`${resolved.table}\` WHERE \`id\` = ? LIMIT 1`,
-    [resolved.docId]
-  );
+  let rows: any = [];
+  try {
+    const [result]: any = await conn.query(
+      `SELECT \`data\` FROM \`${resolved.table}\` WHERE \`id\` = ? LIMIT 1`,
+      [resolved.docId]
+    );
+    rows = result;
+  } catch (err: any) {
+    if (err.code === 'ER_NO_SUCH_TABLE' || err.errno === 1146 || (err.message && err.message.includes("doesn't exist"))) {
+      await ensureTableExists(conn, resolved.table);
+      return { exists: false, data: null };
+    }
+    throw err;
+  }
 
   if (rows.length === 0) {
     return { exists: false, data: null };
@@ -620,7 +640,17 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
     sql += ` LIMIT 18446744073709551615${offsetClause}`;
   }
 
-  const [rows]: any = await conn.query(sql, params);
+  let rows: any = [];
+  try {
+    const [result]: any = await conn.query(sql, params);
+    rows = result;
+  } catch (err: any) {
+    if (err.code === 'ER_NO_SUCH_TABLE' || err.errno === 1146 || (err.message && err.message.includes("doesn't exist"))) {
+      await ensureTableExists(conn, resolved.table);
+      return [];
+    }
+    throw err;
+  }
 
   return (rows || []).map((row: any) => {
     const rawData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;

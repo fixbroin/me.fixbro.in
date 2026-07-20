@@ -2,6 +2,7 @@
 'use server';
 
 import { adminDb } from './firebaseAdmin';
+import { cache } from 'react';
 import { unstable_cache, revalidateTag } from 'next/cache';
 import { Timestamp } from './mysqlDbAdmin';
 import type { FirestoreBooking, FirestoreUser, UserActivity } from '@/types/firestore';
@@ -23,77 +24,70 @@ export interface DashboardData {
   recentActivities: any[];
 }
 
-export const getDashboardData = unstable_cache(
+export const getDashboardData = cache(
   async (providerFeeType?: string, providerFeeValue?: number): Promise<DashboardData> => {
     try {
-      // 1. Fetch Aggregate Stats (1 read)
-      const statsDoc = await adminDb.collection('appConfiguration').doc('stats').get();
-      const systemStats = statsDoc.exists ? statsDoc.data() : null;
+      // 1. Fetch live collection records for 100% accurate system stats
+      const [bookingsSnap, usersSnap] = await Promise.all([
+        adminDb.collection('bookings').get(),
+        adminDb.collection('users').get()
+      ]);
 
-      let completedRevenue = systemStats?.totalRevenue || 0;
-      let totalBookings = systemStats?.totalBookings || 0;
-      let activeUsers = systemStats?.totalUsers || 0;
-      let newSignups = systemStats?.newSignups30d || 0;
-      let earnedCommission = systemStats?.earnedCommission || 0;
+      let completedRevenue = 0;
+      let earnedCommission = 0;
+      let completedBookings = 0;
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      // 2. Fetch other small collections/limits - OPTIMIZED: only fetch recent search activities
-      // Fix: Removed orderBy on 'count' as it was preventing results if the field was missing.
-      // Also removed orderBy on 'timestamp' to avoid requiring composite indexes for this specific view.
+      bookingsSnap.forEach(doc => {
+        const data = doc.data() as FirestoreBooking;
+        if (data.status === 'Completed') {
+          completedBookings++;
+          completedRevenue += data.totalAmount || 0;
+          if (providerFeeType === 'fixed') {
+            earnedCommission += providerFeeValue || 0;
+          } else if (providerFeeType === 'percentage') {
+            earnedCommission += ((data.totalAmount || 0) * (providerFeeValue || 0)) / 100;
+          }
+        }
+      });
+
+      // Filter real users with email or mobileNumber, or fallback to total count
+      const realUsers = usersSnap.docs.filter(doc => {
+        const data = doc.data();
+        return data.email || data.mobileNumber;
+      });
+
+      const activeUsers = realUsers.length > 0 ? realUsers.length : usersSnap.size;
+      const totalBookings = bookingsSnap.size;
+
+      let newSignups = 0;
+      usersSnap.forEach(doc => {
+        const data = doc.data() as any;
+        if (data.createdAt) {
+          const createdDate = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+          if (!isNaN(createdDate.getTime()) && createdDate >= startOfMonth) {
+            newSignups++;
+          }
+        }
+      });
+
+      // Synchronize latest stats into MySQL appConfiguration/stats in background
+      adminDb.collection('appConfiguration').doc('stats').set({
+        totalBookings,
+        completedBookings,
+        totalRevenue: completedRevenue,
+        earnedCommission,
+        totalUsers: activeUsers,
+        newSignups30d: newSignups,
+        updatedAt: Timestamp.now()
+      }, { merge: true }).catch(e => console.error("Error auto-syncing stats:", e));
+
+      // 2. Fetch search activities
       const [searchActivitiesSnap, persistentSearchSnap] = await Promise.all([
         adminDb.collection('userActivities').where('eventType', '==', 'search').limit(100).get(),
         adminDb.collection('searchAnalytics').limit(100).get()
       ]);
-
-      // If stats don't exist yet, we do a one-time scan to initialize them
-      if (!systemStats) {
-        console.log("Dashboard stats missing, performing full scan to initialize...");
-        const [bookingsSnap, usersSnap] = await Promise.all([
-          adminDb.collection('bookings').get(),
-          adminDb.collection('users').get()
-        ]);
-
-        completedRevenue = 0;
-        earnedCommission = 0;
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-        bookingsSnap.forEach(doc => {
-          const data = doc.data() as FirestoreBooking;
-          if (data.status === 'Completed') {
-            completedRevenue += data.totalAmount || 0;
-            if (providerFeeType === 'fixed') {
-              earnedCommission += providerFeeValue || 0;
-            } else if (providerFeeType === 'percentage') {
-              earnedCommission += ((data.totalAmount || 0) * (providerFeeValue || 0)) / 100;
-            }
-          }
-        });
-
-        // Only count users who have an email or mobileNumber (real users)
-        const realUsers = usersSnap.docs.filter(doc => {
-          const data = doc.data();
-          return data.email || data.mobileNumber;
-        });
-
-        activeUsers = realUsers.length;
-        newSignups = 0;
-        realUsers.forEach(doc => {
-          const data = doc.data() as FirestoreUser;
-          if (data.createdAt && data.createdAt.toDate() >= startOfMonth) newSignups++;
-        });
-        totalBookings = bookingsSnap.size;
-
-        // Initialize the stats document for future fast reads
-        adminDb.collection('appConfiguration').doc('stats').set({
-          totalBookings,
-          completedBookings: bookingsSnap.docs.filter(d => d.data().status === 'Completed').length,
-          totalRevenue: completedRevenue,
-          earnedCommission,
-          totalUsers: activeUsers,
-          newSignups30d: newSignups,
-          updatedAt: Timestamp.now()
-        }).catch(e => console.error("Error initializing stats:", e));
-      }
 
       // 3. Analytics: Trending Services (Top 10 bookings - OPTIMIZED to reduce massive reads)
       const trendingBookings = await adminDb.collection('bookings').orderBy('createdAt', 'desc').limit(100).get();
@@ -196,9 +190,7 @@ export const getDashboardData = unstable_cache(
       console.error("Error in getDashboardData:", error);
       throw error;
     }
-  },
-  ['admin-dashboard-stats'],
-  { revalidate: false, tags: ['bookings', 'users', 'global-cache', 'admin-dashboard-stats'] }
+  }
 );
 
 export const getArchivedBookings = unstable_cache(
