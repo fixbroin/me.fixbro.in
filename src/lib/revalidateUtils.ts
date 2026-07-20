@@ -12,7 +12,7 @@ import { FieldValue } from './mysqlDbAdmin';
  */
 export async function triggerRefresh(tag: 'services' | 'categories' | 'cities' | 'bookings' | 'users' | 'content' | 'blog' | 'global' | 'withdrawal-referral-config' | 'withdrawal-provider-config' | 'promo-usage' | string) {
   try {
-    (revalidateTag as any)(tag);
+    (revalidateTag as any)(tag, 'max');
     
     // Purge static HTML pages cache globally only for changes affecting public layout/content
     const isPublicContentChange = [

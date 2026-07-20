@@ -4,7 +4,25 @@ import { getPool } from '@/lib/mysql';
 
 export async function POST(req: Request) {
   try {
-    const importData = await req.json();
+    let importData: any = null;
+    const contentType = req.headers.get('content-type') || '';
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const file = formData.get('file') as File | null;
+      if (!file) {
+        return NextResponse.json({ error: 'No backup file uploaded' }, { status: 400 });
+      }
+      const text = await file.text();
+      importData = JSON.parse(text);
+    } else {
+      importData = await req.json();
+    }
+
+    if (!importData || typeof importData !== 'object') {
+      return NextResponse.json({ error: 'Invalid JSON format in backup file' }, { status: 400 });
+    }
+
     const pool = await getPool();
     const conn = await pool.getConnection();
 

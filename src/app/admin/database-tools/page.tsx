@@ -56,22 +56,31 @@ export default function DatabaseToolsPage() {
     showToast({ title: "Importing Database", description: "Wiping existing tables and restoring data..." });
 
     try {
-      const fileContent = await dbFile.text();
-      const importData = JSON.parse(fileContent);
+      const formData = new FormData();
+      formData.append('file', dbFile);
 
       const response = await fetch('/api/admin/database/import', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(importData)
+        body: formData
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Database import failed");
+      const resText = await response.text();
+      let resJson: any = {};
+      try {
+        resJson = JSON.parse(resText);
+      } catch {
+        if (resText.includes('413') || resText.toLowerCase().includes('too large')) {
+          throw new Error("File too large for Nginx (max 1MB). Increase client_max_body_size in Nginx.");
+        }
+        throw new Error("Server returned HTML error page instead of JSON.");
+      }
+
+      if (!response.ok || !resJson.success) {
+        throw new Error(resJson.error || "Database import failed");
       }
 
       await triggerRefresh('global-cache');
-      showToast({ title: "Import Successful", description: "All database tables restored successfully." });
+      showToast({ title: "Import Successful", description: `Restored ${resJson.count || 0} table records successfully.` });
       setDbFile(null);
       const fileInput = document.getElementById('db-file-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
