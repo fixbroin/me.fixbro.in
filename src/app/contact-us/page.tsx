@@ -49,9 +49,14 @@ export default async function ContactUsPage() {
   const pageData = await getContentPageData(PAGE_SLUG);
 
   // Load App Settings for working hours
-  const appConfigSnap = await adminDb.collection("webSettings").doc("applicationConfig").get();
-  const appConfig = appConfigSnap.data() || {};
-  const timeSlotSettings = appConfig.timeSlotSettings || {};
+  let timeSlotSettings: any = {};
+  try {
+    const appConfigSnap = await adminDb.collection("webSettings").doc("applicationConfig").get();
+    const appConfig = appConfigSnap.data() || {};
+    timeSlotSettings = appConfig.timeSlotSettings || {};
+  } catch (dbErr) {
+    console.warn("ContactUsPage: Could not load applicationConfig from DB, using defaults:", dbErr);
+  }
   
   const defaultWeeklyAvailability = {
     monday: { isEnabled: true, startTime: "09:00", endTime: "17:00", intervals: [{ startTime: "09:00", endTime: "17:00" }] },
@@ -69,12 +74,17 @@ export default async function ContactUsPage() {
   };
 
   // Load Leaves (active and upcoming)
-  const todayISO = new Date().toLocaleDateString('en-CA');
-  const leavesSnap = await adminDb.collection("leaves")
-      .where("endDate", ">=", todayISO)
-      .get();
+  let leavesSnap: any = { docs: [] };
+  try {
+    const todayISO = new Date().toLocaleDateString('en-CA');
+    leavesSnap = await adminDb.collection("leaves")
+        .where("endDate", ">=", todayISO)
+        .get();
+  } catch (e) {
+    console.warn("ContactUsPage: Could not load leaves from DB:", e);
+  }
   const leaves = leavesSnap.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .map((doc: any) => ({ id: doc.id, ...doc.data() }))
       .sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
 
   if (!pageData) {
