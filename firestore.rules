@@ -1,0 +1,128 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- HELPER FUNCTIONS ---
+    function isAuthenticated() { return request.auth != null; }
+    function isAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.status == 'active';
+    }
+    function isSuperAdmin() {
+      return isAdmin() && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'super_admin';
+    }
+
+    // --- 1. PUBLIC CONTENT (Readable by everyone) ---
+    match /adminCategories/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /adminSubCategories/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /adminServices/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /adminTaxes/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /adminSlideshows/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /adminPopups/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /adminFAQs/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /blogPosts/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /adminReviews/{id} { 
+      allow read: if true; 
+      allow create: if isAdmin() || (isAuthenticated() && request.resource.data.userId == request.auth.uid); 
+      allow update, delete: if isAdmin(); 
+    }
+    match /cities/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /areas/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /serviceZones/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /adminPromoCodes/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /webSettings/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /contentPages/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /providerControlOptions/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /appConfiguration/{id} { allow read: if true; allow write: if isSuperAdmin(); }
+
+    // --- 2. USER & PROVIDER SPECIFIC ACCESS ---
+    match /users/{userId} {
+      allow read: if isAuthenticated(); // Needed for chat & profile lookup
+      allow write: if (isAuthenticated() && request.auth.uid == userId) || isAdmin();
+    }
+    match /userCarts/{userId} {
+      allow read, write: if (isAuthenticated() && request.auth.uid == userId) || isAdmin();
+    }
+    match /quotations/{id} {
+      allow read, write: if isAdmin() || (isAuthenticated() && (resource.data.providerId == request.auth.uid || resource.data.userId == request.auth.uid || request.resource.data.providerId == request.auth.uid));
+    }
+    match /invoices/{id} {
+      allow read, write: if isAdmin() || (isAuthenticated() && (resource.data.providerId == request.auth.uid || resource.data.userId == request.auth.uid || request.resource.data.providerId == request.auth.uid));
+    }
+    match /referrals/{id} {
+      allow read: if (isAuthenticated() && (resource.data.referrerId == request.auth.uid || resource.data.referredUserId == request.auth.uid)) || isAdmin();
+      allow write: if isAdmin();
+    }
+    match /providerApplications/{id} { 
+      allow read: if true; // Publicly readable for serviceability checks
+      allow write: if isAdmin() || (isAuthenticated() && request.auth.uid == id); 
+    }
+    match /withdrawalRequests/{id} {
+      allow read: if isAdmin() || (isAuthenticated() && (resource.data.providerId == request.auth.uid || resource.data.userId == request.auth.uid));
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+    match /bookings/{bookingId} {
+      allow read: if isAdmin() || (isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.providerId == request.auth.uid));
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || (isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.providerId == request.auth.uid));
+      allow delete: if isAdmin();
+    }
+
+    // --- 3. CHAT SYSTEM ---
+    match /chats/{chatId} {
+      allow read, update: if isAdmin() || (isAuthenticated() && request.auth.uid in resource.data.participants);
+      allow create: if isAuthenticated();
+      
+      match /messages/{messageId} {
+        allow read, write: if isAdmin() || (isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants);
+      }
+      
+      match /{allSubcollections=**} {
+        allow read, write: if isAdmin() || (isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants);
+      }
+    }
+
+    // --- 4. LOGGING, FORMS & TRACKING ---
+    match /userActivities/{id} { allow create: if true; allow read, write: if isAdmin(); }
+    match /visitorInfoLogs/{id} { allow create: if true; allow read, write: if isAdmin(); }
+    match /searchHotspots/{id} { allow create: if true; allow read, write: if isAdmin(); }
+    match /searchAnalytics/{id} { allow create: if true; allow read, write: if isAdmin(); }
+    match /popupSubmissions/{id} { allow create: if true; allow read, write: if isAdmin(); }
+    match /contactUsSubmissions/{id} { allow create: if true; allow read, write: if isAdmin(); }
+    match /emailLogs/{id} { allow read, write: if isAdmin(); }
+    match /outOfZoneRequests/{id} { allow create: if true; allow read, write: if isAdmin(); }
+    match /systemStats/{id} { allow read: if isAdmin(); allow write: if isAuthenticated(); }
+
+    match /customServiceRequests/{id} {
+      allow create: if true;
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+    match /userNotifications/{id} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated(); 
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+    }
+
+    // --- 5. ADMINS ONLY ---
+    match /admins/{adminId} {
+      allow read: if isAuthenticated() && (request.auth.uid == adminId || isAdmin());
+      allow write: if isSuperAdmin() || (request.auth.token.email == "fixbro.in@gmail.com" && request.auth.uid == adminId);
+    }
+
+    // --- 6. DEFAULT FALLBACK ---
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // --- 7. COLLECTION GROUP QUERIES ---
+    match /{path=**}/bookings/{bookingId} {
+      allow read: if isAdmin() || (isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.providerId == request.auth.uid));
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || (isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.providerId == request.auth.uid));
+      allow delete: if isAdmin();
+    }
+  }
+}

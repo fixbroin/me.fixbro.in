@@ -1,0 +1,776 @@
+import mysql from 'mysql2/promise';
+import { Timestamp, isTimestamp } from './timestamp';
+export { Timestamp };
+
+const host = process.env.MYSQL_HOST || 'localhost';
+const user = process.env.MYSQL_USER || 'root';
+const password = process.env.MYSQL_PASSWORD || '';
+const databaseName = process.env.MYSQL_DATABASE || 'fixbro_db';
+const port = parseInt(process.env.MYSQL_PORT || '3306', 10);
+
+let poolPromise: Promise<mysql.Pool> | null = null;
+let isInitialized = false;
+
+const TABLES = [
+  'adminCategories',
+  'adminSubCategories',
+  'adminServices',
+  'userCarts',
+  'bookings',
+  'users',
+  'adminSlideshows',
+  'webSettings',
+  'appConfiguration',
+  'contentPages',
+  'adminFAQs',
+  'adminReviews',
+  'timeSlotCategoryLimits',
+  'adminPromoCodes',
+  'taxes',
+  'visitorInfoLogs',
+  'userActivities',
+  'chats',
+  'chats_messages',
+  'userNotifications',
+  'adminPopups',
+  'admins',
+  'providerApplications',
+  'withdrawalRequests',
+  'blogPosts',
+  'contactUsSubmissions',
+  'popupSubmissions',
+  'cityCategorySeoSettings',
+  'areaCategorySeoSettings',
+  'areaServiceSeoSettings',
+  'quotations',
+  'invoices',
+  'serviceZones',
+  'referrals',
+  'pinCodeAreaMappings',
+  'cities',
+  'areas',
+  'searchAnalytics',
+  'leaves',
+  'seoSettings'
+];
+
+/**
+ * Gets or creates the MySQL pool, ensuring the database and tables are initialized.
+ */
+export async function getPool(): Promise<mysql.Pool> {
+  const globalPool = (globalThis as any)._mysqlPool as mysql.Pool | undefined;
+  if (globalPool) return globalPool;
+
+  if (poolPromise) return poolPromise;
+
+  poolPromise = (async () => {
+    try {
+      // Create the connection pool with the database selected directly (saves connection quota)
+      const newPool = mysql.createPool({
+        host,
+        user,
+        password,
+        database: databaseName,
+        port,
+        connectTimeout: 15000,
+        waitForConnections: true,
+        connectionLimit: 4,
+        maxIdle: 4,
+        idleTimeout: 60000,
+        queueLimit: 0,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10000
+      });
+
+      // Run auto-initialization for tables
+      await initializeDatabase(newPool);
+
+      (globalThis as any)._mysqlPool = newPool;
+      return newPool;
+    } catch (error) {
+      poolPromise = null;
+      console.error("Failed to connect to MySQL database:", error);
+      throw error;
+    }
+  })();
+
+  return poolPromise;
+}
+
+/**
+ * Creates any missing tables with the standardized JSON document schema.
+ */
+async function initializeDatabase(p: mysql.Pool) {
+  if (isInitialized) return;
+
+  try {
+    for (const table of TABLES) {
+      const createTableQuery = `
+        CREATE TABLE IF NOT EXISTS \`${table}\` (
+          \`id\` VARCHAR(255) NOT NULL,
+          \`parent_id\` VARCHAR(255) DEFAULT NULL,
+          \`data\` JSON NOT NULL,
+          \`createdAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          \`updatedAt\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (\`id\`),
+          INDEX \`idx_created_at\` (\`createdAt\`),
+          INDEX \`idx_parent_id\` (\`parent_id\`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `;
+      await p.query(createTableQuery);
+    }
+    isInitialized = true;
+    console.log("MySQL Database & Tables initialized successfully.");
+  } catch (error) {
+    console.error("Error during table initialization:", error);
+    throw error;
+  }
+}
+
+async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, table: string) {
+  console.log(`Seeding default demo data for empty table: ${table}`);
+  
+  const insert = async (id: string, parentId: string | null, data: any) => {
+    const serializedData = { ...data, id };
+    await conn.query(
+      `INSERT INTO \`${table}\` (\`id\`, \`parent_id\`, \`data\`) VALUES (?, ?, ?)`,
+      [id, parentId, JSON.stringify(serializedData)]
+    );
+  };
+
+  try {
+    switch (table) {
+      case 'cities':
+        await insert('kochi', null, { name: 'Kochi', slug: 'kochi', isActive: true });
+        await insert('bangalore', null, { name: 'Bangalore', slug: 'bangalore', isActive: true });
+        break;
+
+      case 'areas':
+        await insert('edapally', 'kochi', { name: 'Edapally', slug: 'edapally', parentId: 'kochi', isActive: true });
+        await insert('kakkanad', 'kochi', { name: 'Kakkanad', slug: 'kakkanad', parentId: 'kochi', isActive: true });
+        await insert('electronic-city', 'bangalore', { name: 'Electronic City', slug: 'electronic-city', parentId: 'bangalore', isActive: true });
+        await insert('hsr-layout', 'bangalore', { name: 'HSR Layout', slug: 'hsr-layout', parentId: 'bangalore', isActive: true });
+        break;
+
+      case 'adminCategories':
+        await insert('cleaning', null, { name: 'Cleaning', slug: 'cleaning', order: 1, isActive: true, imageUrl: '/uploads/categories/cleaning.png', iconUrl: '/uploads/categories/cleaning-icon.png' });
+        await insert('plumbing', null, { name: 'Plumbing', slug: 'plumbing', order: 2, isActive: true, imageUrl: '/uploads/categories/plumbing.png', iconUrl: '/uploads/categories/plumbing-icon.png' });
+        await insert('electrical', null, { name: 'Electrical', slug: 'electrical', order: 3, isActive: true, imageUrl: '/uploads/categories/electrical.png', iconUrl: '/uploads/categories/electrical-icon.png' });
+        break;
+
+      case 'adminSubCategories':
+        await insert('home-cleaning', null, { parentId: 'cleaning', name: 'Home Cleaning', slug: 'home-cleaning', order: 1, isActive: true });
+        await insert('pipe-repair', null, { parentId: 'plumbing', name: 'Pipe Repair', slug: 'pipe-repair', order: 1, isActive: true });
+        await insert('fan-installation', null, { parentId: 'electrical', name: 'Fan Installation', slug: 'fan-installation', order: 1, isActive: true });
+        break;
+
+      case 'adminServices':
+        await insert('deep-cleaning', null, { subCategoryId: 'home-cleaning', name: 'Deep House Cleaning', slug: 'deep-cleaning', description: 'Full deep cleaning of 2BHK/3BHK homes.', price: 2999, discountPrice: 2499, isActive: true, rating: 4.8, totalRatings: 25, durationMinutes: 240, imageUrl: '/uploads/services/deep-cleaning.png' });
+        await insert('pipe-fix', null, { subCategoryId: 'pipe-repair', name: 'Leaking Pipe Repair', slug: 'pipe-fix', description: 'Fixing standard household pipe leaks.', price: 399, discountPrice: 299, isActive: true, rating: 4.6, totalRatings: 18, durationMinutes: 60, imageUrl: '/uploads/services/pipe-fix.png' });
+        await insert('fan-install', null, { subCategoryId: 'fan-installation', name: 'Ceiling Fan Installation', slug: 'fan-install', description: 'Mounting and connecting standard ceiling fan.', price: 249, discountPrice: 199, isActive: true, rating: 4.7, totalRatings: 32, durationMinutes: 45, imageUrl: '/uploads/services/fan-install.png' });
+        break;
+
+      case 'admins':
+        await insert('superadmin', null, { email: 'fixbro.in@gmail.com', name: 'Super Admin', role: 'superadmin', permissions: ['all'], isActive: true });
+        break;
+
+      case 'appConfiguration':
+        await insert('stats', null, {
+          totalBookings: 0,
+          completedBookings: 0,
+          totalRevenue: 0,
+          earnedCommission: 0,
+          totalUsers: 0,
+          newSignups30d: 0,
+          lastUserNumber: 1000,
+          lastBookingNumber: 1000,
+          totalDiscountGiven: 0
+        });
+        break;
+
+      case 'webSettings':
+        await insert('global', null, {
+          websiteName: "FixBro",
+          contactEmail: "support@fixbro.in",
+          contactMobile: "+917353113455",
+          address: "#44 Electronic City Phase 2, Bangalore - 560100",
+          logoUrl: "/android-chrome-512x512.png",
+          faviconUrl: "/favicon.ico",
+          websiteIconUrl: "/android-chrome-512x512.png",
+          socialMediaLinks: {
+            facebook: "https://facebook.com/fixbro.in",
+            instagram: "https://instagram.com/fixbro.in",
+            twitter: "https://x.com/fixbro_in"
+          },
+          themeColors: {
+            light: {
+              primary: "221.2 83.2% 53.3%",
+              background: "0 0% 100%",
+              foreground: "222.2 84% 4.9%",
+              card: "0 0% 100%",
+              cardForeground: "222.2 84% 4.9%",
+              popover: "0 0% 100%",
+              popoverForeground: "222.2 84% 4.9%",
+              primaryForeground: "210 40% 98%",
+              secondary: "210 40% 96.1%",
+              secondaryForeground: "222.2 47.4% 11.2%",
+              muted: "210 40% 96.1%",
+              mutedForeground: "215.4 16.3% 46.9%",
+              accent: "210 40% 96.1%",
+              accentForeground: "222.2 47.4% 11.2%",
+              destructive: "0 84.2% 60.2%",
+              destructiveForeground: "210 40% 98%",
+              border: "214.3 31.8% 91.4%",
+              input: "214.3 31.8% 91.4%",
+              ring: "221.2 83.2% 53.3%",
+              radius: "0.5rem"
+            },
+            dark: {
+              primary: "217.2 91.2% 59.8%",
+              background: "222.2 84% 4.9%",
+              foreground: "210 40% 98%",
+              card: "222.2 84% 4.9%",
+              cardForeground: "210 40% 98%",
+              popover: "222.2 84% 4.9%",
+              popoverForeground: "210 40% 98%",
+              primaryForeground: "222.2 47.4% 11.2%",
+              secondary: "217.2 32.6% 17.5%",
+              secondaryForeground: "210 40% 98%",
+              muted: "217.2 32.6% 17.5%",
+              mutedForeground: "215 20.2% 65.1%",
+              accent: "217.2 32.6% 17.5%",
+              accentForeground: "210 40% 98%",
+              destructive: "0 62.8% 30.6%",
+              destructiveForeground: "210 40% 98%",
+              border: "217.2 32.6% 17.5%",
+              input: "217.2 32.6% 17.5%",
+              ring: "224.3 76.3% 48%",
+              radius: "0.5rem"
+            }
+          },
+          loaderType: "pulse",
+          isChatEnabled: true,
+          isAiChatBotEnabled: false,
+          chatNotificationSoundUrl: "/sounds/default-notification.mp3",
+          isCookieConsentEnabled: false,
+          cookieConsentMessage: "We use cookies to improve your experience. By continuing, you agree to our Cookie Policy.",
+          cookiePolicyContent: "<p>Our Cookie Policy details will be updated here soon.</p>"
+        });
+        await insert('applicationConfig', null, {
+          smtpHost: "smtp.gmail.com",
+          smtpPort: "465",
+          smtpUser: "fixbro.in@gmail.com",
+          smtpPass: "your_app_password_here",
+          senderEmail: "fixbro.in@gmail.com",
+          razorpayKeyId: "rzp_test_key_here",
+          razorpayKeySecret: "rzp_secret_here",
+          commissionPercentage: 15,
+          referralBonusReferrer: 100,
+          referralBonusReferred: 50,
+          smsGatewayApiKey: "",
+          fcmServerKey: ""
+        });
+        await insert('referralSettings', null, {
+          referrerBonus: 100,
+          referredBonus: 50,
+          minWithdrawalLimit: 500,
+          isActive: true
+        });
+        await insert('withdrawalSettings', null, {
+          minWithdrawalLimit: 500,
+          isActive: true
+        });
+        await insert('chatSettings', null, {
+          isAiBotEnabled: false,
+          botGreetingMessage: "Hello! Welcome to FixBro. How can we help you today?",
+          supportWorkingHours: "9:00 AM - 6:00 PM"
+        });
+        await insert('whatsappSettings', null, {
+          apiUrl: "https://api.whatsapp.com/send",
+          accessToken: "",
+          phoneNumberId: "",
+          businessAccountId: "",
+          isActive: false
+        });
+        await insert('seo', null, {
+          title: "FixBro | Premium Home Services on Demand",
+          description: "Book certified professionals for cleaning, plumbing, electrical, and other premium home services.",
+          keywords: "home services, cleaning service, plumber, electrician, fixbro",
+          ogImage: "/android-chrome-512x512.png"
+        });
+        await insert('loginSettings', null, {
+          allowSocialLogin: true,
+          requireEmailVerification: false,
+          maxLoginAttempts: 5
+        });
+        break;
+
+      case 'adminFAQs':
+        await insert('faq1', null, { question: 'How do I book a service?', answer: 'You can choose a category, select a service, specify your location, select a time slot, and make payment to book.', order: 1, isActive: true });
+        await insert('faq2', null, { question: 'What are your service timings?', answer: 'We offer services from 8:00 AM to 8:00 PM every day.', order: 2, isActive: true });
+        break;
+
+      case 'adminReviews':
+        await insert('review1', null, { customerName: 'Siddharth R.', serviceId: 'deep-cleaning', rating: 5, comment: 'Fantastic service! The cleaners were extremely professional.', date: '2026-07-15' });
+        await insert('review2', null, { customerName: 'Ananya M.', serviceId: 'pipe-fix', rating: 4, comment: 'Fixed my leaking kitchen tap within 30 minutes. Good plumber.', date: '2026-07-18' });
+        break;
+
+      case 'contentPages':
+        await insert('about-us', null, { slug: 'about-us', title: 'About Us', content: '<h1>About FixBro</h1><p>FixBro is India\'s premium on-demand home services platform...</p>', isActive: true });
+        await insert('terms-and-conditions', null, { slug: 'terms-and-conditions', title: 'Terms & Conditions', content: '<h1>Terms & Conditions</h1><p>Please read these terms carefully before booking...</p>', isActive: true });
+        await insert('privacy-policy', null, { slug: 'privacy-policy', title: 'Privacy Policy', content: '<h1>Privacy Policy</h1><p>We respect your privacy and protect your data...</p>', isActive: true });
+        break;
+
+      case 'adminSlideshows':
+        await insert('slide1', null, { title: 'Premium Cleaning Services', description: 'Get 20% off on your first deep home cleaning.', imageUrl: '/uploads/slideshows/slide1.png', linkUrl: '/category/cleaning', order: 1, isActive: true });
+        await insert('slide2', null, { title: 'Certified Plumbers', description: 'Fix pipe leaks, taps and blockages quickly.', imageUrl: '/uploads/slideshows/slide2.png', linkUrl: '/category/plumbing', order: 2, isActive: true });
+        break;
+
+      case 'adminPromoCodes':
+        await insert('FIXBRO20', null, { code: 'FIXBRO20', type: 'percentage', value: 20, minOrderValue: 500, maxDiscountAmount: 200, isActive: true, usageLimit: 100, usageCount: 0 });
+        break;
+      case 'taxes':
+        await insert('gst', null, { name: 'GST', rate: 18, type: 'percentage', isActive: true });
+        break;
+
+      case 'seoSettings': {
+        const { defaultSeoValues } = require('./seoUtils');
+        await insert('global', null, defaultSeoValues);
+        break;
+      }
+
+      default:
+        break;
+    }
+  } catch (error) {
+    console.error(`Failed to seed demo data for table ${table}:`, error);
+  }
+}
+// Helpers for serializing/deserializing Timestamp objects to/from JSON
+
+/**
+ * Recursively scans an object, converting Timestamps/Dates into standard JSON-serializable structures.
+ */
+export function serializeDbData(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+
+  if (obj instanceof Date) {
+    return { _seconds: Math.floor(obj.getTime() / 1000), _nanoseconds: 0, _isTimestamp: true };
+  }
+
+  if (isTimestamp(obj)) {
+    const s = typeof obj.seconds === 'number' ? obj.seconds : obj._seconds;
+    const ns = typeof obj.nanoseconds === 'number' ? obj.nanoseconds : obj._nanoseconds;
+    return { _seconds: s, _nanoseconds: ns, _isTimestamp: true };
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(serializeDbData);
+  }
+
+  if (typeof obj === 'object') {
+    const serialized: any = {};
+    for (const key of Object.keys(obj)) {
+      serialized[key] = serializeDbData(obj[key]);
+    }
+    return serialized;
+  }
+
+  return obj;
+}
+
+/**
+ * Recursively scans an object, reconstructing Timestamp classes from serialized Timestamp structures.
+ */
+export function deserializeDbData(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+
+  if (typeof obj === 'object') {
+    if (obj._isTimestamp === true || (typeof obj._seconds === 'number' && typeof obj._nanoseconds === 'number')) {
+      return { _seconds: obj._seconds, _nanoseconds: obj._nanoseconds, _isTimestamp: true };
+    }
+    if (typeof obj.seconds === 'number' && typeof obj.nanoseconds === 'number' && Object.keys(obj).length === 2) {
+      return { _seconds: obj.seconds, _nanoseconds: obj.nanoseconds, _isTimestamp: true };
+    }
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(deserializeDbData);
+  }
+
+  if (typeof obj === 'object') {
+    const deserialized: any = {};
+    for (const key of Object.keys(obj)) {
+      deserialized[key] = deserializeDbData(obj[key]);
+    }
+    return deserialized;
+  }
+
+  return obj;
+}
+
+/**
+ * Gets a clean table name from path segments. Handles subcollections by joining with underscore.
+ * e.g., "chats/123/messages" -> table: "chats_messages", parent_id: "123"
+ */
+export function resolvePath(path: string): { table: string; docId: string | null; parentId: string | null } {
+  const parts = path.split('/').filter(Boolean);
+  let tableName = parts[0] || path;
+  if (tableName === 'adminTaxes') tableName = 'taxes';
+
+  if (parts.length === 1) {
+    return { table: tableName, docId: null, parentId: null };
+  }
+  if (parts.length === 2) {
+    return { table: tableName, docId: parts[1], parentId: null };
+  }
+  if (parts.length === 3) {
+    return { table: `${parts[0]}_${parts[2]}`, docId: null, parentId: parts[1] };
+  }
+  if (parts.length >= 4) {
+    return { table: `${parts[0]}_${parts[2]}`, docId: parts.slice(3).join('/'), parentId: parts[1] };
+  }
+  return { table: tableName, docId: null, parentId: null };
+}
+
+// Database query runners implementing Firestore interfaces on MySQL
+export async function getDocInternal(conn: mysql.PoolConnection | mysql.Pool, path: string, docIdInput?: string) {
+  const resolved = resolvePath(docIdInput ? `${path}/${docIdInput}` : path);
+  if (!resolved.docId) {
+    return { exists: false, data: null };
+  }
+
+  const [rows]: any = await conn.query(
+    `SELECT \`data\` FROM \`${resolved.table}\` WHERE \`id\` = ? LIMIT 1`,
+    [resolved.docId]
+  );
+
+  if (rows.length === 0) {
+    return { exists: false, data: null };
+  }
+
+  const rawData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+  return {
+    exists: true,
+    data: deserializeDbData(rawData)
+  };
+}
+
+function jsonExtractText(field: string): string {
+  return `JSON_UNQUOTE(JSON_EXTRACT(\`data\`, '$.${field}'))`;
+}
+
+function jsonExtractRaw(field: string): string {
+  return `JSON_EXTRACT(\`data\`, '$.${field}')`;
+}
+
+export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, path: string, constraints: any[] = []) {
+  const resolved = resolvePath(path);
+  let sql = `SELECT \`id\`, \`data\` FROM \`${resolved.table}\``;
+  const whereClauses: string[] = [];
+  const params: any[] = [];
+
+  // Filter subcollections by parent_id automatically
+  if (resolved.parentId) {
+    whereClauses.push('`parent_id` = ?');
+    params.push(resolved.parentId);
+  }
+
+  let orderByClause = '';
+  let limitClause = '';
+  let offsetClause = '';
+
+  const parseConstraint = (c: any) => {
+    if (!c) return;
+    if (c.type === 'where') {
+      const field = c.field;
+      const op = c.op;
+      const value = serializeDbData(c.value);
+
+      // Handle document id filter
+      if (field === 'id' || field === 'uid' || field === '__name__') {
+        if (op === '==' || op === 'compare') {
+          whereClauses.push('`id` = ?');
+          params.push(value);
+        } else if (op === 'in') {
+          const list = Array.isArray(value) ? value : [value];
+          whereClauses.push(`\`id\` IN (${list.map(() => '?').join(', ')})`);
+          params.push(...list);
+        }
+        return;
+      }
+
+      // Translate filter to JSON path
+      if (op === '==') {
+        if (typeof value === 'boolean') {
+          whereClauses.push(`${jsonExtractText(field)} = ?`);
+          params.push(value ? 'true' : 'false');
+        } else if (value === null) {
+          whereClauses.push(`${jsonExtractText(field)} IS NULL`);
+        } else {
+          whereClauses.push(`${jsonExtractText(field)} = ?`);
+          params.push(String(value));
+        }
+      } else if (op === '!=') {
+        whereClauses.push(`${jsonExtractText(field)} != ?`);
+        params.push(String(value));
+      } else if (op === '<') {
+        if (typeof value === 'number') {
+          whereClauses.push(`CAST(${jsonExtractText(field)} AS DECIMAL(15,4)) < ?`);
+        } else {
+          whereClauses.push(`${jsonExtractText(field)} < ?`);
+        }
+        params.push(value);
+      } else if (op === '<=') {
+        if (typeof value === 'number') {
+          whereClauses.push(`CAST(${jsonExtractText(field)} AS DECIMAL(15,4)) <= ?`);
+        } else {
+          whereClauses.push(`${jsonExtractText(field)} <= ?`);
+        }
+        params.push(value);
+      } else if (op === '>') {
+        if (typeof value === 'number') {
+          whereClauses.push(`CAST(${jsonExtractText(field)} AS DECIMAL(15,4)) > ?`);
+        } else {
+          whereClauses.push(`${jsonExtractText(field)} > ?`);
+        }
+        params.push(value);
+      } else if (op === '>=') {
+        if (typeof value === 'number') {
+          whereClauses.push(`CAST(${jsonExtractText(field)} AS DECIMAL(15,4)) >= ?`);
+        } else {
+          whereClauses.push(`${jsonExtractText(field)} >= ?`);
+        }
+        params.push(value);
+      } else if (op === 'array-contains') {
+        whereClauses.push(`JSON_CONTAINS(${jsonExtractRaw(field)}, ?)`);
+        params.push(typeof value === 'string' ? JSON.stringify(value) : value);
+      } else if (op === 'in') {
+        const list = Array.isArray(value) ? value : [value];
+        whereClauses.push(`${jsonExtractText(field)} IN (${list.map(() => '?').join(', ')})`);
+        params.push(...list.map(v => String(v)));
+      } else if (op === 'array-contains-any') {
+        const list = Array.isArray(value) ? value : [value];
+        const subQueries = list.map(() => `JSON_CONTAINS(${jsonExtractRaw(field)}, ?)`).join(' OR ');
+        whereClauses.push(`(${subQueries})`);
+        params.push(...list.map(v => typeof v === 'string' ? JSON.stringify(v) : v));
+      }
+    } else if (c.type === 'orderBy') {
+      const field = c.field;
+      const direction = c.direction || 'asc';
+      if (field === 'createdAt' || field === 'updatedAt') {
+        orderByClause = ` ORDER BY \`${field}\` ${direction.toUpperCase()}`;
+      } else if (['order', 'price', 'rating', 'reviewCount', 'discountedPrice', 'minQuantity', 'maxQuantity'].includes(field)) {
+        orderByClause = ` ORDER BY CAST(${jsonExtractText(field)} AS SIGNED) ${direction.toUpperCase()}`;
+      } else {
+        orderByClause = ` ORDER BY ${jsonExtractText(field)} ${direction.toUpperCase()}`;
+      }
+    } else if (c.type === 'limit') {
+      limitClause = ` LIMIT ?`;
+      params.push(c.value);
+    } else if (c.type === 'offset') {
+      offsetClause = ` OFFSET ?`;
+      params.push(c.value);
+    } else if (c.type === 'or') {
+      const orClauses: string[] = [];
+      for (const cond of c.conditions) {
+        const tempWhere: string[] = [];
+        if (cond.type === 'where') {
+          const f = cond.field;
+          const o = cond.op;
+          const val = serializeDbData(cond.value);
+          if (f === 'id' || f === 'uid' || f === '__name__') {
+            tempWhere.push('`id` = ?');
+            params.push(val);
+          } else if (o === '==') {
+            if (typeof val === 'boolean') {
+              tempWhere.push(`${jsonExtractText(f)} = ?`);
+              params.push(val ? 'true' : 'false');
+            } else {
+              tempWhere.push(`${jsonExtractText(f)} = ?`);
+              params.push(String(val));
+            }
+          } else if (o === 'array-contains') {
+            tempWhere.push(`JSON_CONTAINS(${jsonExtractRaw(f)}, ?)`);
+            params.push(typeof val === 'string' ? JSON.stringify(val) : val);
+          }
+        }
+        
+        if (tempWhere.length > 0) {
+          orClauses.push(tempWhere.join(' AND '));
+        }
+      }
+      if (orClauses.length > 0) {
+        whereClauses.push(`(${orClauses.join(' OR ')})`);
+      }
+    }
+  };
+
+  constraints.forEach(parseConstraint);
+
+  if (whereClauses.length > 0) {
+    sql += ` WHERE ${whereClauses.join(' AND ')}`;
+  }
+
+  sql += orderByClause;
+  if (limitClause) {
+    sql += limitClause;
+    if (offsetClause) sql += offsetClause;
+  } else if (offsetClause) {
+    sql += ` LIMIT 18446744073709551615${offsetClause}`;
+  }
+
+  const [rows]: any = await conn.query(sql, params);
+
+  return (rows || []).map((row: any) => {
+    const rawData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+    return {
+      id: row.id,
+      data: deserializeDbData(rawData)
+    };
+  });
+}
+
+function resolveFieldValues(target: any, source: any): any {
+  if (source === null || source === undefined) return source;
+
+  if (typeof source === 'object') {
+    if (source.type === 'arrayUnion' && Array.isArray(source.elements)) {
+      const arr = Array.isArray(target) ? [...target] : [];
+      for (const el of source.elements) {
+        const stringifiedEl = JSON.stringify(el);
+        if (!arr.some(item => JSON.stringify(item) === stringifiedEl)) {
+          arr.push(el);
+        }
+      }
+      return arr;
+    }
+
+    if (source.type === 'arrayRemove' && Array.isArray(source.elements)) {
+      const arr = Array.isArray(target) ? [...target] : [];
+      const elementsToRemove = source.elements.map((el: any) => JSON.stringify(el));
+      return arr.filter(item => !elementsToRemove.includes(JSON.stringify(item)));
+    }
+
+    if (source.type === 'deleteField') {
+      return undefined;
+    }
+
+    if (source.type === 'serverTimestamp') {
+      const now = new Date();
+      return { _seconds: Math.floor(now.getTime() / 1000), _nanoseconds: 0, _isTimestamp: true };
+    }
+
+    if (source.type === 'increment' && Array.isArray(source.elements)) {
+      return (Number(target) || 0) + (Number(source.elements[0]) || 0);
+    }
+  }
+
+  if (Array.isArray(source)) {
+    return source.map((item, idx) => resolveFieldValues(Array.isArray(target) ? target[idx] : undefined, item));
+  }
+
+  if (typeof source === 'object' && !isTimestamp(source)) {
+    const result = { ...(target || {}) };
+    for (const key of Object.keys(source)) {
+      const resolved = resolveFieldValues(result[key], source[key]);
+      if (resolved === undefined) {
+        delete result[key];
+      } else {
+        result[key] = resolved;
+      }
+    }
+    return result;
+  }
+
+  return source;
+}
+
+export async function addDocInternal(conn: mysql.PoolConnection | mysql.Pool, path: string, data: any) {
+  const resolved = resolvePath(path);
+  // Generate random id if not in data, or use existing
+  const docId = data.id || data.uid || require('nanoid').nanoid(20);
+  const resolvedData = resolveFieldValues(null, data);
+  const cleanData = { ...serializeDbData(resolvedData), id: docId };
+
+  await conn.query(
+    `INSERT INTO \`${resolved.table}\` (\`id\`, \`parent_id\`, \`data\`) VALUES (?, ?, ?)`,
+    [docId, resolved.parentId, JSON.stringify(cleanData)]
+  );
+
+  return { id: docId };
+}
+
+export async function setDocInternal(conn: mysql.PoolConnection | mysql.Pool, path: string, docIdInput: string, data: any, options: any = {}) {
+  const resolved = resolvePath(`${path}/${docIdInput}`);
+  const resolvedData = resolveFieldValues(null, data);
+  const cleanData = serializeDbData(resolvedData);
+
+  if (options.merge) {
+    // Merge with existing
+    const existing = await getDocInternal(conn, path, docIdInput);
+    if (existing.exists) {
+      const merged = resolveFieldValues(serializeDbData(existing.data), cleanData);
+      merged.id = resolved.docId;
+      await conn.query(
+        `INSERT INTO \`${resolved.table}\` (\`id\`, \`parent_id\`, \`data\`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE \`data\` = VALUES(\`data\`)`,
+        [resolved.docId, resolved.parentId, JSON.stringify(merged)]
+      );
+      return;
+    }
+  }
+
+  const finalData = { ...cleanData, id: resolved.docId };
+  await conn.query(
+    `INSERT INTO \`${resolved.table}\` (\`id\`, \`parent_id\`, \`data\`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE \`data\` = VALUES(\`data\`)`,
+    [resolved.docId, resolved.parentId, JSON.stringify(finalData)]
+  );
+}
+
+export async function updateDocInternal(conn: mysql.PoolConnection | mysql.Pool, path: string, docIdInput: string, data: any) {
+  const resolved = resolvePath(`${path}/${docIdInput}`);
+  const cleanData = serializeDbData(data);
+
+  const existing = await getDocInternal(conn, path, docIdInput);
+  const merged: any = existing.exists ? { ...serializeDbData(existing.data) } : {};
+  for (const key of Object.keys(cleanData)) {
+    // Support dot notation path updates e.g. "marketingStatus.welcomeSent"
+    if (key.includes('.')) {
+      const parts = key.split('.');
+      let current = merged;
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (!current[parts[i]]) current[parts[i]] = {};
+        current = current[parts[i]];
+      }
+      const lastKey = parts[parts.length - 1];
+      const resolvedVal = resolveFieldValues(current[lastKey], cleanData[key]);
+      if (resolvedVal === undefined) {
+        delete current[lastKey];
+      } else {
+        current[lastKey] = resolvedVal;
+      }
+    } else {
+      const resolvedVal = resolveFieldValues(merged[key], cleanData[key]);
+      if (resolvedVal === undefined) {
+        delete merged[key];
+      } else {
+        merged[key] = resolvedVal;
+      }
+    }
+  }
+
+  await conn.query(
+    `UPDATE \`${resolved.table}\` SET \`data\` = ? WHERE \`id\` = ?`,
+    [JSON.stringify(merged), resolved.docId]
+  );
+}
+
+export async function deleteDocInternal(conn: mysql.PoolConnection | mysql.Pool, path: string, docIdInput?: string) {
+  const resolved = resolvePath(docIdInput ? `${path}/${docIdInput}` : path);
+  if (!resolved.docId) return;
+
+  await conn.query(
+    `DELETE FROM \`${resolved.table}\` WHERE \`id\` = ?`,
+    [resolved.docId]
+  );
+}
