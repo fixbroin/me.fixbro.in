@@ -17,7 +17,7 @@ const EmailBookingServiceItemSchema = z.object({
   quantity: z.number(),
   pricePerUnit: z.number(),
   discountedPricePerUnit: z.number().optional(),
-  imageUrl: z.string().url().optional().nullable(),
+  imageUrl: z.string().optional().nullable(),
   total: z.number().optional(),
 });
 
@@ -57,14 +57,14 @@ const BookingConfirmationEmailInputSchema = z.object({
   smtpPort: z.string().optional(),
   smtpUser: z.string().optional(),
   smtpPass: z.string().optional(),
-  senderEmail: z.string().email().optional(),
+  senderEmail: z.string().optional(),
   emailType: z.enum(['booking_confirmation', 'booking_completion', 'booking_rescheduled', 'booking_cancelled_by_admin', 'booking_cancelled_by_user', 'booking_status_update']).optional().default('booking_confirmation'),
   invoicePdfBase64: z.string().optional(),
   previousScheduledDate: z.string().optional(),
   previousScheduledTimeSlot: z.string().optional(),
   cancellationReason: z.string().optional(),
   siteName: z.string().optional(),
-  logoUrl: z.string().url().optional(),
+  logoUrl: z.string().optional(),
 });
 
 export type BookingConfirmationEmailInput = z.infer<typeof BookingConfirmationEmailInputSchema>;

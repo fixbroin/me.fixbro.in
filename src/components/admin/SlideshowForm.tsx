@@ -54,9 +54,9 @@ interface SlideshowFormProps {
   isSubmitting?: boolean;
 }
 
-const isFirebaseStorageUrl = (url: string): boolean => {
+const isFirebaseStorageUrl = (url: string | null | undefined): boolean => {
   if (!url) return false;
-  return typeof url === 'string' && url.includes("firebasestorage.googleapis.com");
+  return typeof url === 'string' && url.trim().length > 0;
 };
 
 const generateRandomHexString = (length: number) => {

@@ -95,3 +95,62 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: error.message || 'Upload failed' }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { fileUrl } = await req.json();
+    if (!fileUrl || typeof fileUrl !== 'string') {
+      return NextResponse.json({ success: false, error: 'No fileUrl provided' }, { status: 400 });
+    }
+
+    // 1. Local VPS Disk Deletion
+    if (fileUrl.startsWith('/uploads/') || fileUrl.startsWith('uploads/')) {
+      const cleanPath = fileUrl.replace(/^\/?uploads\//, '');
+      const filePath = path.join(process.cwd(), 'public', 'uploads', cleanPath);
+      try {
+        await fs.unlink(filePath);
+      } catch (err) {
+        console.warn("Local file unlink note:", filePath, err);
+      }
+    }
+
+    // 2. Remote Shared Hosting Server Deletion
+    let driver = process.env.STORAGE_DRIVER || 'local';
+    let remoteUploadUrl = process.env.REMOTE_UPLOAD_URL || '';
+    let remoteSecretKey = process.env.REMOTE_SECRET_KEY || '';
+
+    try {
+      const storageDoc = await executeDbGetDoc('webSettings', 'storageConfiguration');
+      if (storageDoc && storageDoc.exists && storageDoc.data) {
+        if (storageDoc.data.driver) driver = storageDoc.data.driver;
+        if (storageDoc.data.remoteUploadUrl) remoteUploadUrl = storageDoc.data.remoteUploadUrl;
+        if (storageDoc.data.remoteSecretKey) remoteSecretKey = storageDoc.data.remoteSecretKey;
+      }
+    } catch (dbErr) {
+      console.warn("Could not load storageConfiguration from DB:", dbErr);
+    }
+
+    if (remoteUploadUrl && remoteUploadUrl.trim() !== '') {
+      try {
+        const remoteFormData = new FormData();
+        remoteFormData.append('action', 'delete');
+        remoteFormData.append('fileUrl', fileUrl);
+
+        await fetch(remoteUploadUrl.trim(), {
+          method: 'POST',
+          headers: {
+            'x-api-secret': remoteSecretKey
+          },
+          body: remoteFormData
+        });
+      } catch (remoteErr) {
+        console.error("Remote file deletion warning:", remoteErr);
+      }
+    }
+
+    return NextResponse.json({ success: true, message: 'File deletion processed' });
+  } catch (error: any) {
+    console.error("Delete handler error:", error);
+    return NextResponse.json({ success: false, error: error.message || 'Delete failed' }, { status: 500 });
+  }
+}

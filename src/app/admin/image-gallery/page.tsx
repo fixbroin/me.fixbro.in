@@ -17,6 +17,7 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, updateDoc, setDoc } from '@/lib/mysqlDb';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { compressImage } from '@/lib/imageCompressor';
+import { deleteObject } from '@/lib/mysqlStorage';
 import type { HomepageAd } from '@/types/firestore';
 
 export interface GalleryItem {
@@ -628,6 +629,15 @@ export default function AdminImageGalleryPage() {
 
       setUploadProgress(80);
       const newImageUrl = uploadData.url;
+
+      // Delete old image file from storage
+      if (selectedItem.imageUrl && selectedItem.imageUrl !== newImageUrl) {
+        try {
+          await deleteObject(selectedItem.imageUrl);
+        } catch (dErr) {
+          console.warn("Could not delete old image from storage:", dErr);
+        }
+      }
 
       // Update MySQL Document
       if (selectedItem.collectionName === 'webSettings' && selectedItem.docId === 'featuresConfiguration' && selectedItem.adId) {

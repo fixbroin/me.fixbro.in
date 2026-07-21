@@ -20,7 +20,7 @@ import PermissionGuard from '@/components/admin/PermissionGuard';
 import { useAuth } from '@/hooks/useAuth';
 import { hasActionPermission } from '@/config/rbac';
 
-const isFirebaseStorageUrl = (url: string | null | undefined): boolean => !!url && typeof url === 'string' && url.includes("firebasestorage.googleapis.com");
+const isFirebaseStorageUrl = (url: string | null | undefined): boolean => !!url && typeof url === 'string' && url.trim().length > 0;
 
 export default function AdminNewsletterPopupsPage() {
   const { adminPermissions } = useAuth();

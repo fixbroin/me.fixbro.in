@@ -22,9 +22,9 @@ const UserCancellationEmailInputSchema = z.object({
   smtpPort: z.string().optional().describe("SMTP port (e.g., '587', '465')."),
   smtpUser: z.string().optional().describe("SMTP username."),
   smtpPass: z.string().optional().describe("SMTP password."),
-  senderEmail: z.string().email().optional().describe("The email address to send from."),
+  senderEmail: z.string().optional().describe("The email address to send from."),
   siteName: z.string().optional().default("FixBro"),
-  logoUrl: z.string().url().optional(),
+  logoUrl: z.string().optional(),
 });
 
 export type UserCancellationEmailInput = z.infer<typeof UserCancellationEmailInputSchema>;

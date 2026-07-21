@@ -21,15 +21,15 @@ const NewCustomServiceRequestEmailInputSchema = z.object({
   category: z.string().describe("The category (pre-defined or custom) selected by the user."),
   minBudget: z.number().optional().nullable().describe("The minimum budget for the service."), // Added
   maxBudget: z.number().optional().nullable().describe("The maximum budget for the service."), // Added
-  adminUrl: z.string().url().describe("Direct URL to view the request in the admin panel."),
+  adminUrl: z.string().describe("Direct URL to view the request in the admin panel."),
   // SMTP Settings
   smtpHost: z.string().optional().describe("SMTP host for sending emails."),
   smtpPort: z.string().optional().describe("SMTP port (e.g., '587', '465')."),
   smtpUser: z.string().optional().describe("SMTP username."),
   smtpPass: z.string().optional().describe("SMTP password."),
-  senderEmail: z.string().email().optional().describe("The email address to send from."),
+  senderEmail: z.string().optional().describe("The email address to send from."),
   siteName: z.string().optional(),
-  logoUrl: z.string().url().optional(),
+  logoUrl: z.string().optional(),
 });
 
 export type NewCustomServiceRequestEmailInput = z.infer<typeof NewCustomServiceRequestEmailInputSchema>;
@@ -44,7 +44,8 @@ export async function sendNewCustomServiceRequestEmail(input: NewCustomServiceRe
 }
 
 const createHtmlTemplate = (title: string, bodyContent: string, siteName: string, logoUrl?: string) => {
-    const finalLogoUrl = logoUrl || `${getBaseUrl()}/default-image.png`;
+    const rawLogoUrl = logoUrl || `${getBaseUrl()}/android-chrome-512x512.png`;
+    const finalLogoUrl = rawLogoUrl.startsWith('http') ? rawLogoUrl : `${getBaseUrl()}${rawLogoUrl.startsWith('/') ? '' : '/'}${rawLogoUrl}`;
     return `
 <!DOCTYPE html>
 <html lang="en">

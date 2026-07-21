@@ -73,7 +73,7 @@ interface PopupFormProps {
   isSubmitting?: boolean;
 }
 
-const isFirebaseStorageUrl = (url: string | null | undefined): boolean => !!url && typeof url === 'string' && url.includes("firebasestorage.googleapis.com");
+const isFirebaseStorageUrl = (url: string | null | undefined): boolean => !!url && typeof url === 'string' && url.trim().length > 0;
 const isValidImageSrc = (url: string | null | undefined): url is string => {
     if (!url || url.trim() === '') return false;
     return url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('http:') || url.startsWith('https:') || url.startsWith('/');

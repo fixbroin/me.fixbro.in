@@ -32,9 +32,9 @@ const generateSlug = (name: string) => {
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 };
 
-const isFirebaseStorageUrl = (url: string): boolean => {
+const isFirebaseStorageUrl = (url: string | null | undefined): boolean => {
   if (!url) return false;
-  return typeof url === 'string' && url.includes("firebasestorage.googleapis.com");
+  return typeof url === 'string' && url.trim().length > 0;
 };
 
 export default function AdminServicesPage() {

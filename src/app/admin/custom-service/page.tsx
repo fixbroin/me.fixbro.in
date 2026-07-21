@@ -175,12 +175,20 @@ export default function CustomServiceAdminPage() {
     try {
       const requestToDelete = requests.find((r) => r.id === requestId);
       if (requestToDelete?.imageUrls && requestToDelete.imageUrls.length > 0) {
-        // Delete all uploaded images from Firebase Storage
+        // Delete all uploaded images (handles Local VPS, Remote Shared Hosting, and legacy Firebase Storage)
         await Promise.all(
           requestToDelete.imageUrls.map(async (url) => {
             try {
-              const imageRef = storageRef(storage, url);
-              await deleteObject(imageRef);
+              if (url.includes('firebasestorage.googleapis.com')) {
+                const imageRef = storageRef(storage, url);
+                await deleteObject(imageRef);
+              } else {
+                await fetch('/api/upload', {
+                  method: 'DELETE',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ fileUrl: url })
+                });
+              }
             } catch (err) {
               console.error("Failed to delete image from storage:", url, err);
             }

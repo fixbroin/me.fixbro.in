@@ -124,27 +124,31 @@ export async function getDownloadURL(refInstance: MySQLStorageRef): Promise<stri
   return refInstance.path;
 }
 
-export async function deleteObject(refInstance: MySQLStorageRef): Promise<void> {
-  let cleanUrl = refInstance.path;
+export async function deleteObject(refInstance: any): Promise<void> {
+  const targetUrl = typeof refInstance === 'string' 
+    ? refInstance 
+    : (refInstance?.path || refInstance?.name || String(refInstance || ''));
+    
+  if (!targetUrl || targetUrl.trim() === '') return;
+
+  let cleanUrl = targetUrl.trim();
   if (cleanUrl.startsWith('public/')) {
     cleanUrl = cleanUrl.replace(/^public\//, '/');
   }
-  
-  if (!cleanUrl.startsWith('/uploads/')) {
-    console.warn("deleteObject: skipped non-local upload path", refInstance.path);
-    return;
-  }
 
-  const res = await fetch('/api/delete-upload', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ url: cleanUrl })
-  });
-
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    throw new Error(data.error || 'Failed to delete file from local storage');
+  try {
+    const res = await fetch('/api/upload', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ fileUrl: cleanUrl })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      console.warn("deleteObject warning:", data?.error || 'Deletion warning');
+    }
+  } catch (err) {
+    console.error("deleteObject error:", err);
   }
 }

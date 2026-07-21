@@ -37,6 +37,24 @@ if (empty($providedSecret) || $providedSecret !== SECRET_KEY) {
     exit();
 }
 
+// Check for Delete Request
+if (isset($_POST['action']) && $_POST['action'] === 'delete') {
+    $fileUrl = isset($_POST['fileUrl']) ? trim($_POST['fileUrl']) : '';
+    if (!empty($fileUrl)) {
+        $parts = explode('/uploads/', $fileUrl);
+        if (count($parts) > 1) {
+            $relativePath = trim($parts[1], '/');
+            $cleanRelativePath = preg_replace('/[^a-zA-Z0-9_\-\.\/]/', '', $relativePath);
+            $targetFilePath = __DIR__ . '/uploads/' . $cleanRelativePath;
+            if (file_exists($targetFilePath) && is_file($targetFilePath)) {
+                @unlink($targetFilePath);
+            }
+        }
+    }
+    echo json_encode(['success' => true, 'message' => 'File deleted if existed']);
+    exit();
+}
+
 if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'No valid file uploaded']);
