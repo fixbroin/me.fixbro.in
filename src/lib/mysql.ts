@@ -591,33 +591,49 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
     } else if (c.type === 'offset') {
       offsetClause = ` OFFSET ?`;
       params.push(c.value);
+    } else if (c.type === 'and') {
+      if (Array.isArray(c.conditions)) {
+        c.conditions.forEach(parseConstraint);
+      }
     } else if (c.type === 'or') {
       const orClauses: string[] = [];
-      for (const cond of c.conditions) {
-        const tempWhere: string[] = [];
-        if (cond.type === 'where') {
-          const f = cond.field;
-          const o = cond.op;
-          const val = serializeDbData(cond.value);
-          if (f === 'id' || f === 'uid' || f === '__name__') {
-            tempWhere.push('`id` = ?');
-            params.push(val);
-          } else if (o === '==') {
-            if (typeof val === 'boolean') {
-              tempWhere.push(`${jsonExtractText(f)} = ?`);
-              params.push(val ? 'true' : 'false');
-            } else {
-              tempWhere.push(`${jsonExtractText(f)} = ?`);
-              params.push(String(val));
+      if (Array.isArray(c.conditions)) {
+        for (const cond of c.conditions) {
+          const tempWhere: string[] = [];
+          const tempParams: any[] = [];
+          
+          if (cond.type === 'where') {
+            const f = cond.field;
+            const o = cond.op;
+            const val = serializeDbData(cond.value);
+            if (f === 'id' || f === 'uid' || f === '__name__') {
+              tempWhere.push('`id` = ?');
+              tempParams.push(val);
+            } else if (o === '==') {
+              if (typeof val === 'boolean') {
+                tempWhere.push(`${jsonExtractText(f)} = ?`);
+                tempParams.push(val ? 'true' : 'false');
+              } else if (val === null) {
+                tempWhere.push(`${jsonExtractText(f)} IS NULL`);
+              } else {
+                tempWhere.push(`${jsonExtractText(f)} = ?`);
+                tempParams.push(String(val));
+              }
+            } else if (o === '!=') {
+              tempWhere.push(`${jsonExtractText(f)} != ?`);
+              tempParams.push(String(val));
+            } else if (o === 'array-contains') {
+              tempWhere.push(`JSON_CONTAINS(${jsonExtractRaw(f)}, ?)`);
+              tempParams.push(typeof val === 'string' ? JSON.stringify(val) : val);
             }
-          } else if (o === 'array-contains') {
-            tempWhere.push(`JSON_CONTAINS(${jsonExtractRaw(f)}, ?)`);
-            params.push(typeof val === 'string' ? JSON.stringify(val) : val);
+          } else if (cond.type === 'and') {
+            cond.conditions?.forEach(parseConstraint);
           }
-        }
-        
-        if (tempWhere.length > 0) {
-          orClauses.push(tempWhere.join(' AND '));
+          
+          if (tempWhere.length > 0) {
+            orClauses.push(tempWhere.join(' AND '));
+            params.push(...tempParams);
+          }
         }
       }
       if (orClauses.length > 0) {

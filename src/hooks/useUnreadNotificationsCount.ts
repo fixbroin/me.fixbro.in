@@ -35,43 +35,33 @@ export function useUnreadNotificationsCount(userIdOverride?: string): UseUnreadN
     setIsLoading(true);
     const notificationsCollectionRef = collection(db, "userNotifications");
     
-    let newQuery;
-
-    if (isSuperAdmin) {
-      // Super Admin sees everything
-      newQuery = query(
-        notificationsCollectionRef,
-        where("read", "==", false),
-        limit(20)
-      );
-    } else if (isAdmin) {
-      // Other admins see their own OR any admin alerts, but only unread ones
-      newQuery = query(
-        notificationsCollectionRef,
-        and(
-          or(
-            where("userId", "==", effectiveUserId),
-            where("type", "==", "admin_alert")
-          ),
-          where("read", "==", false)
-        ),
-        limit(20)
-      );
-    } else {
-      // Regular users only see their own unread
-      newQuery = query(
-        notificationsCollectionRef,
-        where("userId", "==", effectiveUserId),
-        where("read", "==", false),
-        limit(20)
-      );
-    }
+    // Simple, reliable query for all unread notifications (filtered in memory for absolute safety)
+    const newQuery = query(
+      notificationsCollectionRef,
+      where("read", "==", false),
+      limit(50)
+    );
 
     const unsubscribe = onSnapshot(newQuery, (querySnapshot) => {
-      setCount(querySnapshot.size);
-      setIsLoading(false);
+      try {
+        const docs = querySnapshot.docs.map(docSnap => docSnap.data());
+        const unreadCount = docs.filter((data: any) => {
+          if (data.read === true) return false;
+          if (isSuperAdmin) return true;
+          if (isAdmin) {
+            return data.userId === effectiveUserId || data.type === 'admin_alert';
+          }
+          return data.userId === effectiveUserId;
+        }).length;
+
+        setCount(unreadCount);
+      } catch (e) {
+        setCount(0);
+      } finally {
+        setIsLoading(false);
+      }
     }, (error) => {
-      console.error("Error fetching unread notifications count:", error);
+      console.warn("Error fetching unread notifications count:", error);
       setCount(0);
       setIsLoading(false);
     });

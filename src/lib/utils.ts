@@ -138,9 +138,14 @@ export function convertWallClockToUTC(wallClockDate: Date, timeZone: string = 'A
  */
 export function formatDateInTimezone(date: Date | string | number | undefined, timeZone: string = 'Asia/Kolkata', options: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' }): string {
     if (!date) return 'N/A';
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return String(date);
-    return new Intl.DateTimeFormat('en-IN', { ...options, timeZone }).format(d);
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return String(date);
+      const validTz = (timeZone && typeof timeZone === 'string' && timeZone.trim()) ? timeZone.trim() : 'Asia/Kolkata';
+      return new Intl.DateTimeFormat('en-IN', { ...options, timeZone: validTz }).format(d);
+    } catch (e) {
+      return String(date);
+    }
 }
 
 /**
@@ -148,9 +153,14 @@ export function formatDateInTimezone(date: Date | string | number | undefined, t
  */
 export function formatTimeInTimezone(date: Date | string | number | undefined, timeZone: string = 'Asia/Kolkata', options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: true }): string {
     if (!date) return 'N/A';
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return String(date);
-    return new Intl.DateTimeFormat('en-IN', { ...options, timeZone }).format(d);
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return String(date);
+      const validTz = (timeZone && typeof timeZone === 'string' && timeZone.trim()) ? timeZone.trim() : 'Asia/Kolkata';
+      return new Intl.DateTimeFormat('en-IN', { ...options, timeZone: validTz }).format(d);
+    } catch (e) {
+      return String(date);
+    }
 }
 
 /**

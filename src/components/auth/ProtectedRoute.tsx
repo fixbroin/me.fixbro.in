@@ -71,6 +71,9 @@ const ProtectedRoute: React.FC<PropsWithChildren> = ({ children }) => {
       }
     } else { // User is logged in
       if (isAdminRoute) {
+        if (authIsLoading || isAdminLoading) {
+          return; // Wait for admin permissions to finish loading cleanly
+        }
         if (!adminPermissions && !isAdminLoginPage) {
           toast({ title: "Access Denied", description: "You are not authorized for the admin panel.", variant: "destructive" });
           router.push('/');

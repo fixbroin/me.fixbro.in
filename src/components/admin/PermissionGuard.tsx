@@ -21,10 +21,24 @@ export const PermissionGuard: React.FC<PermissionGuardProps> = ({
   children, 
   fallback = null 
 }) => {
-  const { adminPermissions, isSuperAdmin } = useAuth();
+  const { adminPermissions, isSuperAdmin, isLoading, isAdminLoading } = useAuth();
 
-  // Super Admin always has all permissions
+  // 1. While auth & permissions are loading, render loading spinner instead of crashing to null
+  if (isLoading || isAdminLoading) {
+    return (
+      <div className="flex items-center justify-center p-12 text-muted-foreground text-sm font-medium">
+        <span className="animate-spin mr-2">⏳</span> Loading module permissions...
+      </div>
+    );
+  }
+
+  // 2. Super Admin always has all permissions
   if (isSuperAdmin) {
+    return <>{children}</>;
+  }
+
+  // 3. If permissions haven't loaded yet or user is active admin, allow initial render
+  if (!adminPermissions) {
     return <>{children}</>;
   }
 

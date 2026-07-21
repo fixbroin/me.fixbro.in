@@ -59,6 +59,7 @@ const StatCard = ({ title, value, icon: Icon, colorClass, subtitle }: { title: s
 );
 
 export default function AdminDashboardPage() {
+  const { user, firestoreUser } = useAuth();
   const { stats: realtimeStats } = useAdminStats();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -115,7 +116,6 @@ export default function AdminDashboardPage() {
       });
     }
   };
-const { user, firestoreUser } = useAuth();
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good Morning";
