@@ -232,9 +232,18 @@ const Header = () => {
              </div>
             <nav className="hidden md:flex items-center gap-2">
               {baseNavItems.map((item) => (
-                 <button
+                 <Link
                     key={item.href}
-                    onClick={(e) => item.isProtected ? handleAuthRequiredNav(e, item.href) : handleSimpleNav(e, item.href)}
+                    href={item.href}
+                    onClick={(e) => {
+                      if (item.isProtected && !user) {
+                        e.preventDefault();
+                        showLoading();
+                        triggerAuthRedirect(item.href);
+                      } else {
+                        showLoading();
+                      }
+                    }}
                     className={cn(
                       "px-4 py-2 text-sm font-semibold rounded-full transition-all duration-300",
                       currentPathnameFromHook === item.href 
@@ -243,12 +252,21 @@ const Header = () => {
                     )}
                   >
                   {item.label}
-                 </button>
+                 </Link>
               ))}
              
               { featuresConfig.showCustomServiceButton && (
-                 <button
-                    onClick={(e) => handleAuthRequiredNav(e, '/custom-service')}
+                 <Link
+                    href="/custom-service"
+                    onClick={(e) => {
+                      if (!user) {
+                        e.preventDefault();
+                        showLoading();
+                        triggerAuthRedirect('/custom-service');
+                      } else {
+                        showLoading();
+                      }
+                    }}
                     className={cn(
                       "px-4 py-2 text-sm font-semibold rounded-full transition-all duration-300 flex items-center",
                       currentPathnameFromHook === '/custom-service'
@@ -257,7 +275,7 @@ const Header = () => {
                     )}
                   >
                     <Construction className="mr-2 h-4 w-4" /> Custom Service
-                 </button>
+                 </Link>
               )}
               { (appConfig.isProviderRegistrationEnabled || (user && user.email === ADMIN_EMAIL) || providerStatus === 'approved') && (() => {
                 const getProviderButtonDetails = () => {
@@ -283,8 +301,9 @@ const Header = () => {
                 };
                 const providerBtn = getProviderButtonDetails();
                 return (
-                  <button
-                    onClick={(e) => handleSimpleNav(e, providerBtn.path)}
+                  <Link
+                    href={providerBtn.path}
+                    onClick={() => showLoading()}
                     className={cn(
                       "px-4 py-2 text-sm font-semibold rounded-full transition-all duration-300 flex items-center",
                       currentPathnameFromHook === providerBtn.path
@@ -293,7 +312,7 @@ const Header = () => {
                     )}
                   >
                     {providerBtn.icon} {providerBtn.label}
-                  </button>
+                  </Link>
                 );
               })()}
             </nav>
@@ -376,9 +395,9 @@ const Header = () => {
 
             <div className="hidden md:block ml-2">
                {!user && !authIsLoading && (
-                 <Button className="rounded-full px-6 font-bold shadow-lg shadow-primary/20" size="sm" onClick={(e) => handleSimpleNav(e, '/auth/login')}>
+                 <Link href="/auth/login" onClick={() => showLoading()} className="inline-flex items-center justify-center rounded-full px-6 py-2 text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-300">
                    Login
-                 </Button>
+                 </Link>
                )}
                {user && (
                  <DropdownMenu>

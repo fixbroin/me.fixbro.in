@@ -190,10 +190,23 @@ export function startAfter(snapshotOrVal: any) {
 }
 
 export async function getDoc(docRef: DocumentReference): Promise<DocumentSnapshot> {
-  const result = await executeDbGetDoc(docRef.path);
+  let result = { exists: false, data: null };
+  try {
+    const res = await fetch('/api/db/getDoc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: docRef.path })
+    });
+    if (res.ok) {
+      result = await res.json();
+    }
+  } catch (e) {
+    console.error("getDoc API fetch error:", e);
+  }
+
   return {
     id: docRef.path.split('/').pop() || '',
-    exists: () => result.exists,
+    exists: () => !!result.exists,
     data: () => deserializeClientData(result.data),
     ref: docRef
   };
@@ -202,7 +215,21 @@ export async function getDoc(docRef: DocumentReference): Promise<DocumentSnapsho
 export async function getDocs(queryRef: CollectionReference | Query): Promise<QuerySnapshot> {
   const constraints = queryRef.type === 'query' ? (queryRef as Query).constraints : [];
   const cleanConstraints = serializeClientData(constraints);
-  const rawDocs = await executeDbGetDocs(queryRef.path, cleanConstraints);
+  
+  let rawDocs: any[] = [];
+  try {
+    const res = await fetch('/api/db/getDocs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: queryRef.path, constraints: cleanConstraints })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      rawDocs = Array.isArray(data) ? data : (data.docs || []);
+    }
+  } catch (e) {
+    console.error("getDocs API fetch error:", e);
+  }
   
   const docs: QueryDocumentSnapshot[] = rawDocs.map((docItem: any) => ({
     id: docItem.id,
@@ -221,7 +248,12 @@ export async function getDocs(queryRef: CollectionReference | Query): Promise<Qu
 
 export async function addDoc(collectionRef: CollectionReference, data: any) {
   const cleanData = serializeClientData(data);
-  const result = await executeDbAddDoc(collectionRef.path, cleanData);
+  const res = await fetch('/api/db/mutate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'addDoc', path: collectionRef.path, data: cleanData })
+  });
+  const result = await res.json();
   return {
     id: result.id,
     path: `${collectionRef.path}/${result.id}`
@@ -233,7 +265,11 @@ export async function setDoc(docRef: DocumentReference, data: any, options?: any
   const collectionPath = parts.slice(0, -1).join('/');
   const docId = parts.pop() || '';
   const cleanData = serializeClientData(data);
-  await executeDbSetDoc(collectionPath, docId, cleanData, options);
+  await fetch('/api/db/mutate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'setDoc', path: collectionPath, id: docId, data: cleanData, options })
+  });
   return { success: true };
 }
 
@@ -242,12 +278,20 @@ export async function updateDoc(docRef: DocumentReference, data: any) {
   const collectionPath = parts.slice(0, -1).join('/');
   const docId = parts.pop() || '';
   const cleanData = serializeClientData(data);
-  await executeDbUpdateDoc(collectionPath, docId, cleanData);
+  await fetch('/api/db/mutate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'updateDoc', path: collectionPath, id: docId, data: cleanData })
+  });
   return { success: true };
 }
 
 export async function deleteDoc(docRef: DocumentReference) {
-  await executeDbDeleteDoc(docRef.path);
+  await fetch('/api/db/mutate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'deleteDoc', path: docRef.path })
+  });
   return { success: true };
 }
 
@@ -275,7 +319,11 @@ export function writeBatch(dbInstance: any) {
       operations.push({ action: 'deleteDoc', collection: collectionPath, id: docId });
     },
     commit: async () => {
-      await executeDbBatch(operations);
+      await fetch('/api/db/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operations })
+      });
     }
   };
 }
@@ -391,7 +439,7 @@ export function onSnapshot(queryOrDocRef: any, arg2: any, arg3?: any, arg4?: any
   };
 
   run();
-  intervalId = setInterval(run, 1500);
+  intervalId = setInterval(run, 8000);
 
   return () => {
     isCancelled = true;

@@ -46,7 +46,6 @@ const processSettingsData = (data: Partial<GlobalWebSettings>): GlobalWebSetting
     ...(data.globalAdminPopup || {}),
   } as GlobalAdminPopup;
 
-  // Fix: Convert sentAt to real Timestamp if it's a plain object from cache
   if (globalAdminPopup.sentAt && !(globalAdminPopup.sentAt instanceof Timestamp)) {
     const millis = getTimestampMillis(globalAdminPopup.sentAt);
     if (millis) {
@@ -82,7 +81,6 @@ export function useGlobalSettings() {
   const hasLoadedRef = useRef(false);
   const isVisitorBot = useRef(isBot());
 
-  // Automatically keep the loader type cookie in sync for SSR fallback
   useEffect(() => {
     if (settings?.loaderType && typeof document !== 'undefined') {
       document.cookie = `fixbro-loader-type=${settings.loaderType}; path=/; max-age=31536000; SameSite=Lax`;
@@ -95,8 +93,20 @@ export function useGlobalSettings() {
       return;
     }
 
-    const settingsDocRef = doc(db, WEB_SETTINGS_COLLECTION, WEB_SETTINGS_DOC_ID);
+    // Direct fast fetch to dedicated /api/global-settings REST endpoint
+    fetch('/api/global-settings')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.webSettings) {
+          const processed = processSettingsData(data.webSettings);
+          setSettings(processed);
+          setCache(CACHE_KEY, processed, true);
+        }
+      })
+      .catch(err => console.warn("Global settings REST fetch fallback:", err))
+      .finally(() => setIsLoading(false));
 
+    const settingsDocRef = doc(db, WEB_SETTINGS_COLLECTION, WEB_SETTINGS_DOC_ID);
     const unsubscribe = onSnapshot(settingsDocRef, (docSnap) => {
       if (docSnap.exists()) {
         const processed = processSettingsData(docSnap.data());
@@ -106,15 +116,11 @@ export function useGlobalSettings() {
       setIsLoading(false);
       hasLoadedRef.current = true;
     }, (err: any) => {
-      if (err?.name !== 'AbortError' && !err?.message?.includes('Failed to fetch')) {
-        console.error("Error fetching settings:", err);
-        setError("Failed to load settings.");
-      }
       setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [processSettingsData, isAdmin]);
+  }, [isAdmin]);
 
   return { settings, isLoading, error };
 }
