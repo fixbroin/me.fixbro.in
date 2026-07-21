@@ -189,10 +189,19 @@ export function startAfter(snapshotOrVal: any) {
   return { type: 'startAfter', value: snapshotOrVal };
 }
 
+function getApiUrl(path: string): string {
+  if (typeof window !== 'undefined') {
+    return path;
+  }
+  const port = process.env.PORT || '3006';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${port}`;
+  return `${baseUrl.replace(/\/$/, '')}${path}`;
+}
+
 export async function getDoc(docRef: DocumentReference): Promise<DocumentSnapshot> {
   let result = { exists: false, data: null };
   try {
-    const res = await fetch('/api/db/getDoc', {
+    const res = await fetch(getApiUrl('/api/db/getDoc'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: docRef.path })
@@ -218,7 +227,7 @@ export async function getDocs(queryRef: CollectionReference | Query): Promise<Qu
   
   let rawDocs: any[] = [];
   try {
-    const res = await fetch('/api/db/getDocs', {
+    const res = await fetch(getApiUrl('/api/db/getDocs'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: queryRef.path, constraints: cleanConstraints })
@@ -248,7 +257,7 @@ export async function getDocs(queryRef: CollectionReference | Query): Promise<Qu
 
 export async function addDoc(collectionRef: CollectionReference, data: any) {
   const cleanData = serializeClientData(data);
-  const res = await fetch('/api/db/mutate', {
+  const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'addDoc', path: collectionRef.path, data: cleanData })
@@ -265,7 +274,7 @@ export async function setDoc(docRef: DocumentReference, data: any, options?: any
   const collectionPath = parts.slice(0, -1).join('/');
   const docId = parts.pop() || '';
   const cleanData = serializeClientData(data);
-  await fetch('/api/db/mutate', {
+  await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'setDoc', path: collectionPath, id: docId, data: cleanData, options })
@@ -278,7 +287,7 @@ export async function updateDoc(docRef: DocumentReference, data: any) {
   const collectionPath = parts.slice(0, -1).join('/');
   const docId = parts.pop() || '';
   const cleanData = serializeClientData(data);
-  await fetch('/api/db/mutate', {
+  await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'updateDoc', path: collectionPath, id: docId, data: cleanData })
@@ -287,7 +296,7 @@ export async function updateDoc(docRef: DocumentReference, data: any) {
 }
 
 export async function deleteDoc(docRef: DocumentReference) {
-  await fetch('/api/db/mutate', {
+  await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'deleteDoc', path: docRef.path })
@@ -319,7 +328,7 @@ export function writeBatch(dbInstance: any) {
       operations.push({ action: 'deleteDoc', collection: collectionPath, id: docId });
     },
     commit: async () => {
-      await fetch('/api/db/batch', {
+      await fetch(getApiUrl('/api/db/batch'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ operations })
