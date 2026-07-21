@@ -55,6 +55,7 @@ const withPWA = withPWAInit({
   },
 
   workboxOptions: {
+    maximumFileSizeToCacheInBytes: 3000000,
     exclude: [
       /googletagmanager\.com/,
       /admin/,
@@ -63,7 +64,6 @@ const withPWA = withPWAInit({
       /\.map$/,
     ],
     runtimeCaching: userRuntimeCaching,
-    // The top-level 'plugins' key was incorrect and is removed.
   },
 
   pwas: {
@@ -123,7 +123,7 @@ const nextConfig: NextConfig = {
   typescript: { ignoreBuildErrors: true },
   experimental: {
     workerThreads: false,
-    cpus: 1
+    cpus: 2
   }
 };
 
