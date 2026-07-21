@@ -391,7 +391,7 @@ export function onSnapshot(queryOrDocRef: any, arg2: any, arg3?: any, arg4?: any
   };
 
   run();
-  intervalId = setInterval(run, 12000);
+  intervalId = setInterval(run, 1500);
 
   return () => {
     isCancelled = true;

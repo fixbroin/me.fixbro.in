@@ -25,7 +25,7 @@ function clearDocCache(pathPrefix?: string) {
     return;
   }
   for (const key of docCache.keys()) {
-    if (key.startsWith(pathPrefix)) {
+    if (key.includes(pathPrefix) || key.startsWith(pathPrefix)) {
       docCache.delete(key);
     }
   }
@@ -105,7 +105,7 @@ export async function executeDbGetDocs(path: string, constraints: any[] = []) {
 export async function executeDbAddDoc(path: string, data: any) {
   return withRetry(async () => {
     try {
-      clearDocCache(path);
+      clearDocCache();
       const pool = await getPool();
       return await addDocInternal(pool, path, data);
     } catch (error: any) {
@@ -118,7 +118,7 @@ export async function executeDbAddDoc(path: string, data: any) {
 export async function executeDbSetDoc(path: string, docId: string, data: any, options: any = {}) {
   return withRetry(async () => {
     try {
-      clearDocCache(path);
+      clearDocCache();
       const pool = await getPool();
       await setDocInternal(pool, path, docId, data, options);
       return { success: true };
@@ -132,7 +132,7 @@ export async function executeDbSetDoc(path: string, docId: string, data: any, op
 export async function executeDbUpdateDoc(path: string, docId: string, data: any) {
   return withRetry(async () => {
     try {
-      clearDocCache(path);
+      clearDocCache();
       const pool = await getPool();
       await updateDocInternal(pool, path, docId, data);
       return { success: true };
@@ -146,7 +146,7 @@ export async function executeDbUpdateDoc(path: string, docId: string, data: any)
 export async function executeDbDeleteDoc(path: string, docId?: string) {
   return withRetry(async () => {
     try {
-      clearDocCache(path);
+      clearDocCache();
       const pool = await getPool();
       await deleteDocInternal(pool, path, docId);
       return { success: true };

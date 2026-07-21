@@ -12,7 +12,11 @@ import { FieldValue } from './mysqlDbAdmin';
  */
 export async function triggerRefresh(tag: 'services' | 'categories' | 'cities' | 'bookings' | 'users' | 'content' | 'blog' | 'global' | 'withdrawal-referral-config' | 'withdrawal-provider-config' | 'promo-usage' | string) {
   try {
-    (revalidateTag as any)(tag, 'max');
+    try {
+      (revalidateTag as any)(tag);
+    } catch (e) {
+      // Ignore Next.js internal revalidateTag profile mismatch
+    }
     
     // Purge static HTML pages cache globally only for changes affecting public layout/content
     const isPublicContentChange = [

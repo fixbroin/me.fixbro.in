@@ -184,6 +184,13 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
     const tempNewMessage = newMessage;
     setNewMessage('');
     
+    // Instantly append to local messages array for 0ms response
+    const optimisticMessage: ChatMessage = {
+      id: `temp_${Date.now()}`,
+      ...messageData
+    };
+    setMessages(prev => [...prev, optimisticMessage]);
+
     try {
       const sessionDocRef = doc(db, 'chats', chatSessionId);
       const sessionSnap = await getDoc(sessionDocRef);

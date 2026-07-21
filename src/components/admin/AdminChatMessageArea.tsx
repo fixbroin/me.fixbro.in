@@ -193,6 +193,14 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
 
     const tempNewMessage = newMessage;
     setNewMessage('');
+
+    // Instantly append to local messages array for 0ms response
+    const optimisticMessage: ChatMessage = {
+      id: `temp_${Date.now()}`,
+      ...messageData
+    };
+    setMessages(prev => [...prev, optimisticMessage]);
+
     try {
       const messagesRef = collection(db, 'chats', currentChatSessionId, 'messages');
       await addDoc(messagesRef, messageData);

@@ -41,8 +41,7 @@ export default function AdminUserListForChat({
     const chatsRef = collection(db, "chats");
     const q = query(
       chatsRef,
-      where("participants", "array-contains", adminUser.uid),
-      orderBy("lastMessageTimestamp", "desc"),
+      orderBy("updatedAt", "desc"),
       limit(50)
     );
 
@@ -52,25 +51,39 @@ export default function AdminUserListForChat({
 
       snapshot.forEach(docSnap => {
         const session = { id: docSnap.id, ...docSnap.data() } as ChatSession;
-        const participantUserId = session.participants?.find(pId => pId !== adminUser?.uid);
+        const participantUserId = session.userId || session.participants?.find(pId => pId !== adminUser?.uid);
         if (participantUserId) {
           sessions[participantUserId] = session;
-          userIdsToFetch.push(participantUserId);
+          if (!userIdsToFetch.includes(participantUserId)) {
+            userIdsToFetch.push(participantUserId);
+          }
         }
       });
 
-      setChatSessions(prev => ({ ...prev, ...sessions }));
+      setChatSessions(sessions);
 
       if (userIdsToFetch.length > 0) {
         // Fetch user profiles for these IDs in chunks of 30
-        const fetchedUsers: FirestoreUser[] = [];
+        const fetchedUsersMap: Record<string, FirestoreUser> = {};
         for (let i = 0; i < userIdsToFetch.length; i += 30) {
           const chunk = userIdsToFetch.slice(i, i + 30);
           const usersQuery = query(collection(db, "users"), where(documentId(), "in", chunk));
           const userSnap = await getDocs(usersQuery);
-          userSnap.forEach(d => fetchedUsers.push({ ...d.data(), id: d.id } as FirestoreUser));
+          userSnap.forEach(d => {
+            fetchedUsersMap[d.id] = { ...d.data(), id: d.id } as FirestoreUser;
+          });
         }
-        setRecentUsers(fetchedUsers);
+        
+        // Sort users by the latest message / update timestamp of their chat session (newest at the top)
+        const sortedUsers = userIdsToFetch
+          .map(uid => fetchedUsersMap[uid] || { id: uid, displayName: sessions[uid]?.userName || "User", email: "" } as FirestoreUser)
+          .sort((a, b) => {
+            const timeA = getTimestampMillis(sessions[a.id]?.updatedAt || sessions[a.id]?.lastMessageTimestamp);
+            const timeB = getTimestampMillis(sessions[b.id]?.updatedAt || sessions[b.id]?.lastMessageTimestamp);
+            return timeB - timeA;
+          });
+
+        setRecentUsers(sortedUsers);
       } else {
         setRecentUsers([]);
       }
