@@ -76,6 +76,7 @@ const navItems = [
   { href: '/admin/web-settings', label: 'Web Settings', icon: Settings2 },
   { href: '/admin/cookie-settings', label: 'Cookie Settings', icon: Cookie },
   { href: '/admin/database-tools', label: 'Database Tools', icon: Database },
+  { href: '/admin/system-logs', label: 'System Logs', icon: FileText },
 ];
 
 export default function AdminSidebarContent() {

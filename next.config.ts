@@ -51,7 +51,7 @@ const withPWA = withPWAInit({
   reloadOnOnline: true,
   swcMinify: true,
   fallbacks: {
-    document: '/offline',
+    document: '/404',
   },
 
   workboxOptions: {
@@ -63,7 +63,13 @@ const withPWA = withPWAInit({
       /chunk-[A-Za-z0-9]+\.js/,
       /\.map$/,
     ],
-    runtimeCaching: userRuntimeCaching,
+    runtimeCaching: [
+      {
+        urlPattern: /\/_next\/data\/.*/i,
+        handler: 'NetworkOnly' as const,
+      },
+      ...userRuntimeCaching
+    ],
   },
 
   pwas: {
