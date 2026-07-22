@@ -74,9 +74,9 @@ export async function getPool(): Promise<mysql.Pool> {
         port,
         connectTimeout: 15000,
         waitForConnections: true,
-        connectionLimit: 20,
-        maxIdle: 10,
-        idleTimeout: 60000,
+        connectionLimit: 3,
+        maxIdle: 2,
+        idleTimeout: 15000,
         queueLimit: 0,
         enableKeepAlive: true,
         keepAliveInitialDelay: 10000

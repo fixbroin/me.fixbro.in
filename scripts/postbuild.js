@@ -38,6 +38,14 @@ if (fs.existsSync(standalonePath)) {
     fs.cpSync(staticSrc, staticDest, { recursive: true });
     console.log(`[Postbuild] Successfully copied ${staticSrc} -> ${staticDest}`);
   }
+
+  const serverSrc = path.join(root, '.next', 'server');
+  const serverDest = path.join(standalonePath, '.next', 'server');
+  if (fs.existsSync(serverSrc)) {
+    fs.mkdirSync(serverDest, { recursive: true });
+    fs.cpSync(serverSrc, serverDest, { recursive: true });
+    console.log(`[Postbuild] Successfully copied ${serverSrc} -> ${serverDest}`);
+  }
 } else {
   console.log('[Postbuild] Standalone folder not found. Skipping static files copy.');
 }

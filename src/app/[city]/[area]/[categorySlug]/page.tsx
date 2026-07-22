@@ -16,42 +16,7 @@ import { getCategorySearchTerm, generateBreadcrumbSchema } from '@/lib/seoAdvanc
 export const revalidate = false;
 
 export async function generateStaticParams() {
-  try {
-    const citiesSnapshot = await adminDb.collection('cities').where('isActive', '==', true).get();
-    const categoriesSnapshot = await adminDb.collection('adminCategories').where('isActive', '==', true).get();
-    
-    const params: Array<{ city: string; area: string; categorySlug: string }> = [];
-
-    for (const cityDoc of citiesSnapshot.docs) {
-      const cityData = cityDoc.data() as FirestoreCity;
-      if (!cityData.slug) continue;
-
-      const areasSnapshot = await adminDb.collection('areas')
-        .where('cityId', '==', cityDoc.id)
-        .where('isActive', '==', true)
-        .get();
-
-      for (const areaDoc of areasSnapshot.docs) {
-        const areaData = areaDoc.data() as FirestoreArea;
-        if (!areaData.slug) continue;
-
-        for (const catDoc of categoriesSnapshot.docs) {
-          const catData = catDoc.data() as FirestoreCategory;
-          if (!catData.slug) continue;
-
-          params.push({
-            city: cityData.slug,
-            area: areaData.slug,
-            categorySlug: catData.slug
-          });
-        }
-      }
-    }
-    return params;
-  } catch (error) {
-    console.error("Error generating static params for area-category pages:", error);
-    return [];
-  }
+  return [];
 }
 
 interface AreaCategoryPageProps {

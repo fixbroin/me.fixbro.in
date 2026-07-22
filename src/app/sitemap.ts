@@ -5,8 +5,7 @@ import type { FirestoreCategory, FirestoreService, FirestoreCity, FirestoreArea,
 import { getBaseUrl } from '@/lib/config'; 
 import { unstable_cache } from 'next/cache';
 
-export const dynamic = 'force-static'; 
-export const revalidate = false;
+export const dynamic = 'force-dynamic';
 
 const safeToISOString = (timestamp: Timestamp | undefined | string | Date, fallbackDate: string): string => {
   try {

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 
-export const revalidate = false;
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Sitemap - FixBro Home Services',

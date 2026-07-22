@@ -104,11 +104,6 @@ MYSQL_PASSWORD=SuperStrongPassword123!
 MYSQL_DATABASE=fixbro_db
 MYSQL_PORT=3306
 ```
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=fixbro_db
-DB_USER=fixbro_user
-DB_PASSWORD=SuperStrongPassword123!
 
 Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`).
 

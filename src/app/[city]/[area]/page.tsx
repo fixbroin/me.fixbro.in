@@ -108,30 +108,7 @@ export async function generateMetadata(
 }
 
 export async function generateStaticParams() {
-  try {
-    const citiesSnapshot = await adminDb.collection('cities').where('isActive', '==', true).get();
-    const paramsArray: { city: string; area: string }[] = [];
-
-    for (const cityDoc of citiesSnapshot.docs) {
-      const cityData = cityDoc.data() as FirestoreCity;
-      if (!cityData.slug || cityData.slug.includes('.') || RESERVED_SLUGS.includes(cityData.slug)) continue; 
-      const areasQuery = adminDb
-        .collection('areas')
-        .where('cityId', '==', cityDoc.id)
-        .where('isActive', '==', true);
-      const areasSnapshot = await areasQuery.get();
-      areasSnapshot.docs.forEach(areaDoc => {
-        const areaData = areaDoc.data() as FirestoreArea;
-        if (areaData.slug && !areaData.slug.includes('.')) { 
-          paramsArray.push({ city: cityData.slug!, area: areaData.slug });
-        }
-      });
-    }
-    return paramsArray;
-  } catch (error) {
-    console.error("Error generating static params for area pages:", error);
-    return [];
-  }
+  return [];
 }
 
 export default async function AreaHomePage({ params }: AreaPageProps) {
