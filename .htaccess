@@ -1,0 +1,74 @@
+# Apache .htaccess file for Next.js standalone application
+
+# Turn on the rewrite engine
+RewriteEngine On
+
+# ----------------------------------------------------------------------
+# SECURITY: Block access to sensitive files and directories
+# ----------------------------------------------------------------------
+# Block access to all dot files/folders (e.g., .git, .env)
+RewriteRule "(^|/)\." - [F]
+
+# Block access to specific files
+<FilesMatch "^(package\.json|package-lock\.json|yarn\.lock|next\.config\.ts|tsconfig\.json|\.env.*)$">
+    Require all denied
+</FilesMatch>
+
+# ----------------------------------------------------------------------
+# REVERSE PROXY TO Next.js App (running on http://localhost:3000)
+# Uncomment and modify if you are using Apache as a reverse proxy.
+# Ensure mod_proxy and mod_proxy_http are enabled in your Apache config.
+# ----------------------------------------------------------------------
+# Example:
+# RewriteCond %{REQUEST_FILENAME} !-f
+# RewriteCond %{REQUEST_FILENAME} !-d
+# RewriteRule ^(.*)$ http://localhost:3000/$1 [P,L]
+
+# For WebSockets (Next.js HMR, etc.)
+# RewriteCond %{HTTP:Upgrade} websocket [NC]
+# RewriteCond %{HTTP:Connection} upgrade [NC]
+# RewriteRule ^/?(.*) "ws://localhost:3000/$1" [P,L]
+
+# ----------------------------------------------------------------------
+# HTTPS REDIRECTION (Optional - handle at load balancer or main Apache config if possible)
+# Uncomment if Apache is handling SSL directly and you want to force HTTPS.
+# ----------------------------------------------------------------------
+# RewriteCond %{HTTPS} !=on
+# RewriteCond %{HTTP_HOST} ^wecanfix.in\.com$ [NC]
+# RewriteRule ^/?(.*)$ https://wecanfix.in/$1 [R=301,L]
+
+# ----------------------------------------------------------------------
+# WWW to non-WWW REDIRECTION (or vice-versa) (Optional)
+# Example: Force non-www
+# ----------------------------------------------------------------------
+# RewriteCond %{HTTP_HOST} ^www\.wecanfix.in\.com$ [NC]
+# RewriteRule ^/?(.*)$ https://wecanfix.in/$1 [R=301,L]
+
+# ----------------------------------------------------------------------
+# BASIC BROWSER CACHING (Optional - Next.js handles its assets well)
+# Consider using these if serving other static files directly via Apache.
+# ----------------------------------------------------------------------
+# <IfModule mod_expires.c>
+#   ExpiresActive On
+#   ExpiresDefault                              "access plus 1 month"
+#   ExpiresByType text/html                     "access plus 0 seconds"
+#   ExpiresByType text/xml                      "access plus 0 seconds"
+#   ExpiresByType application/xml               "access plus 0 seconds"
+#   ExpiresByType application/json              "access plus 0 seconds"
+#   ExpiresByType application/pdf               "access plus 1 month"
+#   ExpiresByType image/x-icon                  "access plus 1 week"
+#   ExpiresByType image/gif                     "access plus 1 month"
+#   ExpiresByType image/png                     "access plus 1 month"
+#   ExpiresByType image/jpeg                    "access plus 1 month"
+#   ExpiresByType text/css                      "access plus 1 month"
+#   ExpiresByType application/javascript        "access plus 1 month"
+# </IfModule>
+
+# ----------------------------------------------------------------------
+# CUSTOM ERROR PAGES (Optional)
+# ----------------------------------------------------------------------
+# ErrorDocument 404 /404.html
+# ErrorDocument 500 /500.html
+
+# Prevent directory listing
+Options -Indexes
