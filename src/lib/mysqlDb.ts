@@ -193,7 +193,7 @@ function getApiUrl(path: string): string {
   if (typeof window !== 'undefined') {
     return path;
   }
-  const port = process.env.PORT || '3001';
+  const port = process.env.PORT || '3006';
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${port}`;
   return `${baseUrl.replace(/\/$/, '')}${path}`;
 }

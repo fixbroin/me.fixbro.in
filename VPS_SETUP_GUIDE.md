@@ -95,7 +95,7 @@ Paste the following production configuration inside `.env`:
 ```env
 # Production Environment Variables
 NODE_ENV=production
-PORT=3001
+PORT=3006
 
 # Local MySQL Database credentials on VPS
 MYSQL_HOST=localhost
@@ -149,7 +149,7 @@ server {
     client_max_body_size 50M;
 
     location / {
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3006;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
