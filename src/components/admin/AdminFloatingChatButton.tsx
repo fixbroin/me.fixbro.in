@@ -39,7 +39,7 @@ export default function AdminFloatingChatButton({ onClick }: AdminFloatingChatBu
     <Button
       variant="default"
       size="lg"
-      className="fixed bottom-6 right-6 rounded-full shadow-xl h-14 w-14 p-0 z-40 flex items-center justify-center sm:h-16 sm:w-16"
+      className="fixed bottom-20 md:bottom-6 right-6 rounded-full shadow-xl h-14 w-14 p-0 z-40 flex items-center justify-center sm:h-16 sm:w-16"
       onClick={onClick}
       aria-label="Open Chat Window"
     >

@@ -18,6 +18,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { getTimestampMillis } from '@/lib/utils';
 import AppImage from '@/components/ui/AppImage';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 
 const formatDate = (timestamp?: any): string => {
@@ -33,6 +34,8 @@ interface ReferralInfoTabProps {
 
 export default function ReferralInfoTab({ settings }: ReferralInfoTabProps) {
   const { firestoreUser, isLoading: authIsLoading } = useAuth();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
   const { toast } = useToast();
   const [referralLink, setReferralLink] = useState('');
   const [referralHistory, setReferralHistory] = useState<EnrichedReferral[]>([]);
@@ -91,11 +94,11 @@ export default function ReferralInfoTab({ settings }: ReferralInfoTabProps) {
 
   const referrerBonusDisplay = settings.bonusType === 'percentage' 
     ? `${settings.referrerBonus}%` 
-    : `₹${settings.referrerBonus || 0}`;
+    : `${symbol}${settings.referrerBonus || 0}`;
 
   const referredBonusDisplay = settings.bonusType === 'percentage' 
     ? `${settings.referredUserBonus}%` 
-    : `₹${settings.referredUserBonus || 0}`;
+    : `${symbol}${settings.referredUserBonus || 0}`;
 
   const shareMessage = `Hey! I've been using Wecanfix for my home services and they are excellent. You should try them too! Sign up using my link you'll get a ${referredBonusDisplay} welcome reward in your wallet immediately! 🏠🛠️\n\nJoin here: ${referralLink}`;
   const codeShareMessage = `Hey! Use my referral code: ${firestoreUser?.referralCode} on Wecanfix to get a ${referredBonusDisplay} welcome bonus in your wallet! 🏠🛠️\n\nJoin here: ${referralLink}`;
@@ -117,7 +120,7 @@ export default function ReferralInfoTab({ settings }: ReferralInfoTabProps) {
              <Alert variant="default" className="text-xs w-full bg-blue-50 border-blue-200">
                 <Info className="h-4 w-4 text-blue-600"/>
                 <AlertDescription className="text-blue-700">
-                    You will receive your referral bonus once your friend completes their first booking of minimum value <span className="font-semibold">₹{settings.minBookingValueForBonus}</span>.
+                    You will receive your referral bonus once your friend completes their first booking of minimum value <span className="font-semibold">{symbol}{settings.minBookingValueForBonus}</span>.
                 </AlertDescription>
             </Alert>
           </CardFooter>

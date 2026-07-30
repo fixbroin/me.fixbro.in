@@ -30,6 +30,7 @@ const NewCustomServiceRequestEmailInputSchema = z.object({
   senderEmail: z.string().optional().describe("The email address to send from."),
   siteName: z.string().optional(),
   logoUrl: z.string().optional(),
+  currencySymbol: z.string().optional().describe("Currency symbol to use in email templates."),
 });
 
 export type NewCustomServiceRequestEmailInput = z.infer<typeof NewCustomServiceRequestEmailInputSchema>;
@@ -113,7 +114,7 @@ const newCustomServiceRequestEmailFlow = ai.defineFlow(
   },
   async (details) => {
     try {
-      const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "Wecanfix", logoUrl, ...requestDetails } = details;
+      const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "Wecanfix", logoUrl, currencySymbol = "₹", ...requestDetails } = details;
 
       const adminEmail = "wecanfix.in@gmail.com"; 
       const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
@@ -129,7 +130,7 @@ const newCustomServiceRequestEmailFlow = ai.defineFlow(
             <li><strong>Customer Mobile:</strong> ${requestDetails.userMobile || 'N/A'}</li>
             <li><strong>Service Title:</strong> ${requestDetails.serviceTitle}</li>
             <li><strong>Category:</strong> ${requestDetails.category}</li>
-            <li><strong>Budget:</strong> ₹${requestDetails.minBudget || 'N/A'} - ₹${requestDetails.maxBudget || 'N/A'}</li>
+            <li><strong>Budget:</strong> ${currencySymbol}${requestDetails.minBudget || 'N/A'} - ${currencySymbol}${requestDetails.maxBudget || 'N/A'}</li>
         </ul>
         <h3>Description:</h3>
         <p>${requestDetails.description}</p>

@@ -373,6 +373,7 @@ export async function POST(request: Request) {
 
     // C. Admin Dashboard Notification (Notify all active admins)
     try {
+        const currencySymbol = appConfig?.currencySymbol || "₹";
         const adminsSnapshot = await adminDb.collection('admins').where('status', '==', 'active').get();
         if (!adminsSnapshot.empty) {
             let adminTitle = "Booking Update";
@@ -381,7 +382,7 @@ export async function POST(request: Request) {
 
             if (isCompleted) {
                 adminTitle = "Job Completed!";
-                adminMessage = `Booking ${booking.bookingId} for ${booking.customerName} is now complete. Total: ₹${booking.totalAmount.toFixed(2)}.`;
+                adminMessage = `Booking ${booking.bookingId} for ${booking.customerName} is now complete. Total: ${currencySymbol}${booking.totalAmount.toFixed(2)}.`;
             } else if (isCancelled) {
                 adminTitle = "Booking Cancelled";
                 adminMessage = `Booking ${booking.bookingId} by ${booking.customerName} has been cancelled.`;
@@ -454,6 +455,7 @@ export async function POST(request: Request) {
                 contactEmail: appConfig?.companyEmail || 'support@wecanfix.in',
                 contactMobile: appConfig?.companyPhone || '+91-7353113455',
                 timezone: appConfig?.timezone || 'Asia/Kolkata',
+                currencySymbol: appConfig?.currencySymbol || "₹",
             };
             const pdfDataUri = await generateInvoicePdf(booking, companyDetails);
             if (pdfDataUri && pdfDataUri.includes(',')) {
@@ -492,6 +494,7 @@ export async function POST(request: Request) {
         status: booking.status,
         siteName: seoSettings?.websiteName || "Wecanfix",
         logoUrl: seoSettings?.logoUrl,
+        currencySymbol: appConfig.currencySymbol || "Rs.",
         smtpHost: appConfig.smtpHost,
         smtpPort: appConfig.smtpPort,
         smtpUser: appConfig.smtpUser,
@@ -608,10 +611,11 @@ export async function POST(request: Request) {
                     });
 
                     // 7. Notify Referrer
+                    const currencySymbol = appConfig?.currencySymbol || "₹";
                     const notification: any = {
                         userId: referralData.referrerId,
                         title: "Referral Bonus Credited!",
-                        message: `Your friend ${booking.customerName} completed their first booking. ₹${bonusAmount.toFixed(2)} has been added to your wallet.`,
+                        message: `Your friend ${booking.customerName} completed their first booking. ${currencySymbol}${bonusAmount.toFixed(2)} has been added to your wallet.`,
                         type: 'success',
                         href: '/referral?tab=wallet',
                         read: false,

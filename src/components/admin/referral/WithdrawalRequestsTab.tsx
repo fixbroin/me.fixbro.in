@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Separator } from '@/components/ui/separator';
 import { getTimestampMillis } from '@/lib/utils';
+import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 
 const formatDate = (timestamp?: any) => {
     const millis = getTimestampMillis(timestamp);
@@ -30,6 +31,8 @@ const DetailItem = ({ label, value }: { label: string, value?: string | null }) 
 );
 
 export default function WithdrawalRequestsTab() {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
   const [requests, setRequests] = useState<WithdrawalRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
@@ -77,14 +80,14 @@ export default function WithdrawalRequestsTab() {
 
         const updatePayload: Partial<WithdrawalRequest> = { status: newStatus, processedAt: Timestamp.now() };
         let userUpdatePayload: Partial<{[key: string]: any}> = {};
-        let notificationMessage = `Your withdrawal request of ₹${request.amount.toFixed(2)} has been updated to ${newStatus}.`;
+        let notificationMessage = `Your withdrawal request of ${symbol}${request.amount.toFixed(2)} has been updated to ${newStatus}.`;
         let notificationType: FirestoreNotification['type'] = 'info';
 
         switch (newStatus) {
           case 'rejected':
             const newWalletBalance = (userDoc.data().walletBalance || 0) + request.amount;
             userUpdatePayload = { walletBalance: newWalletBalance, withdrawalPending: false };
-            notificationMessage = `Your withdrawal request of ₹${request.amount.toFixed(2)} was rejected. The amount has been refunded to your wallet.`;
+            notificationMessage = `Your withdrawal request of ${symbol}${request.amount.toFixed(2)} was rejected. The amount has been refunded to your wallet.`;
             notificationType = 'error';
             break;
           case 'completed':
@@ -93,7 +96,7 @@ export default function WithdrawalRequestsTab() {
               withdrawalPending: false,
               totalReferralPaidOut: currentTotalPaidOut + request.amount 
             }; 
-            notificationMessage = `Your withdrawal of ₹${request.amount.toFixed(2)} has been successfully completed.`;
+            notificationMessage = `Your withdrawal of ${symbol}${request.amount.toFixed(2)} has been successfully completed.`;
             notificationType = 'success';
             break;
           case 'approved':
@@ -212,7 +215,7 @@ export default function WithdrawalRequestsTab() {
               {requests.map(req => (
                  <TableRow key={req.id}>
                     <TableCell><div className="font-medium">{req.userName}</div><div className="text-xs text-muted-foreground">{req.userEmail}</div></TableCell>
-                    <TableCell>₹{req.amount.toFixed(2)}</TableCell>
+                    <TableCell>{symbol}{req.amount.toFixed(2)}</TableCell>
                     <TableCell className="capitalize">{req.method.replace('_', ' ')}</TableCell>
                     <TableCell>
                         <Button variant="outline" size="sm" onClick={() => handleViewDetails(req)}>
@@ -235,7 +238,7 @@ export default function WithdrawalRequestsTab() {
                                             </Button>
                                         </AlertDialogTrigger>
                                         <AlertDialogContent>
-                                            <AlertDialogHeader><AlertDialogTitle>Confirm Rejection</AlertDialogTitle><AlertDialogDescription>This will reject the request and refund ₹{req.amount.toFixed(2)} to the user's wallet. Are you sure?</AlertDialogDescription></AlertDialogHeader>
+                                            <AlertDialogHeader><AlertDialogTitle>Confirm Rejection</AlertDialogTitle><AlertDialogDescription>This will reject the request and refund {symbol}{req.amount.toFixed(2)} to the user's wallet. Are you sure?</AlertDialogDescription></AlertDialogHeader>
                                             <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleUpdateStatus(req, 'rejected')} className="bg-destructive hover:bg-destructive/90">Yes, Reject & Refund</AlertDialogAction></AlertDialogFooter>
                                         </AlertDialogContent>
                                     </AlertDialog>
@@ -288,7 +291,7 @@ export default function WithdrawalRequestsTab() {
                 </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
-                <DetailItem label="Amount" value={`₹${selectedRequestForDetails?.amount.toFixed(2)}`} />
+                <DetailItem label="Amount" value={`${symbol}${selectedRequestForDetails?.amount.toFixed(2)}`} />
                 <DetailItem label="Method" value={selectedRequestForDetails?.method.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} />
                 <Separator />
                 <h4 className="font-semibold text-sm">Transfer Details</h4>

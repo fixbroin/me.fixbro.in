@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://wecanfix.in';
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://me.fixbro.in';
 const PROGRESS_FILE = path.join(__dirname, 'indexing-progress.json');
 
 const serviceAccountJson = process.env.FIREBASE_ADMIN_SDK_CONFIG;

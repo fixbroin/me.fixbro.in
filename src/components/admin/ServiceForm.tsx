@@ -25,6 +25,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { compressImage } from "@/lib/imageCompressor";
 import { nanoid } from 'nanoid';
+import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 import { generateServiceDetails } from '@/ai/flows/generateServiceDetailsFlow';
 
 const generateSlug = (name: string) => {
@@ -135,6 +136,8 @@ const isValidImageSrc = (url: string | null | undefined): url is string => {
 const NO_TAX_VALUE = "__NO_TAX__";
 
 export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCancel, parentCategories, subCategories, taxes, allServices, isSubmitting: isParentSubmitting = false }: ServiceFormProps) {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
   const [currentImagePreview, setCurrentImagePreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -836,7 +839,7 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
                    <div className="grid grid-cols-3 gap-2 items-end">
                       <FormField control={form.control} name={`priceVariants.${index}.fromQuantity`} render={({ field }) => (<FormItem><FormLabel className="text-xs font-medium">From Qty</FormLabel><FormControl><Input type="number" placeholder="1" {...field} className="h-8 text-xs" /></FormControl><FormMessage /></FormItem>)}/>
                       <FormField control={form.control} name={`priceVariants.${index}.toQuantity`} render={({ field }) => (<FormItem><FormLabel className="text-xs font-medium">To Qty (Opt.)</FormLabel><FormControl><Input type="number" placeholder="5" {...field} value={field.value ?? ''} className="h-8 text-xs" /></FormControl><FormMessage /></FormItem>)}/>
-                      <FormField control={form.control} name={`priceVariants.${index}.price`} render={({ field }) => (<FormItem><FormLabel className="text-xs font-medium">Price (₹)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="100" {...field} className="h-8 text-xs" /></FormControl><FormMessage /></FormItem>)}/>
+                      <FormField control={form.control} name={`priceVariants.${index}.price`} render={({ field }) => (<FormItem><FormLabel className="text-xs font-medium">Price ({symbol})</FormLabel><FormControl><Input type="number" step="0.01" placeholder="100" {...field} className="h-8 text-xs" /></FormControl><FormMessage /></FormItem>)}/>
                    </div>
                   <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-destructive" onClick={() => removePriceVariant(index)} disabled={effectiveIsSubmitting}><Trash2 className="h-4 w-4" /></Button>
                 </div>
@@ -845,8 +848,8 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField control={form.control} name="price" render={({ field }) => (<FormItem><FormLabel>Default Price (₹)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 1200" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>)}/>
-              <FormField control={form.control} name="discountedPrice" render={({ field }) => (<FormItem><FormLabel>Default Discounted Price (₹) (Optional)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 999" {...field} value={field.value ?? ""} disabled={effectiveIsSubmitting}/></FormControl><FormMessage /></FormItem>)}/>
+              <FormField control={form.control} name="price" render={({ field }) => (<FormItem><FormLabel>Default Price ({symbol})</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 1200" {...field} disabled={effectiveIsSubmitting} /></FormControl><FormMessage /></FormItem>)}/>
+              <FormField control={form.control} name="discountedPrice" render={({ field }) => (<FormItem><FormLabel>Default Discounted Price ({symbol}) (Optional)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 999" {...field} value={field.value ?? ""} disabled={effectiveIsSubmitting}/></FormControl><FormMessage /></FormItem>)}/>
             </div>
           )}
 

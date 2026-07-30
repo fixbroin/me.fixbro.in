@@ -30,7 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { cn, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
+import { cn, formatDateInTimezone, formatTimeInTimezone, formatCurrency } from '@/lib/utils';
 import AppImage from '@/components/ui/AppImage';
 import { getDashboardData, getArchivedBookings, type DashboardData } from '@/lib/adminDashboardUtils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
@@ -162,6 +162,9 @@ export default function AdminBookingsPage() {
   const [selectedBooking, setSelectedBooking] = useState<FirestoreBooking | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
 
   const formatDateForDisplay = useCallback((dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
@@ -574,7 +577,7 @@ export default function AdminBookingsPage() {
                     )}
                 </div>
                 <div className="font-black text-base text-foreground flex items-center gap-1">
-                    <IndianRupee className="h-3.5 w-3.5" />
+                    <span>{symbol}</span>
                     {booking.totalAmount.toLocaleString()}
                 </div>
             </div>
@@ -742,7 +745,7 @@ export default function AdminBookingsPage() {
           ) : filteredBookings.length === 0 ? ( <div className="text-center py-20"><PackageSearch className="h-10 w-10 text-muted-foreground mx-auto mb-4" /><h3 className="text-lg font-semibold">No bookings found</h3></div>
           ) : (
             <><div className="hidden md:block">
-                <Table><TableHeader><TableRow><TableHead className="w-[50px]">No.</TableHead><TableHead className="w-[120px]">ID</TableHead><TableHead>Customer</TableHead><TableHead>Date & Time</TableHead><TableHead>Payment</TableHead><TableHead>Services</TableHead><TableHead className="text-right">Amount (₹)</TableHead></TableRow></TableHeader>
+                <Table><TableHeader><TableRow><TableHead className="w-[50px]">No.</TableHead><TableHead className="w-[120px]">ID</TableHead><TableHead>Customer</TableHead><TableHead>Date & Time</TableHead><TableHead>Payment</TableHead><TableHead>Services</TableHead><TableHead className="text-right">Amount ({symbol})</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {filteredBookings.slice(0, displayLimit).map((b, index) => {
                     return (
@@ -781,11 +784,8 @@ export default function AdminBookingsPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="max-w-[200px] truncate text-xs font-medium">{b.services.map(s => s.name).join(', ')}</TableCell>
-                          <TableCell className="text-right pr-6">
-                            <div className="flex items-center justify-end gap-1 font-black text-lg">
-                                <IndianRupee className="h-4 w-4 text-foreground" />
-                                {b.totalAmount.toLocaleString()}
-                            </div>
+                          <TableCell className="text-right pr-6 font-black text-lg">
+                            {formatCurrency(b.totalAmount, symbol, decimals, code)}
                           </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-transparent border-t-0">

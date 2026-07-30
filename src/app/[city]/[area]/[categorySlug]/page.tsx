@@ -8,6 +8,7 @@ import { replacePlaceholders, defaultSeoValues } from '@/lib/seoUtils';
 import { getGlobalSEOSettings, getAreaCategorySeoOverride } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config';
 import JsonLdScript from '@/components/shared/JsonLdScript';
+import { getGlobalAppSettings } from '@/lib/webServerUtils';
 import { getCategoryFullData, getAggregateRating } from '@/lib/homepageUtils';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
@@ -137,11 +138,13 @@ export default async function AreaCategoryPage({ params }: AreaCategoryPageProps
     notFound();
   }
 
-  const [pageData, fullCategoryData, aggregateRating] = await Promise.all([
+  const [pageData, fullCategoryData, aggregateRating, appConfig] = await Promise.all([
     getPageData(citySlug, areaSlug, catSlug),
     getCategoryFullData(catSlug, citySlug, areaSlug),
-    getAggregateRating()
+    getAggregateRating(),
+    getGlobalAppSettings()
   ]);
+  const symbol = appConfig?.currencySymbol || "₹";
 
   if (!pageData) {
     notFound();
@@ -205,7 +208,7 @@ export default async function AreaCategoryPage({ params }: AreaCategoryPageProps
     "description": seoOverride?.meta_description || categoryData.metaDescription || `Professional ${searchTerm} services in ${areaData.name}, ${cityData.name}. Trusted experts by Wecanfix.`,
     "image": schemaImage,
     "telephone": seoSettings.structuredDataTelephone,
-    "priceRange": "₹₹",
+    "priceRange": `${symbol}${symbol}`,
     "address": {
       "@type": "PostalAddress",
       "addressLocality": areaData.name,

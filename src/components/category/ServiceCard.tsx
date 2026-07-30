@@ -14,8 +14,9 @@ import { useToast } from '@/hooks/use-toast';
 import { logUserActivity } from '@/lib/activityLogger';
 import { useAuth } from '@/hooks/useAuth';
 import { getGuestId } from '@/lib/guestIdManager';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { useLoading } from '@/contexts/LoadingContext'; // Correct loading hook
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 interface ServiceCardProps {
   service: FirestoreService;
@@ -33,6 +34,10 @@ const generateAiHint = (hint?: string, name?: string): string => {
 };
 
 const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) => {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const [quantity, setQuantity] = useState(0);
   const { toast } = useToast();
   const router = useRouter();
@@ -144,8 +149,8 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
                 {service.rating > 0 && (<div className="flex items-center gap-1" title={`${service.rating.toFixed(1)} rating`}><Star className="h-3.5 w-3.5 text-amber-500 fill-amber-400" /><span>{service.rating.toFixed(1)}</span></div>)}
             </div>
             <div className="flex items-baseline gap-2 mt-2">
-                <p className="text-lg font-bold text-foreground">₹{service.discountedPrice ?? service.price}</p>
-                {service.discountedPrice && service.discountedPrice < service.price && (<p className="text-sm text-muted-foreground line-through">₹{service.price}</p>)}
+                <p className="text-lg font-bold text-foreground">{formatCurrency(service.discountedPrice ?? service.price, symbol, decimals, code)}</p>
+                {service.discountedPrice && service.discountedPrice < service.price && (<p className="text-sm text-muted-foreground line-through">{formatCurrency(service.price, symbol, decimals, code)}</p>)}
                 {service.hasMinQuantity && service.minQuantity && service.minQuantity > 1 && (
                   <div className="flex items-center gap-1 text-[10px] text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 w-fit ml-auto">
                     Min. {service.minQuantity} units
@@ -196,8 +201,8 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service, priority = false }) 
                 <div className="flex items-end justify-between">
                      <div>
                         <div className="flex items-baseline gap-2">
-                            <p className="text-xl font-bold text-foreground">₹{service.discountedPrice ?? service.price}</p>
-                            {service.discountedPrice && service.discountedPrice < service.price && (<p className="text-base text-muted-foreground line-through">₹{service.price}</p>)}
+                            <p className="text-xl font-bold text-foreground">{formatCurrency(service.discountedPrice ?? service.price, symbol, decimals, code)}</p>
+                            {service.discountedPrice && service.discountedPrice < service.price && (<p className="text-base text-muted-foreground line-through">{formatCurrency(service.price, symbol, decimals, code)}</p>)}
                             {service.hasMinQuantity && service.minQuantity && service.minQuantity > 1 && (
                               <div className="flex items-center gap-1.5 text-xs text-amber-600 font-bold bg-amber-50 px-2 py-1 rounded border border-amber-100 w-fit">
                                 <Info className="h-4 w-4" /> Min. {service.minQuantity} units required

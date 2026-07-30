@@ -14,7 +14,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn, getTimestampMillis } from "@/lib/utils";
+import { cn, getTimestampMillis, formatCurrency } from "@/lib/utils";
 import { 
   Loader2, ArrowLeft, Search, User, MapPin, Phone, Mail, 
   CalendarDays, Clock, CheckCircle2, IndianRupee, Tag, 
@@ -61,6 +61,9 @@ export default function AdminCreateBookingPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
 
   const ignoreNextSearch = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -441,7 +444,7 @@ export default function AdminCreateBookingPage() {
       if (promoData.minBookingAmount && sumOfItemPrices < promoData.minBookingAmount) {
         toast({ 
           title: "Min Amount Not Met", 
-          description: `Minimum ₹${promoData.minBookingAmount} required for this code.`, 
+          description: `Minimum ${formatCurrency(promoData.minBookingAmount, symbol, decimals, code)} required for this code.`, 
           variant: "destructive" 
         });
         setIsApplyingPromo(false);
@@ -482,7 +485,7 @@ export default function AdminCreateBookingPage() {
       };
       setAppliedPromo(applied);
       setPromoCodeInput("");
-      toast({ title: "Promo Applied!", description: `Saved ₹${disc.toFixed(2)}.` });
+      toast({ title: "Promo Applied!", description: `Saved ${formatCurrency(disc, symbol, decimals, code)}.` });
     } catch (e) {
       console.error(e);
       toast({ title: "Error", description: "Failed to apply promo code.", variant: "destructive" });
@@ -651,14 +654,14 @@ export default function AdminCreateBookingPage() {
                   <div className="space-y-2"><Label>Service</Label>
                     <Dialog open={isServiceDialogOpen} onOpenChange={setIsServiceDialogOpen}>
                       <DialogTrigger asChild><Button variant="outline" className={`w-full justify-between font-normal h-10 px-3`} disabled={!selectedSubCategoryId}><span className="truncate">{selectedService ? selectedService.name : "Select Service"}</span><ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0" /></Button></DialogTrigger>
-                      <DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>Select Service</DialogTitle></DialogHeader><div className="relative mb-2"><Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." className="pl-8" value={serviceSearch} onChange={e => setServiceSearch(e.target.value)} /></div><ScrollArea className="h-96 pr-4"><div className="space-y-1">{filteredServices.map(s => (<Button key={s.id} variant="ghost" className={`w-full justify-start h-auto py-3 px-4 flex flex-col items-start gap-0.5 ${selectedServiceId === s.id ? 'bg-primary/10 text-primary' : ''}`} onClick={() => { setSelectedServiceId(s.id!); setIsServiceDialogOpen(false); }}><span className="font-bold text-sm text-left">{s.name}</span><span className="text-xs text-muted-foreground text-left">Price: ₹{s.discountedPrice ?? s.price}</span></Button>))}</div></ScrollArea></DialogContent>
+                      <DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>Select Service</DialogTitle></DialogHeader><div className="relative mb-2"><Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." className="pl-8" value={serviceSearch} onChange={e => setServiceSearch(e.target.value)} /></div><ScrollArea className="h-96 pr-4"><div className="space-y-1">{filteredServices.map(s => (<Button key={s.id} variant="ghost" className={`w-full justify-start h-auto py-3 px-4 flex flex-col items-start gap-0.5 ${selectedServiceId === s.id ? 'bg-primary/10 text-primary' : ''}`} onClick={() => { setSelectedServiceId(s.id!); setIsServiceDialogOpen(false); }}><span className="font-bold text-sm text-left">{s.name}</span><span className="text-xs text-muted-foreground text-left">Price: {formatCurrency(s.discountedPrice ?? s.price, symbol, decimals, code)}</span></Button>))}</div></ScrollArea></DialogContent>
                     </Dialog>
                   </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/10">
                   <div className="space-y-2"><Label>Name</Label><Input value={customServiceName} onChange={e => setCustomServiceName(e.target.value)} placeholder="e.g. Custom Plumbing repair" /></div>
-                  <div className="space-y-2"><Label>Price (₹)</Label><Input type="number" value={customServicePrice} onChange={e => setCustomServicePrice(e.target.value)} placeholder="500" /></div>
+                  <div className="space-y-2"><Label>Price ({symbol})</Label><Input type="number" value={customServicePrice} onChange={e => setCustomServicePrice(e.target.value)} placeholder="500" /></div>
                 </div>
               )}
 
@@ -695,8 +698,8 @@ export default function AdminCreateBookingPage() {
                         <div>
                           <p className="text-sm font-bold text-foreground">{item.name}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            ₹{(item.pricePerUnit * item.quantity).toFixed(2)} ({item.quantity} x ₹{item.pricePerUnit.toFixed(2)})
-                            {item.taxPercentApplied && item.taxPercentApplied > 0 ? ` • Incl. ${item.taxPercentApplied}% Tax (₹${(item.taxAmountForItem || 0).toFixed(2)})` : ''}
+                            {formatCurrency(item.pricePerUnit * item.quantity, symbol, decimals, code)} ({item.quantity} x {formatCurrency(item.pricePerUnit, symbol, decimals, code)})
+                            {item.taxPercentApplied && item.taxPercentApplied > 0 ? ` • Incl. ${item.taxPercentApplied}% Tax (${formatCurrency(item.taxAmountForItem || 0, symbol, decimals, code)})` : ''}
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
@@ -792,17 +795,17 @@ export default function AdminCreateBookingPage() {
             <CardHeader><CardTitle>Summary</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span>Service:</span><span className="font-medium">₹{summary.itemTotal.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Visiting:</span><span className="font-medium">₹{summary.visitingCharge.toFixed(2)}</span></div>
-                {summary.appliedPlatformFees.map((fee, idx) => (<div key={idx} className="flex justify-between"><span className="flex items-center gap-1 text-muted-foreground"><HandCoins className="h-3 w-3" /> {fee.name}:</span><span className="font-medium">₹{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}</span></div>))}
-                <div className="flex justify-between"><span>Tax:</span><span className="font-medium">₹{summary.taxTotal.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Service:</span><span className="font-medium">{formatCurrency(summary.itemTotal, symbol, decimals, code)}</span></div>
+                <div className="flex justify-between"><span>Visiting:</span><span className="font-medium">{formatCurrency(summary.visitingCharge, symbol, decimals, code)}</span></div>
+                {summary.appliedPlatformFees.map((fee, idx) => (<div key={idx} className="flex justify-between"><span className="flex items-center gap-1 text-muted-foreground"><HandCoins className="h-3 w-3" /> {fee.name}:</span><span className="font-medium">{formatCurrency(fee.calculatedFeeAmount + fee.taxAmountOnFee, symbol, decimals, code)}</span></div>))}
+                <div className="flex justify-between"><span>Tax:</span><span className="font-medium">{formatCurrency(summary.taxTotal, symbol, decimals, code)}</span></div>
                 {summary.discountAmount > 0 && (
                   <div className="flex justify-between text-green-600 font-semibold">
                     <span>Discount ({appliedPromo?.code}):</span>
-                    <span>-₹{summary.discountAmount.toFixed(2)}</span>
+                    <span>-{formatCurrency(summary.discountAmount, symbol, decimals, code)}</span>
                   </div>
                 )}
-                <Separator /><div className="flex justify-between text-lg font-bold"><span>Total:</span><span className="text-primary">₹{summary.grandTotal.toFixed(2)}</span></div>
+                <Separator /><div className="flex justify-between text-lg font-bold"><span>Total:</span><span className="text-primary">{formatCurrency(summary.grandTotal, symbol, decimals, code)}</span></div>
               </div>
               <Separator />
               
@@ -815,7 +818,7 @@ export default function AdminCreateBookingPage() {
                       <Tag className="h-4 w-4 text-green-600" />
                       <div>
                         <p className="text-xs font-bold text-green-700 dark:text-green-400">&quot;{appliedPromo.code}&quot; Applied</p>
-                        <p className="text-[10px] text-green-600">Saved ₹{appliedPromo.calculatedDiscount.toFixed(2)}</p>
+                        <p className="text-[10px] text-green-600">Saved {formatCurrency(appliedPromo.calculatedDiscount, symbol, decimals, code)}</p>
                       </div>
                     </div>
                     <Button 
@@ -862,7 +865,7 @@ export default function AdminCreateBookingPage() {
                               <Tag className="h-2.5 w-2.5" />
                               <span>{promo.code}</span>
                               <span className="text-[9px] font-normal text-muted-foreground/85">
-                                ({promo.discountType === 'percentage' ? `${promo.discountValue}%` : `₹${promo.discountValue}`})
+                                ({promo.discountType === 'percentage' ? `${promo.discountValue}%` : formatCurrency(promo.discountValue, symbol, decimals, code)})
                               </span>
                             </button>
                           ))}
@@ -961,10 +964,10 @@ export default function AdminCreateBookingPage() {
             {summary.discountAmount > 0 && (
               <div className="flex justify-between text-green-600 font-semibold">
                 <span>Discount ({appliedPromo?.code}):</span>
-                <span>-₹{summary.discountAmount.toFixed(2)}</span>
+                <span>-{formatCurrency(summary.discountAmount, symbol, decimals, code)}</span>
               </div>
             )}
-            <div className="flex justify-between pt-2 border-t font-bold"><span>Amount:</span><span className="text-primary">₹{summary.grandTotal.toFixed(2)}</span></div>
+            <div className="flex justify-between pt-2 border-t font-bold"><span>Amount:</span><span className="text-primary">{formatCurrency(summary.grandTotal, symbol, decimals, code)}</span></div>
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-6">
             <Button variant="outline" className="w-full sm:flex-1" onClick={() => router.push('/admin')}>Dashboard</Button>

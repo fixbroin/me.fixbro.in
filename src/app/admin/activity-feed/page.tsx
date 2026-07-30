@@ -29,7 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { cn, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
+import { cn, formatDateInTimezone, formatTimeInTimezone, formatCurrency } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getArchivedActivities } from '@/lib/adminDashboardUtils';
@@ -78,6 +78,9 @@ const formatTimestamp = (timestamp?: any): string => {
 
 export default function AdminActivityFeedPage() {
   const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const [cachedActivities, setCachedActivities] = useState<UserActivity[]>([]);
   const [liveActivities, setLiveActivities] = useState<UserActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -329,7 +332,7 @@ export default function AdminActivityFeedPage() {
       case 'newBooking':
         return (
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-teal-600">₹{data.totalAmount?.toFixed(2)}</span>
+            <span className="text-xs font-bold text-teal-600">{formatCurrency(data.totalAmount || 0, symbol, decimals, code)}</span>
             <Link href={`/admin/bookings/edit/${data.bookingDocId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline flex items-center">
               {data.bookingId} <ChevronRight className="h-3 w-3 ml-0.5" />
             </Link>

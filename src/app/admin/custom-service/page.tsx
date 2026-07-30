@@ -17,7 +17,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import AppImage from '@/components/ui/AppImage';
 import { Separator } from "@/components/ui/separator";
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatCurrency } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
@@ -47,10 +48,15 @@ const DetailItem = ({ label, value }: { label: string; value?: string | number |
 );
 
 const CustomRequestDetailsModal = ({ isOpen, onClose, request }: { isOpen: boolean; onClose: () => void; request: CustomServiceRequest | null; }) => {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
+
   if (!request) return null;
 
   const budgetDisplay = (request.minBudget != null && request.maxBudget != null) 
-    ? `₹${request.minBudget} - ₹${request.maxBudget}` 
+    ? `${formatCurrency(request.minBudget, symbol, decimals, code)} - ${formatCurrency(request.maxBudget, symbol, decimals, code)}` 
     : 'Not specified';
 
   return (

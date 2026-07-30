@@ -20,7 +20,7 @@ import type { BreadcrumbItem } from '@/types/ui';
 import { useLoading } from '@/contexts/LoadingContext';
 import AppImage from '@/components/ui/AppImage';
 import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { Star, Clock, ListChecks, Loader2, FileText, ShoppingCart, Users, Ban, Percent, Info } from 'lucide-react';
 import AdBannerCard from '@/components/shared/AdBannerCard';
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
@@ -173,15 +173,15 @@ const getPriceForNthUnit = (service: FirestoreService, n: number): number => {
   return service.discountedPrice ?? service.price;
 };
 
-const getPriceDisplayInfo = (service: FirestoreService, quantity: number) => {
+const getPriceDisplayInfo = (service: FirestoreService, quantity: number, symbol: string = '₹', decimals: number = 2, code: string = 'INR') => {
     if (!service.hasPriceVariants || !service.priceVariants || service.priceVariants.length === 0) {
         const unitSaving = service.discountedPrice && service.discountedPrice < service.price ? service.price - service.discountedPrice : 0;
         const totalSaving = unitSaving * (quantity > 0 ? quantity : 1);
         
         return {
-            mainPrice: `₹${service.discountedPrice ?? service.price}`,
-            priceSuffix: unitSaving > 0 ? `₹${service.price}` : null,
-            promoText: unitSaving > 0 ? `Save ₹${totalSaving.toFixed(0)}!` : null,
+            mainPrice: formatCurrency(service.discountedPrice ?? service.price, symbol, decimals, code),
+            priceSuffix: unitSaving > 0 ? formatCurrency(service.price, symbol, decimals, code) : null,
+            promoText: unitSaving > 0 ? `Save ${formatCurrency(totalSaving, symbol, decimals, code)}!` : null,
         };
     }
 
@@ -193,24 +193,28 @@ const getPriceDisplayInfo = (service: FirestoreService, quantity: number) => {
     let promoText = null;
     if (nextCheaperTier) {
         const needed = nextCheaperTier.fromQuantity - quantity;
-        promoText = `Add ${needed} more to unlock ₹${nextCheaperTier.price} price!`;
+        promoText = `Add ${needed} more to unlock ${formatCurrency(nextCheaperTier.price, symbol, decimals, code)} price!`;
     } else {
         const finalTier = sortedVariants[sortedVariants.length - 1];
         if (quantity >= finalTier.fromQuantity) {
-            promoText = `Price continues at ₹${finalTier.price} each.`;
+            promoText = `Price continues at ${formatCurrency(finalTier.price, symbol, decimals, code)} each.`;
         }
     }
 
     const displayPrice = getPriceForNthUnit(service, nextQuantity);
 
     return {
-        mainPrice: `₹${displayPrice}`,
+        mainPrice: formatCurrency(displayPrice, symbol, decimals, code),
         priceSuffix: quantity > 0 ? 'per next unit' : 'onwards',
         promoText,
     };
 };
 
 const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service }) => {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const router = useRouter();
   const { showLoading } = useLoading();
   const { user, triggerAuthRedirect } = useAuth();
@@ -295,7 +299,7 @@ const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service 
   };
   const taskTimeDisplay = formatTaskTime(service.taskTimeValue, service.taskTimeUnit);
 
-  const { mainPrice, priceSuffix, promoText } = getPriceDisplayInfo(service, quantity);
+  const { mainPrice, priceSuffix, promoText } = getPriceDisplayInfo(service, quantity, symbol, decimals, code);
 
   const isAvailable = service.maxQuantity === undefined || service.maxQuantity === null || service.maxQuantity > 0;
   
@@ -330,9 +334,13 @@ const HomepageServiceCard: React.FC<{ service: FirestoreService }> = ({ service 
                   <div className="flex flex-wrap items-baseline gap-2 mt-2">
                     <p className="text-lg font-bold text-foreground">{mainPrice}</p>
                      {priceSuffix && (
-                       <p className="text-sm text-muted-foreground"><span className="line-through">
-                          {priceSuffix.replace(/[^\d₹.,]/g, "")}</span>{" "}{priceSuffix.replace(/[\d₹.,]/g, "")}
-                      </p>
+                       <p className="text-sm text-muted-foreground">
+                         {priceSuffix.includes(symbol) || /\d/.test(priceSuffix) ? (
+                           <span className="line-through">{priceSuffix}</span>
+                         ) : (
+                           priceSuffix
+                         )}
+                       </p>
                      )}
                   </div>
                   {service.hasMinQuantity && service.minQuantity && service.minQuantity > 1 && (
@@ -497,7 +505,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       setCache('pageH1', currentH1);
 
       const siteName = fetchedSeoSettings.siteName || 'Wecanfix';
-      const defaultOgImage = (process.env.NEXT_PUBLIC_BASE_URL || 'https://wecanfix.in') + '/android-chrome-512x512.png';
+      const defaultOgImage = (process.env.NEXT_PUBLIC_BASE_URL || 'https://me.fixbro.in') + '/android-chrome-512x512.png';
 
       let webSettingsData: GlobalWebSettings | null = null;
       try {
@@ -509,7 +517,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
       } catch (e) { console.error("Error fetching webSettings for LD+JSON:", e); }
 
       const ogImage = webSettingsData?.websiteIconUrl || webSettingsData?.logoUrl || fetchedSeoSettings.structuredDataImage || defaultOgImage;
-      const pageUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://wecanfix.in';
+      const pageUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://me.fixbro.in';
       let specificPageUrl = pageUrl;
       if (citySlug && areaSlug) specificPageUrl = `${pageUrl}/${citySlug}/${areaSlug}`;
       else if (citySlug) specificPageUrl = `${pageUrl}/${citySlug}`;

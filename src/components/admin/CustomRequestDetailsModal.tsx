@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import type { CustomServiceRequest } from '@/types/firestore';
 import AppImage from '@/components/ui/AppImage';
 import { getTimestampMillis } from '@/lib/utils';
+import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 
 interface CustomRequestDetailsModalProps {
   isOpen: boolean;
@@ -28,6 +29,8 @@ const DetailItem = ({ label, value }: { label: string; value?: string | number |
 );
 
 export default function CustomRequestDetailsModal({ isOpen, onClose, request }: CustomRequestDetailsModalProps) {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
   if (!request) return null;
 
   return (
@@ -45,7 +48,7 @@ export default function CustomRequestDetailsModal({ isOpen, onClose, request }: 
                 <DetailItem label="Customer Email" value={request.userEmail} />
                 <DetailItem label="Customer Mobile" value={request.userMobile} />
                 <DetailItem label="Preferred Start Date" value={formatDate(request.preferredStartDate)} />
-                <DetailItem label="Budget" value={request.minBudget && request.maxBudget ? `₹${request.minBudget} - ₹${request.maxBudget}` : 'Not specified'} />
+                <DetailItem label="Budget" value={request.minBudget && request.maxBudget ? `${symbol}${request.minBudget} - ${symbol}${request.maxBudget}` : 'Not specified'} />
             </div>
             
             <div>

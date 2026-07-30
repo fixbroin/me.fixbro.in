@@ -21,6 +21,7 @@ import { uploadPdfToStorage, triggerPdfDownload, dataUriToBlob } from '@/lib/pdf
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { getTimestampMillis } from '@/lib/utils';
 import { deleteObject } from '@/lib/mysqlStorage';
+import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 
 interface ManageQuotationsTabProps {
   onEditQuotation: (quotation: FirestoreQuotation) => void;
@@ -38,6 +39,8 @@ export default function ManageQuotationsTab({ onEditQuotation }: ManageQuotation
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const { toast } = useToast();
   const { settings: companySettings, isLoading: isLoadingCompanySettings } = useGlobalSettings();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
 
   useEffect(() => {
     setIsLoading(true);
@@ -108,6 +111,7 @@ export default function ManageQuotationsTab({ onEditQuotation }: ManageQuotation
         contactEmail: companySettings?.contactEmail || "",
         contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
+        currencySymbol: appConfig?.currencySymbol || "₹",
       };
 
       const pdfDataUri = await generateQuotationPdf(quotation, companyInfo);
@@ -148,6 +152,7 @@ export default function ManageQuotationsTab({ onEditQuotation }: ManageQuotation
         contactEmail: companySettings?.contactEmail || "",
         contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
+        currencySymbol: appConfig?.currencySymbol || "₹",
       };
       const pdfDataUri = await generateQuotationPdf(quotation, companyInfo);
       triggerPdfDownload(pdfDataUri, `Quotation-${quotation.quotationNumber}.pdf`);
@@ -193,7 +198,7 @@ export default function ManageQuotationsTab({ onEditQuotation }: ManageQuotation
             <p>{formatDate(quotation.quotationDate)}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Amount (₹)</p>
+            <p className="text-xs text-muted-foreground">Amount ({symbol})</p>
             <p>{quotation.totalAmount.toFixed(2)}</p>
           </div>
         </div>
@@ -268,7 +273,7 @@ export default function ManageQuotationsTab({ onEditQuotation }: ManageQuotation
         {/* Desktop View */}
         <div className="hidden md:block">
             <Table>
-            <TableHeader><TableRow><TableHead>Quotation #</TableHead><TableHead>Customer</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount (₹)</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+             <TableHeader><TableRow><TableHead>Quotation #</TableHead><TableHead>Customer</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Amount ({symbol})</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
                 {quotations.map((quotation) => (
                 <TableRow key={quotation.id}>

@@ -99,6 +99,7 @@ export default function CustomServiceRequestForm({
   const { toast } = useToast();
   const { user, firestoreUser } = useAuth();
   const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
   const { settings: globalSettings } = useGlobalSettings();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -299,6 +300,7 @@ export default function CustomServiceRequestForm({
               senderEmail: appConfig.senderEmail,
               siteName: globalSettings?.websiteName,
               logoUrl: globalSettings?.logoUrl,
+              currencySymbol: appConfig.currencySymbol || "₹",
           };
           try { 
               const emailResult = await sendNewCustomServiceRequestEmail(emailInput);
@@ -476,7 +478,7 @@ export default function CustomServiceRequestForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>
-                  Min. Budget (₹) <span className="text-destructive">*</span>
+                  Min. Budget ({symbol}) <span className="text-destructive">*</span>
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -497,7 +499,7 @@ export default function CustomServiceRequestForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>
-                  Max. Budget (₹) <span className="text-destructive">*</span>
+                  Max. Budget ({symbol}) <span className="text-destructive">*</span>
                 </FormLabel>
                 <FormControl>
                   <Input

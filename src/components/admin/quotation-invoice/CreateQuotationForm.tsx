@@ -26,6 +26,7 @@ import { uploadPdfToStorage, triggerPdfDownload, dataUriToBlob } from '@/lib/pdf
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getTimestampMillis } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 
 const quotationItemSchema = z.object({
@@ -72,6 +73,8 @@ interface CreateQuotationFormProps {
 export default function CreateQuotationForm({ initialData, onSaveSuccess }: CreateQuotationFormProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
   const { settings: companySettings, isLoading: isLoadingCompanySettings } = useGlobalSettings();
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -256,6 +259,7 @@ export default function CreateQuotationForm({ initialData, onSaveSuccess }: Crea
         name: companySettings?.websiteName || "Wecanfix", address: companySettings?.address || "",
         contactEmail: companySettings?.contactEmail || "", contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
+        currencySymbol: appConfig?.currencySymbol || "₹",
       };
 
       const pdfDataUri = await generateQuotationPdf(savedQuotation, companyInfo);
@@ -304,6 +308,7 @@ export default function CreateQuotationForm({ initialData, onSaveSuccess }: Crea
         name: companySettings?.websiteName || "Wecanfix", address: companySettings?.address || "",
         contactEmail: companySettings?.contactEmail || "", contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
+        currencySymbol: appConfig?.currencySymbol || "₹",
       };
 
       const pdfDataUri = await generateQuotationPdf(savedQuotation, companyInfo);
@@ -438,8 +443,8 @@ export default function CreateQuotationForm({ initialData, onSaveSuccess }: Crea
                   <div className="grid grid-cols-1 sm:grid-cols-itemized-quotation gap-3 items-end">
                     <FormField control={form.control} name={`items.${index}.itemName`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Item Name <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Service or Product" {...field} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)}/>
                     <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Qty <span className="text-destructive">*</span></FormLabel><FormControl><Input type="number" placeholder="1" {...field} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)}/>
-                    <FormField control={form.control} name={`items.${index}.ratePerUnit`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Rate/Unit (₹) <span className="text-destructive">*</span></FormLabel><FormControl><Input type="number" step="0.01" placeholder="100.00" {...field} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)}/>
-                    <FormItem><FormLabel className="text-xs">Total (₹)</FormLabel><Input type="text" value={((form.watch(`items.${index}.quantity`) || 0) * (form.watch(`items.${index}.ratePerUnit`) || 0)).toFixed(2)} disabled readOnly className="bg-muted/50"/></FormItem>
+                    <FormField control={form.control} name={`items.${index}.ratePerUnit`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Rate/Unit ({symbol}) <span className="text-destructive">*</span></FormLabel><FormControl><Input type="number" step="0.01" placeholder="100.00" {...field} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)}/>
+                    <FormItem><FormLabel className="text-xs">Total ({symbol})</FormLabel><Input type="text" value={((form.watch(`items.${index}.quantity`) || 0) * (form.watch(`items.${index}.ratePerUnit`) || 0)).toFixed(2)} disabled readOnly className="bg-muted/50"/></FormItem>
                   </div>
                   {fields.length > 1 && (<Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-destructive" onClick={() => remove(index)} disabled={isSaving}><Trash2 className="h-4 w-4" /></Button>)}
                 </div>
@@ -452,13 +457,13 @@ export default function CreateQuotationForm({ initialData, onSaveSuccess }: Crea
               <h3 className="text-lg font-medium">Summary & Notes</h3>
               <FormField control={form.control} name="additionalNotes" render={({ field }) => (<FormItem><FormLabel>Additional Notes (Optional)</FormLabel><FormControl><Textarea placeholder="Terms, validity, etc." {...field} rows={3} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)}/>
               <div className="space-y-1 text-right text-sm">
-                <div>Subtotal: <span className="font-semibold">₹{subtotal.toFixed(2)}</span></div>
+                <div>Subtotal: <span className="font-semibold">{symbol}{subtotal.toFixed(2)}</span></div>
                 <div className="flex items-center justify-end gap-2">
                   <FormLabel htmlFor="taxPercentInput" className="text-sm whitespace-nowrap">Tax (%):</FormLabel>
                   <FormField control={form.control} name="taxPercent" render={({ field }) => (<FormItem className="inline-block w-20"><FormControl><Input type="number" id="taxPercentInput" step="0.01" placeholder="0" {...field} disabled={isSaving} className="h-8 text-right" /></FormControl><FormMessage className="text-left text-xs" /></FormItem>)}/>
                 </div>
-                <div>Tax Amount: <span className="font-semibold">₹{taxAmount.toFixed(2)}</span></div>
-                <div className="text-lg font-bold text-primary">Grand Total: ₹{grandTotal.toFixed(2)}</div>
+                <div>Tax Amount: <span className="font-semibold">{symbol}{taxAmount.toFixed(2)}</span></div>
+                <div className="text-lg font-bold text-primary">Grand Total: {symbol}{grandTotal.toFixed(2)}</div>
               </div>
             </div>
           </CardContent>

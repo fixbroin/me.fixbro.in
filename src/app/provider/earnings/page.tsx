@@ -28,6 +28,7 @@ const isCashPayment = (method: string) => method === 'Pay After Service' || meth
 export default function ProviderEarningsPage() {
   const { user: providerUser, firestoreUser, isLoading: authIsLoading } = useAuth();
   const { config: appConfig, isLoading: isLoadingAppConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
   const { toast } = useToast();
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -169,20 +170,20 @@ export default function ProviderEarningsPage() {
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card className="bg-primary/5 border-primary/20">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Month Gross</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold">₹{earningsData.monthlyGrossEarnings.toFixed(2)}</p></CardContent>
+            <CardContent><p className="text-2xl font-bold">{symbol}{earningsData.monthlyGrossEarnings.toFixed(2)}</p></CardContent>
           </Card>
           <Card className="bg-destructive/5 border-destructive/20">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Month Admin Fee</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold">₹{earningsData.monthlyAdminCommission.toFixed(2)}</p></CardContent>
+            <CardContent><p className="text-2xl font-bold">{symbol}{earningsData.monthlyAdminCommission.toFixed(2)}</p></CardContent>
           </Card>
           <Card className="bg-green-500/5 border-green-500/20">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Month Net Earnings</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold text-green-600">₹{earningsData.monthlyNetEarnings.toFixed(2)}</p></CardContent>
+            <CardContent><p className="text-2xl font-bold text-green-600">{symbol}{earningsData.monthlyNetEarnings.toFixed(2)}</p></CardContent>
           </Card>
           <Card className="bg-blue-500/5 border-blue-500/20">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Wallet Balance</CardTitle></CardHeader>
             <CardContent>
-                <p className="text-2xl font-bold text-blue-600">₹{earningsData.withdrawableBalance.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-blue-600">{symbol}{earningsData.withdrawableBalance.toFixed(2)}</p>
                 <p className="text-[10px] text-muted-foreground mt-1">Available to Withdraw</p>
             </CardContent>
              <CardFooter className="pt-0"><Link href="/provider/withdrawal" className="w-full"><Button size="sm" variant="outline" className="w-full h-8 text-xs">Withdraw</Button></Link></CardFooter>
@@ -198,34 +199,34 @@ export default function ProviderEarningsPage() {
                 <div className="space-y-2 text-sm">
                     <div className="flex justify-between items-center py-1 border-b border-dashed">
                         <span>Balance Carried Forward <span className="text-[10px] text-muted-foreground ml-1">(Previous months)</span></span>
-                        <span className="font-semibold text-blue-600">₹{earningsData.balanceCarriedForward.toFixed(2)}</span>
+                        <span className="font-semibold text-blue-600">{symbol}{earningsData.balanceCarriedForward.toFixed(2)}</span>
                     </div>
 
                     <div className="flex justify-between items-center py-1 border-b border-dashed text-green-600">
                         <span>Online Jobs Earnings <span className="text-[10px] text-muted-foreground ml-1">(Your share after fee)</span></span>
-                        <span className="font-semibold">+ ₹{earningsData.monthlyOnlineNet.toFixed(2)}</span>
+                        <span className="font-semibold">+ {symbol}{earningsData.monthlyOnlineNet.toFixed(2)}</span>
                     </div>
 
                     <div className="flex justify-between items-center py-1 border-b border-dashed text-destructive">
                         <span>Admin Fees for Cash Jobs <span className="text-[10px] text-muted-foreground ml-1">(Deducted from wallet)</span></span>
-                        <span className="font-semibold">- ₹{earningsData.monthlyCashCommission.toFixed(2)}</span>
+                        <span className="font-semibold">- {symbol}{earningsData.monthlyCashCommission.toFixed(2)}</span>
                     </div>
 
                     <div className="flex justify-between items-center py-1 border-b border-dashed text-destructive">
                         <span>Payouts requested this month</span>
-                        <span className="font-semibold">- ₹{earningsData.monthlyWithdrawals.toFixed(2)}</span>
+                        <span className="font-semibold">- {symbol}{earningsData.monthlyWithdrawals.toFixed(2)}</span>
                     </div>
 
                     <div className="flex justify-between items-center pt-2 font-bold text-base">
                         <span>Total Available in Wallet</span>
-                        <span className="text-blue-600">₹{earningsData.withdrawableBalance.toFixed(2)}</span>
+                        <span className="text-blue-600">{symbol}{earningsData.withdrawableBalance.toFixed(2)}</span>
                     </div>
                 </div>
 
                 <div className="bg-primary/5 rounded-lg p-3 border border-primary/20 space-y-1">
                     <div className="flex justify-between items-center text-xs font-bold text-primary uppercase">
                         <span>Lifetime Total Paid Out</span>
-                        <span>₹{earningsData.lifetimePaidOut.toFixed(2)}</span>
+                        <span>{symbol}{earningsData.lifetimePaidOut.toFixed(2)}</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground italic">
                         * This is your permanent record of all money successfully sent to your bank/UPI.
@@ -235,7 +236,7 @@ export default function ProviderEarningsPage() {
                 <div className="mt-4 pt-4 border-t border-muted-foreground/20 bg-primary/5 -mx-4 px-4 rounded-b-xl">
                     <div className="flex justify-between items-center text-xs">
                         <span className="text-muted-foreground uppercase font-bold">Total Cash Collected by You:</span>
-                        <span className="font-black text-primary text-sm">₹{earningsData.monthlyCashCollected.toFixed(2)}</span>
+                        <span className="font-black text-primary text-sm">{symbol}{earningsData.monthlyCashCollected.toFixed(2)}</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-1 italic">
                         * Note: This cash is already with you. Only the Admin Fee was deducted from your wallet balance.
@@ -258,7 +259,7 @@ export default function ProviderEarningsPage() {
                     <HandCoins className="h-4 w-4 text-green-600" />
                     <AlertTitle className="text-green-800 font-bold">Wallet Status</AlertTitle>
                     <AlertDescription className="text-green-700">
-                        You have <span className="font-bold text-lg">₹{earningsData.withdrawableBalance.toFixed(2)}</span> ready to withdraw.
+                        You have <span className="font-bold text-lg">{symbol}{earningsData.withdrawableBalance.toFixed(2)}</span> ready to withdraw.
                     </AlertDescription>
                 </Alert>
             )}

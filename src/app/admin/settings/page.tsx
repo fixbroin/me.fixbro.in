@@ -76,15 +76,52 @@ const generateTimezones = (): TimezoneOption[] => {
   }
 };
 
+interface CurrencyOption {
+  code: string;
+  symbol: string;
+  name: string;
+}
+
+const currenciesList: CurrencyOption[] = [
+  { code: "INR", symbol: "₹", name: "India Rupee" },
+  { code: "USD", symbol: "$", name: "United States Dollar" },
+  { code: "EUR", symbol: "€", name: "Euro" },
+  { code: "GBP", symbol: "£", name: "United Kingdom Pound" },
+  { code: "AED", symbol: "د.إ", name: "United Arab Emirates Dirham" },
+  { code: "SAR", symbol: "ر.س", name: "Saudi Arabia Riyal" },
+  { code: "CAD", symbol: "C$", name: "Canada Dollar" },
+  { code: "AUD", symbol: "A$", name: "Australia Dollar" },
+  { code: "SGD", symbol: "S$", name: "Singapore Dollar" },
+  { code: "MYR", symbol: "RM", name: "Malaysia Ringgit" },
+  { code: "NPR", symbol: "रू", name: "Nepal Rupee" },
+  { code: "LKR", symbol: "රු", name: "Sri Lanka Rupee" },
+  { code: "BDT", symbol: "৳", name: "Bangladesh Taka" },
+  { code: "PKR", symbol: "₨", name: "Pakistan Rupee" },
+  { code: "QAR", symbol: "ر.ق", name: "Qatar Riyal" },
+  { code: "KWD", symbol: "د.ك", name: "Kuwait Dinar" },
+  { code: "BHD", symbol: ".د.ب", name: "Bahrain Dinar" },
+  { code: "OMR", symbol: "ر.ع.", name: "Oman Rial" },
+  { code: "MMK", symbol: "K", name: "Myanmar (Burma) Kyat" },
+  { code: "THB", symbol: "฿", name: "Thailand Baht" },
+  { code: "IDR", symbol: "Rp", name: "Indonesia Rupiah" },
+  { code: "PHP", symbol: "₱", name: "Philippines Peso" },
+  { code: "VND", symbol: "₫", name: "Vietnam Dong" },
+  { code: "CNY", symbol: "¥", name: "China Yuan Renminbi" },
+  { code: "JPY", symbol: "¥", name: "Japan Yen" },
+];
+
 const ALL_TIMEZONES = generateTimezones();
 
 export default function AdminSettingsPage() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<AppSettings>(defaultAppSettings);
+  const symbol = settings.currencySymbol || '₹';
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [timezoneSearch, setTimezoneSearch] = useState("");
   const [isTimezoneDialogOpen, setIsTimezoneDialogOpen] = useState(false);
+  const [currencySearch, setCurrencySearch] = useState("");
+  const [isCurrencyDialogOpen, setIsCurrencyDialogOpen] = useState(false);
   const [isVcTaxPickerOpen, setIsVcTaxPickerOpen] = useState(false);
   const [isCancelFeeTypePickerOpen, setIsCancelFeeTypePickerOpen] = useState(false);
 
@@ -107,6 +144,12 @@ export default function AdminSettingsPage() {
     const search = timezoneSearch.toLowerCase().replace(/\//g, ' ').trim();
     return ALL_TIMEZONES.filter((tz: TimezoneOption) => tz.searchLabel.includes(search));
   }, [timezoneSearch]);
+
+  const filteredCurrencies = useMemo(() => {
+    if (!currencySearch) return currenciesList;
+    const search = currencySearch.toLowerCase().trim();
+    return currenciesList.filter(c => c.code.toLowerCase().includes(search) || c.name.toLowerCase().includes(search));
+  }, [currencySearch]);
 
   const loadSettingsFromFirestore = useCallback(async () => {
     setIsLoadingSettings(true);
@@ -286,7 +329,7 @@ export default function AdminSettingsPage() {
     setSettings(prev => {
       const newSettings = JSON.parse(JSON.stringify(prev)); 
 
-      if (['carouselAutoplayDelay', 'visitingChargeTaxPercent', 'minimumBookingAmount', 'visitingChargeAmount', 'limitLateBookingHours', 'freeCancellationDays', 'freeCancellationHours', 'freeCancellationMinutes', 'cancellationFeeValue', 'maxProviderRadiusKm', 'autoDispatchRadiusKm', 'timeSlotSettings.slotIntervalMinutes', 'timeSlotSettings.breakTimeMinutes'].includes(name)) {
+      if (['carouselAutoplayDelay', 'visitingChargeTaxPercent', 'minimumBookingAmount', 'visitingChargeAmount', 'limitLateBookingHours', 'freeCancellationDays', 'freeCancellationHours', 'freeCancellationMinutes', 'cancellationFeeValue', 'maxProviderRadiusKm', 'autoDispatchRadiusKm', 'timeSlotSettings.slotIntervalMinutes', 'timeSlotSettings.breakTimeMinutes', 'currencyDecimalPoints'].includes(name)) {
         const keys = name.split('.');
         if (keys.length > 1) {
           (newSettings as any)[keys[0]][keys[1]] = parseFloat(value) || 0;
@@ -340,6 +383,14 @@ export default function AdminSettingsPage() {
     setSettings(prev => ({
       ...prev,
       [name]: name === 'isVisitingChargeTaxInclusive' ? (value === "true") : value,
+    }));
+  };
+
+  const handleSelectCurrency = (currency: CurrencyOption) => {
+    setSettings(prev => ({
+      ...prev,
+      currencyCode: currency.code,
+      currencySymbol: currency.symbol,
     }));
   };
 
@@ -702,6 +753,116 @@ export default function AdminSettingsPage() {
                 </div>
               </div>
 
+              {/* Currency Settings */}
+              <div className="space-y-4 p-4 border rounded-md shadow-sm">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-primary" /> Currency Settings
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Country Currency Selector */}
+                  <div className="space-y-2 flex flex-col justify-between">
+                    <Label htmlFor="countryCurrency" className="mb-1 text-slate-700 dark:text-slate-200">Country Currency</Label>
+                    <Dialog open={isCurrencyDialogOpen} onOpenChange={setIsCurrencyDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={isCurrencyDialogOpen}
+                          className="w-full justify-between h-10 border-border/60 hover:bg-muted/50"
+                        >
+                          {(() => {
+                            const cur = currenciesList.find(c => c.code === (settings.currencyCode || 'INR')) || currenciesList[0];
+                            return `${cur.code} - ${cur.name}`;
+                          })()}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Select Country Currency</DialogTitle>
+                          <DialogDescription>Search and select your local business currency.</DialogDescription>
+                        </DialogHeader>
+                        <div className="flex flex-col gap-4 pt-2">
+                          <div className="relative">
+                            <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Search currency code or name..."
+                              className="pl-8"
+                              value={currencySearch}
+                              onChange={(e) => setCurrencySearch(e.target.value)}
+                            />
+                          </div>
+                          <ScrollArea className="h-[250px] rounded-md border p-2">
+                            <div className="space-y-1">
+                              {filteredCurrencies.map((c) => (
+                                <Button
+                                  key={c.code}
+                                  variant={settings.currencyCode === c.code ? "secondary" : "ghost"}
+                                  className="w-full justify-start text-left h-auto py-2.5 px-3 relative group"
+                                  onClick={() => {
+                                    handleSelectCurrency(c);
+                                    setIsCurrencyDialogOpen(false);
+                                    setCurrencySearch("");
+                                  }}
+                                  type="button"
+                                >
+                                  <span className="font-bold text-sm mr-2">{c.code}</span>
+                                  <span className="text-xs text-muted-foreground">{c.name}</span>
+                                  {settings.currencyCode === c.code && (
+                                    <Check className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                                  )}
+                                </Button>
+                              ))}
+                              {filteredCurrencies.length === 0 && (
+                                <p className="text-center py-4 text-sm text-muted-foreground">No matching currencies found.</p>
+                              )}
+                            </div>
+                          </ScrollArea>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+
+                  {/* Currency Symbol Text Input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="currencySymbol">Currency Symbol</Label>
+                    <Input
+                      id="currencySymbol"
+                      name="currencySymbol"
+                      value={settings.currencySymbol || '₹'}
+                      onChange={handleInputChange}
+                      placeholder="e.g., ₹, $, €"
+                      disabled={isSaving}
+                    />
+                  </div>
+
+                  {/* Decimal Points Select Dropdown */}
+                  <div className="space-y-2">
+                    <Label htmlFor="currencyDecimalPoints">Decimal Point</Label>
+                    <div className="relative">
+                      <select
+                        id="currencyDecimalPoints"
+                        name="currencyDecimalPoints"
+                        value={settings.currencyDecimalPoints !== undefined ? settings.currencyDecimalPoints : 2}
+                        onChange={(e) => {
+                          setSettings(prev => ({
+                            ...prev,
+                            currencyDecimalPoints: parseInt(e.target.value, 10)
+                          }));
+                        }}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={isSaving}
+                      >
+                        <option value={0}>0</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-4 p-4 border rounded-md shadow-sm">
                 <h3 className="text-lg font-semibold">Minimum Booking Policy</h3>
                 <div className="flex items-center justify-between rounded-lg border p-4">
@@ -723,7 +884,7 @@ export default function AdminSettingsPage() {
                 {settings.enableMinimumBookingPolicy && (
                   <div className="space-y-4 pl-4 border-l-2 border-primary ml-2 pt-4">
                     <div className="space-y-2">
-                      <Label htmlFor="minimumBookingAmount">Minimum Booking Amount (₹)</Label>
+                      <Label htmlFor="minimumBookingAmount">Minimum Booking Amount ({settings.currencySymbol || '₹'})</Label>
                       <Input
                         id="minimumBookingAmount"
                         name="minimumBookingAmount"
@@ -735,7 +896,7 @@ export default function AdminSettingsPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="visitingChargeAmount">Visiting Charge Amount (₹)</Label>
+                      <Label htmlFor="visitingChargeAmount">Visiting Charge Amount ({settings.currencySymbol || '₹'})</Label>
                       <Input
                         id="visitingChargeAmount"
                         name="visitingChargeAmount"
@@ -768,7 +929,7 @@ export default function AdminSettingsPage() {
                         name="minimumBookingPolicyDescription"
                         value={settings.minimumBookingPolicyDescription}
                         onChange={handleInputChange}
-                        placeholder="e.g., A visiting charge of ₹{VISITING_CHARGE} will be applied..."
+                        placeholder={`e.g., A visiting charge of ${symbol}{VISITING_CHARGE} will be applied if your booking total is below ${symbol}{MINIMUM_BOOKING_AMOUNT}.`}
                         rows={3}
                         disabled={isSaving}
                       />
@@ -1258,7 +1419,7 @@ export default function AdminSettingsPage() {
                             <span>
                               {settings.cancellationFeeType === 'percentage'
                                 ? "Percentage (%)"
-                                : "Fixed Amount (₹)"}
+                                : `Fixed Amount (${symbol})`}
                             </span>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -1282,7 +1443,7 @@ export default function AdminSettingsPage() {
                                   }}
                                   type="button"
                                 >
-                                  <span className="font-semibold text-sm">Fixed Amount (₹)</span>
+                                  <span className="font-semibold text-sm">Fixed Amount ({symbol})</span>
                                   {settings.cancellationFeeType !== 'percentage' && (
                                     <Check className="absolute right-3 top-3 h-4 w-4 text-green-500" />
                                   )}
@@ -1309,7 +1470,7 @@ export default function AdminSettingsPage() {
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="cancellationFeeValue">Fee Value</Label>
-                      <Input id="cancellationFeeValue" name="cancellationFeeValue" type="number" min="0" value={settings.cancellationFeeValue ?? 0} onChange={handleInputChange} disabled={isSaving} placeholder={settings.cancellationFeeType === 'percentage' ? "e.g., 10 (for 10%)" : "e.g., 50 (for ₹50)"} />
+                      <Input id="cancellationFeeValue" name="cancellationFeeValue" type="number" min="0" value={settings.cancellationFeeValue ?? 0} onChange={handleInputChange} disabled={isSaving} placeholder={settings.cancellationFeeType === 'percentage' ? "e.g., 10 (for 10%)" : `e.g., 50 (for ${symbol}50)`} />
                     </div>
                   </div>
                    <p className="text-xs text-muted-foreground">If percentage, it's based on the booking's total amount.</p>

@@ -11,7 +11,7 @@ import ContactUsForm from "@/components/forms/ContactUsForm";
 import AppImage from '@/components/ui/AppImage';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import { Card, CardContent } from "@/components/ui/card";
-import { getContentPageData } from '@/lib/webServerUtils';
+import { getContentPageData, getGlobalAppSettings } from '@/lib/webServerUtils';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 import type { BreadcrumbItem } from '@/types/ui';
 
@@ -51,9 +51,8 @@ export default async function ContactUsPage() {
   // Load App Settings for working hours
   let timeSlotSettings: any = {};
   try {
-    const appConfigSnap = await adminDb.collection("webSettings").doc("applicationConfig").get();
-    const appConfig = appConfigSnap.data() || {};
-    timeSlotSettings = appConfig.timeSlotSettings || {};
+    const appConfig = await getGlobalAppSettings();
+    timeSlotSettings = appConfig?.timeSlotSettings || {};
   } catch (dbErr) {
     console.warn("ContactUsPage: Could not load applicationConfig from DB, using defaults:", dbErr);
   }

@@ -8,9 +8,10 @@ import { getBaseUrl } from '@/lib/config';
 import { serializeFirestoreData } from '@/lib/serializeUtils';
 import { getAggregateRating } from '@/lib/homepageUtils';
 import { replacePlaceholders, defaultSeoValues } from '@/lib/seoUtils';
-import { getSpinnedLocalContent } from '@/lib/seoGenerator';
 import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
 import JsonLdScript from '@/components/shared/JsonLdScript';
+import { getGlobalAppSettings } from '@/lib/webServerUtils';
+import { getSpinnedLocalContent } from '@/lib/seoGenerator';
 import AreaServiceSeoPageClient from '@/components/service/AreaServiceSeoPageClient';
 import type { FirestoreCity, FirestoreArea, FirestoreService, AreaServiceSeoSetting } from '@/types/firestore';
 
@@ -135,11 +136,13 @@ export async function generateMetadata(
 
 export default async function AreaServiceDetailPage({ params }: AreaServicePageProps) {
   const { city: citySlug, area: areaSlug, serviceSlug } = await params;
-  const [pageData, aggregateRating, seoSettings] = await Promise.all([
+  const [pageData, aggregateRating, seoSettings, appConfig] = await Promise.all([
     getPageData(citySlug, areaSlug, serviceSlug),
     getAggregateRating(),
-    getGlobalSEOSettings()
+    getGlobalSEOSettings(),
+    getGlobalAppSettings()
   ]);
+  const symbol = appConfig?.currencySymbol || "₹";
 
   if (!pageData || !pageData.serviceData) {
     notFound();
@@ -209,7 +212,7 @@ export default async function AreaServiceDetailPage({ params }: AreaServicePageP
       "@type": "LocalBusiness",
       "name": "Wecanfix",
       "telephone": seoSettings.structuredDataTelephone,
-      "priceRange": "₹₹",
+      "priceRange": `${symbol}${symbol}`,
       "image": schemaImage,
       "address": {
         "@type": "PostalAddress",

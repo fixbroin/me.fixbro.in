@@ -176,3 +176,25 @@ export function formatScheduledDate(dateStr: string | undefined): string {
   }
   return dateStr;
 }
+
+/**
+ * Formats a numeric amount with the target currency symbol, locale rules, and decimal places.
+ */
+export function formatCurrency(
+  amount: number,
+  symbol: string = '₹',
+  decimals: number = 2,
+  code: string = 'INR'
+): string {
+  if (amount === undefined || amount === null || isNaN(amount)) return 'N/A';
+  try {
+    const locale = code === 'INR' ? 'en-IN' : 'en-US';
+    const formattedAmount = new Intl.NumberFormat(locale, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    }).format(amount);
+    return `${symbol}${formattedAmount}`;
+  } catch (e) {
+    return `${symbol}${amount.toFixed(decimals)}`;
+  }
+}

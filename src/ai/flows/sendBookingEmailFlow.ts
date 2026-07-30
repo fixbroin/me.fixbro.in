@@ -65,6 +65,7 @@ const BookingConfirmationEmailInputSchema = z.object({
   cancellationReason: z.string().optional(),
   siteName: z.string().optional(),
   logoUrl: z.string().optional(),
+  currencySymbol: z.string().optional().describe("Currency symbol to use in email templates."),
 });
 
 export type BookingConfirmationEmailInput = z.infer<typeof BookingConfirmationEmailInputSchema>;
@@ -174,28 +175,29 @@ const bookingEmailFlow = ai.defineFlow(
         siteName = "Wecanfix",
         cancellationReason,
         logoUrl,
+        currencySymbol = "Rs.",
       } = bookingDetails;
 
       const paymentSummaryHtml = `
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-family: 'Roboto', sans-serif; line-height: 1.6; font-size: 14px; color: #444444;">
-          <tr><td style="padding: 4px 0;">Items Total:</td><td align="right" style="padding: 4px 0;">Rs. ${bookingDetails.subTotal.toFixed(2)}</td></tr>
-          ${bookingDetails.discountAmount && bookingDetails.discountAmount > 0 ? `<tr><td style="padding: 4px 0; color: #198754;">Discount (${bookingDetails.discountCode || 'Applied'}):</td><td align="right" style="padding: 4px 0; color: #198754;">- Rs. ${bookingDetails.discountAmount.toFixed(2)}</td></tr>` : ''}
-          ${bookingDetails.visitingCharge && bookingDetails.visitingCharge > 0 ? `<tr><td style="padding: 4px 0;">Visiting Charge:</td><td align="right">+ Rs. ${bookingDetails.visitingCharge.toFixed(2)}</td></tr>` : ''}
+          <tr><td style="padding: 4px 0;">Items Total:</td><td align="right" style="padding: 4px 0;">${currencySymbol} ${bookingDetails.subTotal.toFixed(2)}</td></tr>
+          ${bookingDetails.discountAmount && bookingDetails.discountAmount > 0 ? `<tr><td style="padding: 4px 0; color: #198754;">Discount (${bookingDetails.discountCode || 'Applied'}):</td><td align="right" style="padding: 4px 0; color: #198754;">- ${currencySymbol} ${bookingDetails.discountAmount.toFixed(2)}</td></tr>` : ''}
+          ${bookingDetails.visitingCharge && bookingDetails.visitingCharge > 0 ? `<tr><td style="padding: 4px 0;">Visiting Charge:</td><td align="right">+ ${currencySymbol} ${bookingDetails.visitingCharge.toFixed(2)}</td></tr>` : ''}
           
-          ${bookingDetails.appliedPlatformFees && bookingDetails.appliedPlatformFees.length > 0 ? bookingDetails.appliedPlatformFees.map(fee => `<tr><td style="padding: 4px 0;">${fee.name}:</td><td align="right">+ Rs. ${fee.amount.toFixed(2)}</td></tr>`).join('') : ''}
+          ${bookingDetails.appliedPlatformFees && bookingDetails.appliedPlatformFees.length > 0 ? bookingDetails.appliedPlatformFees.map(fee => `<tr><td style="padding: 4px 0;">${fee.name}:</td><td align="right">+ ${currencySymbol} ${fee.amount.toFixed(2)}</td></tr>`).join('') : ''}
           
           ${bookingDetails.additionalCharges && bookingDetails.additionalCharges.length > 0 ? `
             <tr><td colspan="2" style="padding: 10px 0 5px 0; font-size: 12px; color: #888888; text-transform: uppercase; font-weight: bold;">Additional Service Charges:</td></tr>
             ${bookingDetails.additionalCharges.map(charge => `
-              <tr><td style="padding: 2px 0;">${charge.name}:</td><td align="right">+ Rs. ${charge.amount.toFixed(2)}</td></tr>
+              <tr><td style="padding: 2px 0;">${charge.name}:</td><td align="right">+ ${currencySymbol} ${charge.amount.toFixed(2)}</td></tr>
             `).join('')}
           ` : ''}
 
-          <tr><td style="padding: 4px 0;">Total Tax:</td><td align="right">+ Rs. ${bookingDetails.taxAmount.toFixed(2)}</td></tr>
+          ${bookingDetails.taxAmount && bookingDetails.taxAmount > 0 ? `<tr><td style="padding: 4px 0;">Total Tax:</td><td align="right">+ ${currencySymbol} ${bookingDetails.taxAmount.toFixed(2)}</td></tr>` : ''}
           <tr><td colspan="2" style="border-top: 1px solid #eeeeee; padding-top: 10px; margin-top: 10px;"></td></tr>
           <tr style="font-size: 18px; font-weight: bold; color: #111111;">
             <td style="padding: 5px 0;">Total Amount:</td>
-            <td align="right" style="padding: 5px 0;">Rs. ${bookingDetails.totalAmount.toFixed(2)}</td>
+            <td align="right" style="padding: 5px 0;">${currencySymbol} ${bookingDetails.totalAmount.toFixed(2)}</td>
           </tr>
         </table>
       `;
@@ -216,8 +218,8 @@ const bookingEmailFlow = ai.defineFlow(
               </td>
               <td class="service-info-cell">
                 <div class="service-name">${s.name} (x${s.quantity})</div>
-                <div class="service-meta">Avg: Rs. ${avgPrice.toFixed(2)}</div>
-                <div class="service-price">Total: Rs. ${itemTotal.toFixed(2)}</div>
+                <div class="service-meta">Avg: ${currencySymbol} ${avgPrice.toFixed(2)}</div>
+                <div class="service-price">Total: ${currencySymbol} ${itemTotal.toFixed(2)}</div>
               </td>
             </tr>
             `;
@@ -253,7 +255,7 @@ const bookingEmailFlow = ai.defineFlow(
           <p>Thank you for choosing ${siteName}!</p>
         `, siteName, logoUrl);
         adminEmailSubject = `Booking Completed (ID: ${bookingDetails.bookingId})`;
-        adminEmailBody = createHtmlTemplate('Admin Alert: Booking Completed', `<p>Booking ID <strong>${bookingDetails.bookingId}</strong> for <strong>${bookingDetails.customerName}</strong> has been marked as COMPLETED.</p><p>Total: Rs. ${bookingDetails.totalAmount.toFixed(2)}.</p>`, siteName, logoUrl);
+        adminEmailBody = createHtmlTemplate('Admin Alert: Booking Completed', `<p>Booking ID <strong>${bookingDetails.bookingId}</strong> for <strong>${bookingDetails.customerName}</strong> has been marked as COMPLETED.</p><p>Total: ${currencySymbol} ${bookingDetails.totalAmount.toFixed(2)}.</p>`, siteName, logoUrl);
         if (invoicePdfBase64) attachments.push({ filename: `invoice-${bookingDetails.bookingId}.pdf`, content: invoicePdfBase64, encoding: 'base64', contentType: 'application/pdf' });
       } else if (emailType === 'booking_rescheduled') {
         customerEmailSubject = `Your ${siteName} Booking Rescheduled (ID: ${bookingDetails.bookingId})`;

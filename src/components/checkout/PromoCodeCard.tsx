@@ -12,6 +12,7 @@ import { db, auth } from '@/lib/firebase';
 import { collection, query, where, getDocs } from '@/lib/mysqlDb';
 import type { FirestorePromoCode } from '@/types/firestore';
 import { Badge } from '@/components/ui/badge';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { getTimestampMillis } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogClose } from '@/components/ui/dialog';
 
@@ -31,6 +32,8 @@ interface PromoCodeCardProps {
 
 export default function PromoCodeCard({ sumOfItemPrices, onApply, appliedPromo }: PromoCodeCardProps) {
   const { toast } = useToast();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [allFetchedPromoCodes, setAllFetchedPromoCodes] = useState<FirestorePromoCode[]>([]);
@@ -93,7 +96,7 @@ export default function PromoCodeCard({ sumOfItemPrices, onApply, appliedPromo }
       if (validUntil && currentDate > new Date(validUntil)) { toast({ title: "Expired Code", variant: "destructive" }); setIsApplyingPromo(false); return; }
 
       if (promoData.minBookingAmount && sumOfItemPrices < promoData.minBookingAmount) {
-        toast({ title: "Min Amount Not Met", description: `Minimum ₹${promoData.minBookingAmount} required.`, variant: "destructive" });
+        toast({ title: "Min Amount Not Met", description: `Minimum ${symbol}${promoData.minBookingAmount} required.`, variant: "destructive" });
         setIsApplyingPromo(false);
         return;
       }
@@ -164,7 +167,7 @@ export default function PromoCodeCard({ sumOfItemPrices, onApply, appliedPromo }
                     <>
                       <p className="font-bold text-green-600">Code "{appliedPromo.code}" Applied</p>
                       <p className="text-sm text-muted-foreground">
-                        Saved {appliedPromo.discountType === 'percentage' ? `${appliedPromo.discountValue}%` : `₹${appliedPromo.discountValue}`}
+                        Saved {appliedPromo.discountType === 'percentage' ? `${appliedPromo.discountValue}%` : `${symbol}${appliedPromo.discountValue}`}
                       </p>
                     </>
                   ) : (
@@ -242,11 +245,11 @@ export default function PromoCodeCard({ sumOfItemPrices, onApply, appliedPromo }
                           </Badge>
                         </div>
                         <p className="text-sm font-bold">
-                          {promo.discountType === 'percentage' ? `${promo.discountValue}% OFF` : `₹${promo.discountValue} OFF`}
+                          {promo.discountType === 'percentage' ? `${promo.discountValue}% OFF` : `${symbol}${promo.discountValue} OFF`}
                         </p>
                         {promo.minBookingAmount && (
                           <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
-                            On bookings above ₹{promo.minBookingAmount}
+                            On bookings above {symbol}{promo.minBookingAmount}
                           </p>
                         )}
                       </div>

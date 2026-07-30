@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription }
 import { CheckCircle2, Home, ListOrdered, Mail, Download, Loader2, MapPin, Tag, HandCoins, Ban, Hash, Package, Calendar, Clock, CreditCard, Activity, IndianRupee, Wallet, AlertTriangle } from 'lucide-react';
 import CheckoutStepper from '@/components/checkout/CheckoutStepper';
 import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { db, auth } from '@/lib/firebase';
 import { collection, addDoc, Timestamp, doc, getDoc, runTransaction, query, where, getDocs, limit, updateDoc, deleteDoc, setDoc } from '@/lib/mysqlDb';
 import type { FirestoreBooking, BookingServiceItem, FirestoreService, FirestorePromoCode, AppSettings, AppliedPlatformFeeItem, FirestoreNotification, BookingStatus, MarketingAutomationSettings, MarketingSettings, ProviderApplication, FirestoreCategory } from '@/types/firestore';
@@ -137,6 +137,9 @@ export default function ThankYouPage() {
   const router = useRouter();
   const { hideLoading } = useLoading();
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
 
   const SummaryItem = ({ icon: Icon, label, value, className, valueClassName }: { icon: any, label: string, value: React.ReactNode, className?: string, valueClassName?: string }) => (
     <div className={cn("flex items-center justify-between py-3.5 group", className)}>
@@ -501,7 +504,7 @@ export default function ThankYouPage() {
             </div>
             <CardTitle className="text-3xl sm:text-4xl font-black mt-6 bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Booking Cancelled</CardTitle>
             <CardDescription className="text-lg text-muted-foreground font-medium max-w-sm mx-auto">
-                Cancellation fee of <span className="text-foreground font-bold">₹{cancellationFeePaidAmount.toFixed(2)}</span> has been paid.
+                Cancellation fee of <span className="text-foreground font-bold">{formatCurrency(cancellationFeePaidAmount, symbol, decimals, code)}</span> has been paid.
                 Booking ID: <span className="text-foreground font-bold">#{cancelledBookingId || 'N/A'}</span> has been successfully cancelled.
             </CardDescription>
           </CardHeader>
@@ -657,7 +660,7 @@ export default function ThankYouPage() {
                 <SummaryItem icon={MapPin} label="Address" value={`${bookingDetailsForDisplay.addressLine1}${bookingDetailsForDisplay.addressLine2 ? ', ' + bookingDetailsForDisplay.addressLine2 : ''}, ${bookingDetailsForDisplay.city}`} />
                 <Separator className="opacity-40" />
 
-                <SummaryItem icon={IndianRupee} label="Items Total" value={`₹${bookingDetailsForDisplay.subTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
+                <SummaryItem icon={IndianRupee} label="Items Total" value={formatCurrency(bookingDetailsForDisplay.subTotal, symbol, decimals, code)} />
                 <Separator className="opacity-40" />
 
                 {bookingDetailsForDisplay.discountAmount != null && bookingDetailsForDisplay.discountAmount > 0 && (
@@ -666,7 +669,7 @@ export default function ThankYouPage() {
                         icon={Tag} 
                         label={`Discount (${bookingDetailsForDisplay.discountCode || 'Applied'})`} 
                         valueClassName="text-emerald-600"
-                        value={`- ₹${bookingDetailsForDisplay.discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
+                        value={`- ${formatCurrency(bookingDetailsForDisplay.discountAmount, symbol, decimals, code)}`} 
                     />
                     <Separator className="opacity-40" />
                   </>
@@ -674,21 +677,21 @@ export default function ThankYouPage() {
 
                 {bookingDetailsForDisplay.visitingChargeDisplayed != null && bookingDetailsForDisplay.visitingChargeDisplayed > 0 && (
                   <>
-                    <SummaryItem icon={IndianRupee} label="Visiting Charge" value={`+ ₹${bookingDetailsForDisplay.visitingCharge?.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
+                    <SummaryItem icon={IndianRupee} label="Visiting Charge" value={`+ ${formatCurrency(bookingDetailsForDisplay.visitingCharge || 0, symbol, decimals, code)}`} />
                     <Separator className="opacity-40" />
                   </>
                 )}
 
                 {bookingDetailsForDisplay.appliedPlatformFees?.map((fee, index) => (
                   <React.Fragment key={index}>
-                    <SummaryItem icon={HandCoins} label={fee.name} value={`+ ₹${(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}`} />
+                    <SummaryItem icon={HandCoins} label={fee.name} value={`+ ${formatCurrency(fee.calculatedFeeAmount + fee.taxAmountOnFee, symbol, decimals, code)}`} />
                     <Separator className="opacity-40" />
                   </React.Fragment>
                 ))}
 
                 {bookingDetailsForDisplay.taxAmount > 0 && (
                   <>
-                    <SummaryItem icon={Activity} label="Total Tax" value={`+ ₹${bookingDetailsForDisplay.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
+                    <SummaryItem icon={Activity} label="Total Tax" value={`+ ${formatCurrency(bookingDetailsForDisplay.taxAmount, symbol, decimals, code)}`} />
                     <Separator className="opacity-40" />
                   </>
                 )}
@@ -697,7 +700,7 @@ export default function ThankYouPage() {
                     icon={CreditCard} 
                     label="Total Amount" 
                     valueClassName="text-xl text-primary"
-                    value={`₹${bookingDetailsForDisplay.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} 
+                    value={formatCurrency(bookingDetailsForDisplay.totalAmount, symbol, decimals, code)} 
                 />
                 <Separator className="opacity-40" />
 

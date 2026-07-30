@@ -616,8 +616,10 @@ export interface AppSettings {
   freeCancellationMinutes?: number;
   cancellationFeeType?: 'fixed' | 'percentage';
   cancellationFeeValue?: number;
-  
   chatNotificationSoundUrl?: string; // New: default sound for chat notifications
+  currencyCode?: string;
+  currencySymbol?: string;
+  currencyDecimalPoints?: number;
   isChatEnabled?: boolean; // Added for compatibility with appDefaults.ts
   isProviderRegistrationEnabled?: boolean; // For toggling registration
   isCancelledChequeCompulsory?: boolean; // For toggling cheque compulsory status
@@ -1221,6 +1223,7 @@ export interface CompanyDetailsForPdf {
   contactEmail: string;
   contactMobile: string;
   logoUrl?: string;
+  currencySymbol?: string;
 }
 
 // --- Homepage Features Configuration ---

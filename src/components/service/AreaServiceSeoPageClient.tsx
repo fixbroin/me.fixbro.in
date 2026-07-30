@@ -10,6 +10,7 @@ import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import AppImage from '@/components/ui/AppImage';
 import { CheckCircle2, XCircle, Star, Phone, ShieldCheck, Clock, MapPin, Sparkles, ArrowRight } from 'lucide-react';
 import type { FirestoreCity, FirestoreArea, FirestoreService, AreaServiceSeoSetting, FaqItem } from '@/types/firestore';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 interface AreaServiceSeoPageClientProps {
   cityData: FirestoreCity;
@@ -33,6 +34,8 @@ export default function AreaServiceSeoPageClient({
   cityAreas = []
 }: AreaServiceSeoPageClientProps) {
   const router = useRouter();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
 
   const h1Title = seoOverride?.h1_title || `${serviceData.name} in ${areaData.name}, ${cityData.name}`;
   const customSeoContent = seoContent;
@@ -119,11 +122,11 @@ export default function AreaServiceSeoPageClient({
                       {serviceData.price ? (
                         <>
                           <span className="text-2xl md:text-3xl font-extrabold text-slate-900">
-                            ₹{serviceData.discountedPrice || serviceData.price}
+                            {symbol}{serviceData.discountedPrice || serviceData.price}
                           </span>
                           {serviceData.discountedPrice && (
                             <span className="text-sm text-slate-400 line-through">
-                              ₹{serviceData.price}
+                              {symbol}{serviceData.price}
                             </span>
                           )}
                         </>

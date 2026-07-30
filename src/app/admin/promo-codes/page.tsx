@@ -14,7 +14,8 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, Timestamp, where } from '@/lib/mysqlDb';
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatCurrency } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { getPromoCodeUsageHistory, type PromoCodeUsageRecord } from '@/lib/adminDashboardUtils';
 import { getCache, setCache } from '@/lib/client-cache';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,10 @@ import { useAdminStats } from "@/hooks/useAdminStats";
 import { triggerRefresh } from '@/lib/revalidateUtils';
 
 export default function AdminPromoCodesPage() {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const { stats } = useAdminStats();
   const [promoCodes, setPromoCodes] = useState<FirestorePromoCode[]>([]);
   const [usageHistory, setUsageHistory] = useState<PromoCodeUsageRecord[]>([]);
@@ -212,7 +217,7 @@ export default function AdminPromoCodesPage() {
 
   const getDiscountDisplay = (type: DiscountType, value: number) => {
     if (type === 'percentage') return `${value}%`;
-    if (type === 'fixed') return `₹${value.toLocaleString()}`;
+    if (type === 'fixed') return formatCurrency(value, symbol, decimals, code);
     return String(value);
   };
 
@@ -251,7 +256,7 @@ export default function AdminPromoCodesPage() {
                 <TableRow>
                   <TableHead>Code</TableHead>
                   <TableHead>Discount</TableHead>
-                  <TableHead className="text-center">Min. Booking (₹)</TableHead>
+                  <TableHead className="text-center">Min. Booking ({symbol})</TableHead>
                   <TableHead className="text-center">Uses / Max</TableHead>
                   <TableHead className="text-center">Max/User</TableHead>
                   <TableHead className="text-center">Valid From</TableHead>
@@ -338,7 +343,7 @@ export default function AdminPromoCodesPage() {
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Savings Given</p>
-              <h3 className="text-2xl font-black text-primary mt-1">₹{(stats as any).totalDiscountGiven?.toLocaleString() || '0'}</h3>
+              <h3 className="text-2xl font-black text-primary mt-1">{formatCurrency((stats as any).totalDiscountGiven || 0, symbol, decimals, code)}</h3>
             </div>
             <div className="p-3 rounded-2xl bg-primary/10 text-primary">
               <IndianRupee className="h-6 w-6" />
@@ -435,7 +440,7 @@ export default function AdminPromoCodesPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center font-bold text-green-600">
-                          ₹{record.discountAmount.toLocaleString()}
+                          {formatCurrency(record.discountAmount, symbol, decimals, code)}
                         </TableCell>
                         <TableCell className="text-center text-xs font-mono">
                           {record.bookingId}

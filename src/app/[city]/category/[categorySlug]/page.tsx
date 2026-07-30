@@ -9,6 +9,7 @@ import { replacePlaceholders, defaultSeoValues } from '@/lib/seoUtils';
 import { getGlobalSEOSettings, getCityCategorySeoOverride } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config';
 import JsonLdScript from '@/components/shared/JsonLdScript';
+import { getGlobalAppSettings } from '@/lib/webServerUtils';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
@@ -132,11 +133,13 @@ export default async function CityCategoryPage({ params }: PageProps) {
     notFound();
   }
 
-  const [pageData, fullCategoryData, aggregateRating] = await Promise.all([
+  const [pageData, fullCategoryData, aggregateRating, appConfig] = await Promise.all([
     getPageData(citySlugParam, categorySlugParam),
     getCategoryFullData(categorySlugParam, citySlugParam),
-    getAggregateRating()
+    getAggregateRating(),
+    getGlobalAppSettings()
   ]);
+  const symbol = appConfig?.currencySymbol || "₹";
 
   const { city: cityData, category: categoryData, seoOverride } = pageData;
 
@@ -198,7 +201,7 @@ export default async function CityCategoryPage({ params }: PageProps) {
     "description": seoOverride?.meta_description || categoryData.metaDescription || `Professional ${categoryData.name} services in ${cityData.name}. Trusted home maintenance and repairs by Wecanfix.`,
     "image": schemaImage,
     "telephone": seoSettings.structuredDataTelephone,
-    "priceRange": "₹₹",
+    "priceRange": `${symbol}${symbol}`,
     "address": {
       "@type": "PostalAddress",
       "addressLocality": cityData.name,

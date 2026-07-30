@@ -35,14 +35,14 @@ RewriteRule "(^|/)\." - [F]
 # ----------------------------------------------------------------------
 # RewriteCond %{HTTPS} !=on
 # RewriteCond %{HTTP_HOST} ^wecanfix.in\.com$ [NC]
-# RewriteRule ^/?(.*)$ https://wecanfix.in/$1 [R=301,L]
+# RewriteRule ^/?(.*)$ https://me.fixbro.in/$1 [R=301,L]
 
 # ----------------------------------------------------------------------
 # WWW to non-WWW REDIRECTION (or vice-versa) (Optional)
 # Example: Force non-www
 # ----------------------------------------------------------------------
 # RewriteCond %{HTTP_HOST} ^www\.wecanfix.in\.com$ [NC]
-# RewriteRule ^/?(.*)$ https://wecanfix.in/$1 [R=301,L]
+# RewriteRule ^/?(.*)$ https://me.fixbro.in/$1 [R=301,L]
 
 # ----------------------------------------------------------------------
 # BASIC BROWSER CACHING (Optional - Next.js handles its assets well)

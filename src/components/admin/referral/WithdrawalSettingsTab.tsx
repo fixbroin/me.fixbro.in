@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp } from '@/lib/mysqlDb';
 import type { WithdrawalSettings } from '@/types/firestore';
+import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 import { triggerRefresh } from '@/lib/revalidateUtils';
 
 const WITHDRAWAL_CONFIG_COLLECTION = "appConfiguration";
@@ -46,6 +47,8 @@ const defaultWithdrawalSettings: WithdrawalSettings = {
 
 export default function WithdrawalSettingsTab() {
   const { toast } = useToast();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -131,7 +134,7 @@ export default function WithdrawalSettingsTab() {
               name="minWithdrawalAmount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Minimum Withdrawal Amount (₹)</FormLabel>
+                  <FormLabel>Minimum Withdrawal Amount ({symbol})</FormLabel>
                   <FormControl><Input type="number" placeholder="e.g., 200" {...field} disabled={isSaving} /></FormControl>
                   <FormMessage />
                 </FormItem>

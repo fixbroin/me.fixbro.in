@@ -13,7 +13,7 @@ import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, arrayUnion, arrayRemove, onSnapshot, collection, query, where, getDocs } from '@/lib/mysqlDb';
+import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, collection, query, where, getDocs } from '@/lib/mysqlDb';
 import type { Address, FirestoreUser, ServiceZone } from '@/types/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { nanoid } from 'nanoid';
@@ -69,19 +69,22 @@ export default function MyAddressPage() {
     fetchZones();
 
     const userDocRef = doc(db, 'users', user.uid);
-    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const userData = docSnap.data() as FirestoreUser;
-        setAddresses(userData.addresses || []);
-        setFirestoreUser(userData);
+    const fetchUserAddresses = async () => {
+      try {
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          const userData = docSnap.data() as FirestoreUser;
+          setAddresses(userData.addresses || []);
+          setFirestoreUser(userData);
+        }
+      } catch (error) {
+        console.error("Error fetching addresses:", error);
+        toast({ title: "Error", description: "Could not fetch your addresses.", variant: "destructive" });
+      } finally {
+        setIsLoadingAddresses(false);
       }
-      setIsLoadingAddresses(false);
-    }, (error) => {
-      console.error("Error fetching addresses:", error);
-      toast({ title: "Error", description: "Could not fetch your addresses.", variant: "destructive" });
-      setIsLoadingAddresses(false);
-    });
-    return () => unsubscribe();
+    };
+    fetchUserAddresses();
   }, [user, isLoadingAuth, toast]);
   
   const checkServiceability = useCallback((address: Partial<AddressFormData>) => {

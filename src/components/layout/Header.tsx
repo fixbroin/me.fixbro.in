@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Search, Bell, Menu, X, ShoppingCart, LogOut, UserCircle, Briefcase, Settings2, Moon, Sun, MessageSquare, UserPlus, MapPin as AddressIcon, Construction, Handshake, ChevronDown, LayoutDashboard, ClipboardList } from 'lucide-react'; // Added Handshake
 import Logo from '@/components/shared/Logo';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import SearchPopup from '@/components/shared/SearchPopup';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -66,6 +66,9 @@ const Header = () => {
   const { user, firestoreUser, logOut, isLoading: authIsLoading, triggerAuthRedirect, providerStatus } = useAuth();
   const { settings: globalSettings, isLoading: settingsAreLoading } = useGlobalSettings();
   const { config: appConfig, isLoading: isLoadingAppConfig } = useApplicationConfig(); 
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const { featuresConfig, isLoading: isLoadingFeaturesConfig } = useFeaturesConfig(); 
   const [cartItemCount, setCartItemCount] = useState(0);
   const router = useRouter();
@@ -331,7 +334,7 @@ const Header = () => {
                   className="hidden lg:flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider bg-primary/5 text-primary border border-primary/20 rounded-full hover:bg-primary hover:text-primary-foreground transition-all duration-300 mr-2"
                 >
                   <Handshake className="h-4 w-4" /> 
-                  <span>Refer & Earn ₹{referralSettings?.maxEarningsPerReferrer || referralSettings?.referrerBonus || 100}</span>
+                  <span>Refer & Earn {formatCurrency(referralSettings?.maxEarningsPerReferrer || referralSettings?.referrerBonus || 100, symbol, decimals, code)}</span>
                 </button>
               )}
             

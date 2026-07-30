@@ -36,6 +36,7 @@ type ProviderFeesFormData = z.infer<typeof providerFeesSchema>;
 export default function ProviderFeesSetupTab() {
   const { toast } = useToast();
   const { config: appConfig, isLoading: isLoadingAppConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
   const [isSaving, setIsSaving] = useState(false);
 
   const form = useForm<ProviderFeesFormData>({
@@ -111,7 +112,7 @@ export default function ProviderFeesSetupTab() {
                     >
                       <FormItem className="flex items-center space-x-3 space-y-0">
                         <FormControl><RadioGroupItem value="fixed" /></FormControl>
-                        <FormLabel className="font-normal">Fixed Fee (₹)</FormLabel>
+                        <FormLabel className="font-normal">Fixed Fee ({symbol})</FormLabel>
                       </FormItem>
                       <FormItem className="flex items-center space-x-3 space-y-0">
                         <FormControl><RadioGroupItem value="percentage" /></FormControl>
@@ -139,7 +140,7 @@ export default function ProviderFeesSetupTab() {
                     />
                   </FormControl>
                   <FormDescription>
-                    Enter the fixed amount (e.g., 50 for ₹50) or the percentage (e.g., 20 for 20%).
+                    Enter the fixed amount (e.g., 50 for {symbol}50) or the percentage (e.g., 20 for 20%).
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

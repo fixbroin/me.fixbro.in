@@ -51,22 +51,38 @@ export function useApplicationConfig(): UseApplicationConfigReturn {
   useEffect(() => {
     const configDocRef = doc(db, APP_CONFIG_COLLECTION, APP_CONFIG_DOC_ID);
 
-    const unsubscribe = onSnapshot(configDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const processed = processData(docSnap.data());
-        setConfig(processed);
-        setCache(CACHE_KEY, processed);
-      }
-      setIsLoading(false);
-    }, (err: any) => {
-      if (err?.name !== 'AbortError' && !err?.message?.includes('Failed to fetch')) {
-        console.error("Error subscribing to app config:", err);
-      }
-      setIsLoading(false);
-    });
+    const fetchConfig = async () => {
+      try {
+        const remoteVersions = await getRemoteCacheVersions();
+        const remoteVersion = remoteVersions['app-settings'] || remoteVersions.global || 0;
 
-    return () => unsubscribe();
-  }, [processData]);
+        const localVersion = parseInt(localStorage.getItem(`${CACHE_KEY}-version`) || "0");
+        const cached = getCache<AppSettings>(CACHE_KEY, true);
+
+        if (cached && !isAdmin && remoteVersion <= localVersion) {
+          setConfig(processData(cached));
+          setIsLoading(false);
+          return;
+        }
+
+        const docSnap = await getDoc(configDocRef);
+        if (docSnap.exists()) {
+          const processed = processData(docSnap.data());
+          setConfig(processed);
+          setCache(CACHE_KEY, processed, true);
+          localStorage.setItem(`${CACHE_KEY}-version`, remoteVersion.toString());
+        }
+      } catch (err: any) {
+        if (err?.name !== 'AbortError' && !err?.message?.includes('Failed to fetch')) {
+          console.error("Error fetching app config:", err);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchConfig();
+  }, [processData, isAdmin]);
 
   return { config, isLoading, error };
 }

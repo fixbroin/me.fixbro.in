@@ -13,7 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Banknote, RefreshCw } from "lucide-react";
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -86,6 +87,10 @@ const DetailItem = ({ label, value }: { label: string, value?: string | null }) 
 );
 
 export default function ProviderWithdrawalsPage() {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const [requests, setRequests] = useState<WithdrawalRequest[]>([]);
   const [providers, setProviders] = useState<FirestoreUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -193,7 +198,7 @@ export default function ProviderWithdrawalsPage() {
 
         const updatePayload: Partial<WithdrawalRequest> = { status: newStatus, processedAt: Timestamp.now() };
         let userUpdatePayload: Partial<{[key: string]: any}> = {};
-        let notificationMessage = `Your withdrawal request of ₹${request.amount.toFixed(2)} has been updated to ${newStatus}.`;
+        let notificationMessage = `Your withdrawal request of ${formatCurrency(request.amount, symbol, decimals, code)} has been updated to ${newStatus}.`;
         let notificationType: FirestoreNotification['type'] = 'info';
 
         if (newStatus === 'rejected' || newStatus === 're_submit') {
@@ -208,7 +213,7 @@ export default function ProviderWithdrawalsPage() {
           
           const newWalletBalance = (userDoc.data().withdrawableBalance || 0) + request.amount;
           userUpdatePayload = { withdrawableBalance: newWalletBalance, withdrawalPending: false }; // Refund and unlock
-          notificationMessage = `Your withdrawal of ₹${request.amount.toFixed(2)} was ${newStatus === 'rejected' ? 'rejected' : 'sent back for re-submission'}. Reason: ${reason}. The amount has been refunded to your wallet.`;
+          notificationMessage = `Your withdrawal of ${formatCurrency(request.amount, symbol, decimals, code)} was ${newStatus === 'rejected' ? 'rejected' : 'sent back for re-submission'}. Reason: ${reason}. The amount has been refunded to your wallet.`;
           notificationType = newStatus === 'rejected' ? 'error' : 'warning';
         } else if (newStatus === 'completed') {
             // Money already deducted on request.
@@ -229,7 +234,7 @@ export default function ProviderWithdrawalsPage() {
               withdrawalPending: false,
               totalPaidOut: currentTotalPaidOut + request.amount 
             }; 
-            notificationMessage = `Your withdrawal of ₹${request.amount.toFixed(2)} has been successfully completed.`;
+            notificationMessage = `Your withdrawal of ${formatCurrency(request.amount, symbol, decimals, code)} has been successfully completed.`;
             notificationType = 'success';
         }
         
@@ -254,7 +259,7 @@ export default function ProviderWithdrawalsPage() {
       triggerPushNotification({
         userId: request.providerId,
         title: `Withdrawal Request ${newStatus.replace(/_/g, ' ')}`,
-        body: `Your withdrawal of ₹${request.amount.toFixed(2)} has been ${newStatus.replace(/_/g, ' ')}.`,
+        body: `Your withdrawal of ${formatCurrency(request.amount, symbol, decimals, code)} has been ${newStatus.replace(/_/g, ' ')}.`,
         href: '/provider/withdrawal'
       });
 
@@ -358,11 +363,11 @@ export default function ProviderWithdrawalsPage() {
                             <div className="text-xs text-muted-foreground">{req.providerEmail}</div>
                             {currentBalance !== null && (
                                 <div className={cn("text-[10px] font-bold mt-1 px-1.5 py-0.5 rounded w-fit", currentBalance < 0 ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700")}>
-                                    Current Wallet: ₹{currentBalance.toFixed(2)}
+                                    Current Wallet: {formatCurrency(currentBalance, symbol, decimals, code)}
                                 </div>
                             )}
                           </TableCell>
-                          <TableCell className="font-bold">₹{req.amount.toFixed(2)}</TableCell>
+                          <TableCell className="font-bold">{formatCurrency(req.amount, symbol, decimals, code)}</TableCell>
                           <TableCell className="capitalize">{req.method.replace('_', ' ')}</TableCell>
                           <TableCell>
                             <Button variant="outline" size="sm" onClick={() => handleViewDetails(req)}>
@@ -468,14 +473,14 @@ export default function ProviderWithdrawalsPage() {
                        return (
                        <TableRow key={p.uid}>
                           <TableCell><div className="font-medium">{p.displayName}</div><div className="text-xs text-muted-foreground">{p.email}</div></TableCell>
-                          <TableCell className="text-xs font-semibold">₹{stats.gross.toFixed(2)}</TableCell>
-                          <TableCell className="text-xs font-bold text-green-600">₹{monthNet.toFixed(2)}</TableCell>
+                          <TableCell className="text-xs font-semibold">{formatCurrency(stats.gross, symbol, decimals, code)}</TableCell>
+                          <TableCell className="text-xs font-bold text-green-600">{formatCurrency(monthNet, symbol, decimals, code)}</TableCell>
                           <TableCell>
                             <div className={cn("text-lg font-bold", (p.withdrawableBalance || 0) < 0 ? "text-destructive" : "text-blue-600")}>
-                                ₹{(p.withdrawableBalance || 0).toFixed(2)}
+                                {formatCurrency(p.withdrawableBalance || 0, symbol, decimals, code)}
                             </div>
                           </TableCell>
-                          <TableCell className="font-semibold text-muted-foreground">₹{(p.totalPaidOut || 0).toFixed(2)}</TableCell>
+                          <TableCell className="font-semibold text-muted-foreground">{formatCurrency(p.totalPaidOut || 0, symbol, decimals, code)}</TableCell>
                           <TableCell>
                             {(p.withdrawableBalance || 0) < 0 ? (
                                 <Badge variant="destructive">Settlement Due</Badge>
@@ -521,7 +526,7 @@ export default function ProviderWithdrawalsPage() {
                 </DialogDescriptionComponent>
             </DialogHeader>
             <div className="space-y-4 py-2">
-                <DetailItem label="Amount" value={`₹${selectedRequestForDetails?.amount.toFixed(2)}`} />
+                <DetailItem label="Amount" value={selectedRequestForDetails ? formatCurrency(selectedRequestForDetails.amount, symbol, decimals, code) : ''} />
                 <DetailItem label="Method" value={selectedRequestForDetails?.method.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} />
                 <Separator />
                 <h4 className="font-semibold text-sm">Account Details</h4>

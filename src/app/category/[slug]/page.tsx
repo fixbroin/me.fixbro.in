@@ -10,6 +10,7 @@ import { replacePlaceholders } from '@/lib/seoUtils';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
+import { getGlobalAppSettings } from '@/lib/webServerUtils';
 import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
 
 export const revalidate = false;
@@ -36,6 +37,9 @@ const getCategoryDataForPage = cache(async (slug: string): Promise<{category: Fi
         let totalReviews = 0;
         let minPrice = Infinity;
         let maxPrice = 0;
+
+        const appConfig = await getGlobalAppSettings();
+        const symbol = appConfig?.currencySymbol || "₹";
 
         if (subCatIds.length > 0) {
             const chunks = [];
@@ -69,7 +73,7 @@ const getCategoryDataForPage = cache(async (slug: string): Promise<{category: Fi
         const aggregateRating = totalReviews > 0 ? {
             ratingValue: (totalRating / totalReviews).toFixed(1),
             reviewCount: totalReviews,
-            priceRange: minPrice !== Infinity ? `₹${minPrice} - ₹${maxPrice}` : undefined
+            priceRange: minPrice !== Infinity ? `${symbol}${minPrice} - ${symbol}${maxPrice}` : undefined
         } : undefined;
 
         return { category, aggregateRating };

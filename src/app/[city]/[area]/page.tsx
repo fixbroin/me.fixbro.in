@@ -10,6 +10,7 @@ import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { replacePlaceholders } from '@/lib/seoUtils';
 import { getBaseUrl } from '@/lib/config';
 import JsonLdScript from '@/components/shared/JsonLdScript';
+import { getGlobalAppSettings } from '@/lib/webServerUtils';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
@@ -118,11 +119,13 @@ export default async function AreaHomePage({ params }: AreaPageProps) {
     notFound();
   }
   
-  const [areaData, homepageData, aggregateRating] = await Promise.all([
+  const [areaData, homepageData, aggregateRating, appConfig] = await Promise.all([
     getAreaDataForPage(citySlug, areaSlug),
     getHomepageData(),
-    getAggregateRating()
+    getAggregateRating(),
+    getGlobalAppSettings()
   ]);
+  const symbol = appConfig?.currencySymbol || "₹";
   
   if (!areaData) {
     notFound();
@@ -156,7 +159,7 @@ export default async function AreaHomePage({ params }: AreaPageProps) {
     "description": areaData.seo_description || areaData.metaDescription || `Reliable home services in ${areaData.name}.`,
     "image": schemaImage,
     "telephone": seoSettings.structuredDataTelephone,
-    "priceRange": "₹₹",
+    "priceRange": `${symbol}${symbol}`,
     "address": {
       "@type": "PostalAddress",
       "addressLocality": areaData.name,

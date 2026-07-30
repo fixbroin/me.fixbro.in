@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/sidebar';
 import AdminSidebarContent from '@/components/admin/AdminSidebarContent';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import {
   DropdownMenu,
@@ -23,7 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
-import { UserCircle, KeyRound, LogOut, Loader2, Bell, ShieldCheck, ChevronDown } from 'lucide-react';
+import { UserCircle, KeyRound, LogOut, Loader2, Bell, ShieldCheck, ChevronDown, LayoutDashboard, Calendar, Activity, Eye, Users } from 'lucide-react';
 import { auth, db } from '@/lib/firebase'; 
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -228,6 +229,20 @@ export default function AdminLayout({ children }: PropsWithChildren) {
     };
   }, [pathname, adminUser, hideLoading]);
 
+  const mobileTabs = useMemo(() => [
+    { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    { label: 'Bookings', href: '/admin/bookings', icon: Calendar },
+    { label: 'Activity', href: '/admin/activity-feed', icon: Activity },
+    { label: 'Visitors', href: '/admin/visitor-info', icon: Eye },
+    { label: 'Users', href: '/admin/users', icon: Users },
+  ], []);
+
+  const isTabActive = useCallback((href: string) => {
+    if (href === '/admin') {
+      return pathname === '/admin';
+    }
+    return pathname.startsWith(href);
+  }, [pathname]);
 
   if (pathname === '/admin/login') {
     return <>{children}</>;
@@ -363,7 +378,7 @@ export default function AdminLayout({ children }: PropsWithChildren) {
               </div>
             </div>
           </header>
-          <main className="p-4 sm:p-3 lg:p-8 relative flex-grow">
+          <main className="p-4 sm:p-3 lg:p-8 pb-20 md:pb-8 relative flex-grow">
             <Suspense fallback={<AdminPageLoader />}>
               {children}
             </Suspense>
@@ -385,6 +400,28 @@ export default function AdminLayout({ children }: PropsWithChildren) {
               </>
             )}
           </main>
+
+          {/* Mobile Bottom Navigation Bar */}
+          <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-xl border-t border-border/40 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] px-4 py-2 flex items-center justify-around pb-safe">
+            {mobileTabs.map(tab => {
+              const Icon = tab.icon;
+              const isActive = isTabActive(tab.href);
+              return (
+                <Link
+                  key={tab.label}
+                  href={tab.href}
+                  onClick={() => showLoading()}
+                  className={cn(
+                    "flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all duration-300",
+                    isActive ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className={cn("h-5 w-5 transition-transform duration-300", isActive && "scale-110")} />
+                  <span className="text-[9px] font-black uppercase tracking-wider">{tab.label}</span>
+                </Link>
+              );
+            })}
+          </div>
         </SidebarInset>
       </SidebarProvider>
     </ProtectedRoute>

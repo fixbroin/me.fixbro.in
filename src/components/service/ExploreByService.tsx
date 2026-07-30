@@ -11,6 +11,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import AppImage from '@/components/ui/AppImage';
 import { useRouter } from 'next/navigation';
 import { useLoading } from '@/contexts/LoadingContext';
+import { formatCurrency } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import Autoplay from "embla-carousel-autoplay";
 import * as React from "react";
 import Link from 'next/link';
@@ -21,6 +23,10 @@ interface ExploreByServiceProps {
 }
 
 const RelatedServiceCard: React.FC<{ service: FirestoreService }> = ({ service }) => {
+    const { config: appConfig } = useApplicationConfig();
+    const symbol = appConfig?.currencySymbol || '₹';
+    const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+    const code = appConfig?.currencyCode || 'INR';
     const router = useRouter();
     const { showLoading } = useLoading();
 
@@ -37,7 +43,7 @@ const RelatedServiceCard: React.FC<{ service: FirestoreService }> = ({ service }
             </div>
             <CardContent className="p-2 flex-grow">
                 <h4 className="text-xs font-semibold truncate">{service.name}</h4>
-                <p className="text-sm font-medium text-primary mt-1">₹{service.discountedPrice ?? service.price}</p>
+                <p className="text-sm font-medium text-primary mt-1">{formatCurrency(service.discountedPrice ?? service.price, symbol, decimals, code)}</p>
             </CardContent>
         </Card>
     );

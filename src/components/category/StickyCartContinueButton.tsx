@@ -12,6 +12,8 @@ import { useLoading } from '@/contexts/LoadingContext';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from '@/lib/mysqlDb';
 import type { FirestoreService } from '@/types/firestore';
+import { formatCurrency } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 // --- START: Pricing Logic ---
 const getPriceForNthUnit = (service: FirestoreService, n: number): number => {
@@ -44,6 +46,10 @@ const calculateIncrementalTotalPriceForItem = (service: FirestoreService, quanti
 // --- END: Pricing Logic ---
 
 const StickyCartContinueButton = () => {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const [cartItemCount, setCartItemCount] = useState(0);
   const [totalPrice, setTotalPrice] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
@@ -132,7 +138,7 @@ const StickyCartContinueButton = () => {
     <div className="h-5 w-20 bg-muted rounded-md animate-pulse"></div>
   ) : (
     <span className="font-bold text-lg text-primary">
-      ₹{totalPrice.toFixed(2)}
+      {formatCurrency(totalPrice, symbol, decimals, code)}
     </span>
   )}
   <span className="text-sm text-muted-foreground">

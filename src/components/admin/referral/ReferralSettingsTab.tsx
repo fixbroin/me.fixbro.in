@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp } from '@/lib/mysqlDb';
 import type { ReferralSettings } from '@/types/firestore';
+import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 import { triggerRefresh } from '@/lib/revalidateUtils';
 
 const REFERRAL_CONFIG_COLLECTION = "appConfiguration";
@@ -48,6 +49,8 @@ const defaultReferralSettings: ReferralSettings = {
 
 export default function ReferralSettingsTab() {
   const { toast } = useToast();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -142,8 +145,8 @@ export default function ReferralSettingsTab() {
                       <FormLabel>Bonus Type</FormLabel>
                       <FormControl>
                         <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
-                          <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="fixed" /></FormControl><FormLabel className="font-normal">Fixed Amount (₹)</FormLabel></FormItem>
-                          <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="percentage" /></FormControl><FormLabel className="font-normal">Percentage (%)</FormLabel></FormItem>
+                           <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="fixed" /></FormControl><FormLabel className="font-normal">Fixed Amount ({symbol})</FormLabel></FormItem>
+                           <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="percentage" /></FormControl><FormLabel className="font-normal">Percentage (%)</FormLabel></FormItem>
                         </RadioGroup>
                       </FormControl>
                       <FormMessage />
@@ -155,8 +158,8 @@ export default function ReferralSettingsTab() {
             <div className="space-y-4 p-4 border rounded-md">
                 <h4 className="font-medium text-lg">Rules & Conditions</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <FormField control={form.control} name="minBookingValueForBonus" render={({ field }) => (<FormItem><FormLabel>Minimum Booking Value (₹)</FormLabel><FormControl><Input type="number" placeholder="e.g., 250" {...field} /></FormControl><FormDescription>Bonus is credited only if the referred user's first booking is above this value.</FormDescription><FormMessage /></FormItem>)}/>
-                     <FormField control={form.control} name="maxEarningsPerReferrer" render={({ field }) => (<FormItem><FormLabel>Max Earnings Per Referrer (₹, Optional)</FormLabel><FormControl><Input type="number" placeholder="e.g., 5000" {...field} value={field.value ?? ""} /></FormControl><FormDescription>Leave blank for no limit.</FormDescription><FormMessage /></FormItem>)}/>
+                     <FormField control={form.control} name="minBookingValueForBonus" render={({ field }) => (<FormItem><FormLabel>Minimum Booking Value ({symbol})</FormLabel><FormControl><Input type="number" placeholder="e.g., 250" {...field} /></FormControl><FormDescription>Bonus is credited only if the referred user's first booking is above this value.</FormDescription><FormMessage /></FormItem>)}/>
+                     <FormField control={form.control} name="maxEarningsPerReferrer" render={({ field }) => (<FormItem><FormLabel>Max Earnings Per Referrer ({symbol}, Optional)</FormLabel><FormControl><Input type="number" placeholder="e.g., 5000" {...field} value={field.value ?? ""} /></FormControl><FormDescription>Leave blank for no limit.</FormDescription><FormMessage /></FormItem>)}/>
                 </div>
                 <FormField control={form.control} name="referralCodeLength" render={({ field }) => (<FormItem><FormLabel>Referral Code Length</FormLabel><FormControl><Input type="number" placeholder="e.g., 6" {...field} /></FormControl><FormDescription>Length of the auto-generated unique referral code.</FormDescription><FormMessage /></FormItem>)}/>
                  <FormField control={form.control} name="preventReuse" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3"><div className="space-y-0.5"><FormLabel>Prevent Reuse</FormLabel><FormDescription className="text-xs">Attempt to detect and block abuse from the same device/IP.</FormDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)}/>

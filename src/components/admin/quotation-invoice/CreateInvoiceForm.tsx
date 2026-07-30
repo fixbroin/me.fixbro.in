@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { generateInvoicePdf } from '@/lib/sriinvoiceGenerator';
 import { uploadPdfToStorage, triggerPdfDownload, dataUriToBlob } from '@/lib/pdfUtils';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getTimestampMillis } from '@/lib/utils';
 
@@ -77,6 +78,8 @@ export default function CreateInvoiceForm({ initialData, onSaveSuccess }: Create
   const { toast } = useToast();
   const router = useRouter();
   const { settings: companySettings, isLoading: isLoadingCompanySettings } = useGlobalSettings();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -281,6 +284,7 @@ export default function CreateInvoiceForm({ initialData, onSaveSuccess }: Create
         name: companySettings?.websiteName || "Wecanfix", address: companySettings?.address || "",
         contactEmail: companySettings?.contactEmail || "", contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
+        currencySymbol: appConfig?.currencySymbol || "₹",
       };
 
       const pdfDataUri = await generateInvoicePdf(savedInvoice, companyInfo);
@@ -325,6 +329,7 @@ export default function CreateInvoiceForm({ initialData, onSaveSuccess }: Create
         name: companySettings?.websiteName || "Wecanfix", address: companySettings?.address || "",
         contactEmail: companySettings?.contactEmail || "", contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
+        currencySymbol: appConfig?.currencySymbol || "₹",
       };
 
       const pdfDataUri = await generateInvoicePdf(savedInvoice, companyInfo);
@@ -408,8 +413,8 @@ export default function CreateInvoiceForm({ initialData, onSaveSuccess }: Create
                   <div className="grid grid-cols-1 sm:grid-cols-itemized-quotation gap-3 items-end">
                     <FormField control={form.control} name={`items.${index}.itemName`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Item Name <span className="text-destructive">*</span></FormLabel><FormControl><Input placeholder="Service or Product" {...field} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)}/>
                     <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Qty <span className="text-destructive">*</span></FormLabel><FormControl><Input type="number" placeholder="1" {...field} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)}/>
-                    <FormField control={form.control} name={`items.${index}.ratePerUnit`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Rate/Unit (₹) <span className="text-destructive">*</span></FormLabel><FormControl><Input type="number" step="0.01" placeholder="100.00" {...field} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)}/>
-                    <FormItem><FormLabel className="text-xs">Total (₹)</FormLabel><Input type="text" value={((form.watch(`items.${index}.quantity`) || 0) * (form.watch(`items.${index}.ratePerUnit`) || 0)).toFixed(2)} disabled readOnly className="bg-muted/50"/></FormItem>
+                    <FormField control={form.control} name={`items.${index}.ratePerUnit`} render={({ field }) => (<FormItem><FormLabel className="text-xs">Rate/Unit ({appConfig?.currencySymbol || "₹"}) <span className="text-destructive">*</span></FormLabel><FormControl><Input type="number" step="0.01" placeholder="100.00" {...field} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)}/>
+                    <FormItem><FormLabel className="text-xs">Total ({appConfig?.currencySymbol || "₹"})</FormLabel><Input type="text" value={((form.watch(`items.${index}.quantity`) || 0) * (form.watch(`items.${index}.ratePerUnit`) || 0)).toFixed(2)} disabled readOnly className="bg-muted/50"/></FormItem>
                   </div>
                   {fields.length > 1 && (<Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-destructive" onClick={() => remove(index)} disabled={isSaving}><Trash2 className="h-4 w-4" /></Button>)}
                 </div>
@@ -421,19 +426,19 @@ export default function CreateInvoiceForm({ initialData, onSaveSuccess }: Create
             <div className="space-y-3 p-4 border rounded-md">
               <h3 className="text-lg font-medium">Summary & Payment</h3>
               <div className="space-y-1 text-right text-sm">
-                <div>Subtotal: <span className="font-semibold">₹{subtotal.toFixed(2)}</span></div>
+                <div>Subtotal: <span className="font-semibold">{appConfig?.currencySymbol || "₹"}{subtotal.toFixed(2)}</span></div>
                 <div className="flex items-center justify-end gap-2">
                   <FormLabel htmlFor="discountPercentInput" className="text-sm whitespace-nowrap">Discount (%):</FormLabel>
                   <FormField control={form.control} name="discountPercent" render={({ field }) => (<FormItem className="inline-block w-20"><FormControl><Input type="number" id="discountPercentInput" step="0.01" placeholder="0" {...field} disabled={isSaving} className="h-8 text-right" /></FormControl><FormMessage className="text-left text-xs" /></FormItem>)}/>
                 </div>
-                <div>Discount Amount: <span className="font-semibold text-green-600">- ₹{discountAmount.toFixed(2)}</span></div>
-                <div>Amount After Discount: <span className="font-semibold">₹{amountAfterDiscount.toFixed(2)}</span></div>
+                <div>Discount Amount: <span className="font-semibold text-green-600">- {appConfig?.currencySymbol || "₹"}{discountAmount.toFixed(2)}</span></div>
+                <div>Amount After Discount: <span className="font-semibold">{appConfig?.currencySymbol || "₹"}{amountAfterDiscount.toFixed(2)}</span></div>
                 <div className="flex items-center justify-end gap-2">
                   <FormLabel htmlFor="taxPercentInvoiceInput" className="text-sm whitespace-nowrap">Tax (%):</FormLabel>
                   <FormField control={form.control} name="taxPercent" render={({ field }) => (<FormItem className="inline-block w-20"><FormControl><Input type="number" id="taxPercentInvoiceInput" step="0.01" placeholder="0" {...field} disabled={isSaving} className="h-8 text-right" /></FormControl><FormMessage className="text-left text-xs" /></FormItem>)}/>
                 </div>
-                <div>Tax Amount: <span className="font-semibold">₹{taxAmount.toFixed(2)}</span></div>
-                <div className="text-lg font-bold text-primary">Grand Total: ₹{grandTotal.toFixed(2)}</div>
+                <div>Tax Amount: <span className="font-semibold">{appConfig?.currencySymbol || "₹"}{taxAmount.toFixed(2)}</span></div>
+                <div className="text-lg font-bold text-primary">Grand Total: {appConfig?.currencySymbol || "₹"}{grandTotal.toFixed(2)}</div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3">
                 <FormField control={form.control} name="paymentStatus" render={({ field }) => (
@@ -546,9 +551,9 @@ export default function CreateInvoiceForm({ initialData, onSaveSuccess }: Create
                 )}/>
               </div>
               <FormField control={form.control} name="amountPaid" render={({ field }) => (
-                <FormItem><FormLabel>Amount Paid (₹) (Optional)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value ?? ""} disabled={isSaving} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Amount Paid ({symbol}) (Optional)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value ?? ""} disabled={isSaving} /></FormControl><FormMessage /></FormItem>
               )}/>
-              <div className="text-right text-sm font-semibold">Amount Due: <span className="text-destructive">₹{amountDue.toFixed(2)}</span></div>
+              <div className="text-right text-sm font-semibold">Amount Due: <span className="text-destructive">{symbol}{amountDue.toFixed(2)}</span></div>
               <FormField control={form.control} name="paymentNotes" render={({ field }) => (<FormItem><FormLabel>Payment Notes (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Transaction ID, Partial payment details" {...field} rows={2} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)}/>
               <FormField control={form.control} name="additionalNotes" render={({ field }) => (<FormItem><FormLabel>Additional Invoice Notes (Optional)</FormLabel><FormControl><Textarea placeholder="Terms and conditions, Bank details for transfer, etc." {...field} rows={3} disabled={isSaving} /></FormControl><FormMessage /></FormItem>)}/>
             </div>

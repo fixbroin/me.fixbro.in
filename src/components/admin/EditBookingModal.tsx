@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Separator } from "@/components/ui/separator";
 import AppImage from '@/components/ui/AppImage';
@@ -83,6 +83,9 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
   const [isStatusPickerOpen, setIsStatusPickerOpen] = useState(false);
 
   const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const [services, setServices] = useState<BookingServiceItem[]>([]);
   const [allCatalogServices, setAllCatalogServices] = useState<FirestoreService[]>([]);
   const [isAddServiceDialogOpen, setIsAddServiceDialogOpen] = useState(false);
@@ -627,7 +630,7 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
                                     onClick={() => handleAddServiceFromCatalog(srv)}
                                   >
                                     <span className="font-bold text-sm text-foreground">{srv.name}</span>
-                                    <span className="text-xs text-muted-foreground">Price: ₹{srv.discountedPrice ?? srv.price}</span>
+                                    <span className="text-xs text-muted-foreground">Price: {formatCurrency(srv.discountedPrice ?? srv.price, symbol, decimals, code)}</span>
                                   </Button>
                                 ))}
                               {allCatalogServices.filter(s => s.name.toLowerCase().includes(serviceSearchQuery.toLowerCase())).length === 0 && (
@@ -648,7 +651,7 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
                             )}
                             <div className="space-y-0.5">
                               <div className="font-bold text-sm leading-tight">{item.name}</div>
-                              <div className="text-xs text-muted-foreground">₹{item.pricePerUnit} per unit</div>
+                              <div className="text-xs text-muted-foreground">{formatCurrency(item.pricePerUnit, symbol, decimals, code)} per unit</div>
                             </div>
                           </div>
                           
@@ -675,7 +678,7 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
                               </Button>
                             </div>
                             <div className="text-sm font-bold min-w-[70px] text-right">
-                              ₹{(item.pricePerUnit * item.quantity).toLocaleString()}
+                              {formatCurrency(item.pricePerUnit * item.quantity, symbol, decimals, code)}
                             </div>
                             <Button
                               type="button"
@@ -701,34 +704,34 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
                       <div className="mt-4 border-t pt-4 space-y-2 text-xs">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Services Subtotal:</span>
-                          <span className="font-bold">₹{summary.itemTotal.toFixed(2)}</span>
+                          <span className="font-bold">{formatCurrency(summary.itemTotal, symbol, decimals, code)}</span>
                         </div>
                         {summary.visitingCharge > 0 && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Visiting Charge:</span>
-                            <span className="font-bold">₹{summary.visitingCharge.toFixed(2)}</span>
+                            <span className="font-bold">{formatCurrency(summary.visitingCharge, symbol, decimals, code)}</span>
                           </div>
                         )}
                         {summary.appliedPlatformFees.map((fee: any, idx: number) => (
                           <div key={idx} className="flex justify-between">
                             <span className="text-muted-foreground">{fee.name}:</span>
-                            <span className="font-bold">₹{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}</span>
+                            <span className="font-bold">{formatCurrency(fee.calculatedFeeAmount + fee.taxAmountOnFee, symbol, decimals, code)}</span>
                           </div>
                         ))}
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Taxes Applied:</span>
-                          <span className="font-bold">₹{summary.taxTotal.toFixed(2)}</span>
+                          <span className="font-bold">{formatCurrency(summary.taxTotal, symbol, decimals, code)}</span>
                         </div>
                         {summary.discountAmount > 0 && (
                           <div className="flex justify-between text-red-500 font-bold">
                             <span>Promo Discount ({booking?.discountCode}):</span>
-                            <span>-₹{summary.discountAmount.toFixed(2)}</span>
+                            <span>-{formatCurrency(summary.discountAmount, symbol, decimals, code)}</span>
                           </div>
                         )}
                         <Separator />
                         <div className="flex justify-between text-sm font-bold text-primary pt-1">
                           <span>Grand Total:</span>
-                          <span>₹{summary.grandTotal.toFixed(2)}</span>
+                          <span>{formatCurrency(summary.grandTotal, symbol, decimals, code)}</span>
                         </div>
                       </div>
                     )}

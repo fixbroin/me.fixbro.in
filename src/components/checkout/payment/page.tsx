@@ -100,6 +100,7 @@ export default function PaymentPage() {
 
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
   const { settings: globalSettings, isLoading: isLoadingGlobalSettings } = useGlobalSettings();
+  const symbol = appConfig?.currencySymbol || '₹';
 
   const [subTotal, setSubTotal] = useState(0); 
   const [categoryOverrides, setCategoryOverrides] = useState<{
@@ -301,11 +302,17 @@ export default function PaymentPage() {
         displayedVisitingChargeAmount = vcAmount;
         calculatedBaseVisitingCharge = getBasePrice(displayedVisitingChargeAmount, appConfig.isVisitingChargeTaxInclusive, appConfig.visitingChargeTaxPercent);
         if (policyDesc) {
-          currentPolicyMessage = policyDesc
-            .replace(/{MINIMUM_BOOKING_AMOUNT}/g, minBooking.toString())
-            .replace(/{VISITING_CHARGE}/g, displayedVisitingChargeAmount.toString())
-            .replace("{MINIMUM_BOOKING_AMOUNT}", minBooking.toString())
-            .replace("{VISITING_CHARGE}", displayedVisitingChargeAmount.toString());
+          const escapedSymbol = (symbol || "₹").replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+          const patternVc = new RegExp(`(?:₹|\\$|${escapedSymbol})?{VISITING_CHARGE}`, 'g');
+          const patternMin = new RegExp(`(?:₹|\\$|${escapedSymbol})?{MINIMUM_BOOKING_AMOUNT}`, 'g');
+          const normalizedPolicy = policyDesc
+            .replace(patternMin, "{MINIMUM_BOOKING_AMOUNT}")
+            .replace(patternVc, "{VISITING_CHARGE}");
+          currentPolicyMessage = normalizedPolicy
+            .replace(/{MINIMUM_BOOKING_AMOUNT}/g, `${symbol}${minBooking}`)
+            .replace(/{VISITING_CHARGE}/g, `${symbol}${displayedVisitingChargeAmount}`)
+            .replace("{MINIMUM_BOOKING_AMOUNT}", `${symbol}${minBooking}`)
+            .replace("{VISITING_CHARGE}", `${symbol}${displayedVisitingChargeAmount}`);
         }
       }
     }
@@ -415,7 +422,7 @@ export default function PaymentPage() {
           return; 
         } 
       }
-      if (promoData.minBookingAmount && sumOfDisplayedItemPrices < promoData.minBookingAmount) { toast({ title: "Minimum Amount Not Met", description: `Minimum booking amount of ₹${promoData.minBookingAmount} required. Your items total is ₹${sumOfDisplayedItemPrices.toFixed(2)}.`, variant: "destructive" }); setIsApplyingPromo(false); return; }
+      if (promoData.minBookingAmount && sumOfDisplayedItemPrices < promoData.minBookingAmount) { toast({ title: "Minimum Amount Not Met", description: `Minimum booking amount of ${symbol}${promoData.minBookingAmount} required. Your items total is ${symbol}${sumOfDisplayedItemPrices.toFixed(2)}.`, variant: "destructive" }); setIsApplyingPromo(false); return; }
       if (promoData.maxUses && promoData.usesCount >= promoData.maxUses) { toast({ title: "Limit Reached", description: "This promo code has reached its usage limit.", variant: "destructive" }); setIsApplyingPromo(false); return; }
       if (promoData.maxUsesPerUser && promoData.maxUsesPerUser > 0 && currentUser?.uid) {
         const bookingsRef = collection(db, "bookings");
@@ -431,7 +438,7 @@ export default function PaymentPage() {
       calculatedDiscount = Math.min(calculatedDiscount, sumOfDisplayedItemPrices);
       const appliedInfo: AppliedPromoCodeInfo = { id: promoData.id, code: promoData.code, discountType: promoData.discountType, discountValue: promoData.discountValue, calculatedDiscount: calculatedDiscount };
       setAppliedPromoCode(appliedInfo); localStorage.setItem('wecanfixAppliedPromoCode', JSON.stringify(appliedInfo));
-      toast({ title: "Promo Applied!", description: `Discount of ₹${calculatedDiscount.toFixed(2)} applied.`, className: "bg-green-100 border-green-300 text-green-700" });
+      toast({ title: "Promo Applied!", description: `Discount of ${symbol}${calculatedDiscount.toFixed(2)} applied.`, className: "bg-green-100 border-green-300 text-green-700" });
     } catch (error) { console.error("[PaymentPage] Error applying promo code:", error); toast({ title: "Error", description: "Could not apply promo code.", variant: "destructive" });
     } finally { setIsApplyingPromo(false); }
   };
@@ -605,7 +612,7 @@ export default function PaymentPage() {
                 <Ban className="h-5 w-5 text-destructive" />
                 <AlertTitle className="font-semibold text-destructive">Cancellation Fee Payment</AlertTitle>
                 <AlertDescription className="text-destructive/80">
-                    You are paying a cancellation fee of ₹{cancellationFeeDetails?.feeAmount.toFixed(2)} for Booking ID: <strong>{cancellationFeeDetails?.humanReadableBookingId || cancellationFeeDetails?.bookingId}</strong>.
+                    You are paying a cancellation fee of {symbol}{cancellationFeeDetails?.feeAmount.toFixed(2)} for Booking ID: <strong>{cancellationFeeDetails?.humanReadableBookingId || cancellationFeeDetails?.bookingId}</strong>.
                 </AlertDescription>
             </Alert>
           )}
@@ -617,10 +624,10 @@ export default function PaymentPage() {
                     <Input id="discountCode" placeholder="Enter code" value={promoCodeInput} onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())} disabled={isProcessingPayment || isApplyingPromo || !!appliedPromoCode} className="h-10"/>
                     {!appliedPromoCode ? (<Button variant="outline" onClick={handleApplyPromoCode} disabled={isProcessingPayment || isApplyingPromo || !promoCodeInput.trim()} className="h-10">{isApplyingPromo ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}</Button>) : (<Button variant="ghost" onClick={() => handleRemovePromoCode()} disabled={isProcessingPayment || isApplyingPromo} className="h-10 text-destructive hover:text-destructive"><XCircle className="mr-1.5 h-4 w-4"/> Remove</Button>)}
                   </div>
-                  {appliedPromoCode && (<p className="text-xs text-green-600 flex items-center mt-1.5"><CheckCircle className="h-3.5 w-3.5 mr-1" />Code "{appliedPromoCode.code}" applied! Discount: ₹{appliedPromoCode.calculatedDiscount.toFixed(2)}</p>)}
+                  {appliedPromoCode && (<p className="text-xs text-green-600 flex items-center mt-1.5"><CheckCircle className="h-3.5 w-3.5 mr-1" />Code "{appliedPromoCode.code}" applied! Discount: {symbol}{appliedPromoCode.calculatedDiscount.toFixed(2)}</p>)}
                 </div>
                 <div className="mt-3 pt-3 border-t"><Label className="text-sm font-medium block mb-2 flex items-center"><ListFilter className="h-4 w-4 mr-1.5 text-muted-foreground"/>Available Offers:</Label>
-                  {isLoadingPromos ? (<div className="flex items-center text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /><span>Checking for offers...</span></div>) : availablePromoCodesToDisplay.length > 0 ? (<div className="flex flex-wrap gap-2">{availablePromoCodesToDisplay.map(promo => (<Badge key={promo.id} variant="outline" className="cursor-pointer hover:bg-accent/20" onClick={() => handleSelectAvailablePromo(promo.code)} title={`Min. booking: ₹${promo.minBookingAmount || 0}. Uses: ${promo.usesCount}/${promo.maxUses || '∞'}`}>{promo.code} - {promo.discountType === 'percentage' ? `${promo.discountValue}% OFF` : `₹${promo.discountValue} OFF`}</Badge>))}</div>) : (<p className="text-xs text-muted-foreground">{allFetchedPromoCodes.length > 0 ? "No offers currently applicable." : "No active promo codes."}</p>)}
+                  {isLoadingPromos ? (<div className="flex items-center text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /><span>Checking for offers...</span></div>) : availablePromoCodesToDisplay.length > 0 ? (<div className="flex flex-wrap gap-2">{availablePromoCodesToDisplay.map(promo => (<Badge key={promo.id} variant="outline" className="cursor-pointer hover:bg-accent/20" onClick={() => handleSelectAvailablePromo(promo.code)} title={`Min. booking: ${symbol}${promo.minBookingAmount || 0}. Uses: ${promo.usesCount}/${promo.maxUses || '∞'}`}>{promo.code} - {promo.discountType === 'percentage' ? `${promo.discountValue}% OFF` : `${symbol}${promo.discountValue} OFF`}</Badge>))}</div>) : (<p className="text-xs text-muted-foreground">{allFetchedPromoCodes.length > 0 ? "No offers currently applicable." : "No active promo codes."}</p>)}
                 </div>
               </>)}
               {currentAvailablePaymentOptions.length > 0 ? (
@@ -634,25 +641,25 @@ export default function PaymentPage() {
               <div className="border-t pt-4 space-y-2 mt-4">
                 {!isCancellationFeeMode ? (
                     <>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Items Total (Displayed Prices):</span><span>₹{sumOfDisplayedItemPrices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                        {discountAmount > 0 && (<div className="flex justify-between text-green-600"><span>Discount ({appliedPromoCode?.code || 'Applied'}):</span><span>- ₹{discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>)}
-                        {visitingCharge > 0 && (<div className="flex justify-between text-primary"><span className="text-primary">Visiting Charge (Displayed):</span><span>+ ₹{(((categoryOverrides && typeof categoryOverrides.visitingChargeAmount === 'number') ? categoryOverrides.visitingChargeAmount : appConfig.visitingChargeAmount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>)}
-                        {calculatedPlatformFees.map((fee, index) => ( <div key={index} className="flex justify-between"><span className="text-muted-foreground flex items-center"><HandCoins className="mr-1 h-3.5 w-3.5 text-muted-foreground"/> {fee.name}{fee.taxRatePercentOnFee > 0 && <span className="text-xs ml-1">(incl. tax)</span>}</span><span>+ ₹{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}</span></div> ))}
+                        <div className="flex justify-between"><span className="text-muted-foreground">Items Total (Displayed Prices):</span><span>{symbol}{sumOfDisplayedItemPrices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                        {discountAmount > 0 && (<div className="flex justify-between text-green-600"><span>Discount ({appliedPromoCode?.code || 'Applied'}):</span><span>- {symbol}{discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>)}
+                        {visitingCharge > 0 && (<div className="flex justify-between text-primary"><span className="text-primary">Visiting Charge (Displayed):</span><span>+ {symbol}{(((categoryOverrides && typeof categoryOverrides.visitingChargeAmount === 'number') ? categoryOverrides.visitingChargeAmount : appConfig.visitingChargeAmount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>)}
+                        {calculatedPlatformFees.map((fee, index) => ( <div key={index} className="flex justify-between"><span className="text-muted-foreground flex items-center"><HandCoins className="mr-1 h-3.5 w-3.5 text-muted-foreground"/> {fee.name}{fee.taxRatePercentOnFee > 0 && <span className="text-xs ml-1">(incl. tax)</span>}</span><span>+ {symbol}{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}</span></div> ))}
                         <div className="flex justify-between items-center">
                             <div className="flex items-center text-muted-foreground">{effectiveTaxRateDisplay}
                             <Dialog open={isTaxBreakdownOpen} onOpenChange={setIsTaxBreakdownOpen}><DialogTrigger asChild><Button variant="ghost" size="icon" className="h-5 w-5 ml-1 p-0"><Info className="h-3.5 w-3.5 text-muted-foreground hover:text-primary"/></Button></DialogTrigger><DialogContent className="w-[90vw] sm:max-w-md max-h-[80vh] overflow-y-auto"><DialogHeader><DialogTitle>Tax Breakdown</DialogTitle></DialogHeader><TaxBreakdownDisplay items={taxBreakdownItems} visitingCharge={visitingChargeBreakdown} platformFees={calculatedPlatformFees} subTotalBeforeDiscount={subTotal} totalDiscount={discountAmount} totalTax={taxAmount} grandTotal={totalAmountDue} defaultTaxRatePercent={appConfig.visitingChargeTaxPercent || 0} /><DialogClose asChild className="mt-2"><Button variant="outline" className="w-full">Close</Button></DialogClose></DialogContent></Dialog>
-                            </div><span>+ ₹{taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div><span>+ {symbol}{taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                     </>
                 ) : (
                     cancellationFeeDetails && (
                         <div className="flex justify-between font-semibold text-md">
                             <span>Cancellation Fee:</span>
-                            <span>₹{cancellationFeeDetails.feeAmount.toFixed(2)}</span>
+                            <span>{symbol}{cancellationFeeDetails.feeAmount.toFixed(2)}</span>
                         </div>
                     )
                 )}
-                 <div className="flex justify-between text-lg font-semibold pt-1 border-t mt-1"><span>Total Amount Due:</span><span className="text-primary">₹{totalAmountDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                 <div className="flex justify-between text-lg font-semibold pt-1 border-t mt-1"><span>Total Amount Due:</span><span className="text-primary">{symbol}{totalAmountDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                  {paymentMethod === 'later' && payAfterServiceEnabled && !isCancellationFeeMode && (<p className="text-sm text-muted-foreground mt-1 text-right">You will be charged after service.</p>)}
               </div>
             </>

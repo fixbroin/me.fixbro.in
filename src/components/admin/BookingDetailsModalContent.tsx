@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MapPin, ExternalLink, Tag, HandCoins, Plus, UserCheck, Loader2, Phone, UserCircle, Clock, AlertTriangle } from 'lucide-react'; 
 import AppImage from '@/components/ui/AppImage'; 
-import { getTimestampMillis, formatScheduledDate } from '@/lib/utils';
+import { getTimestampMillis, formatScheduledDate, formatCurrency } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from '@/lib/mysqlDb';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -35,6 +36,10 @@ const getBasePriceForInvoice = (displayedPrice: number, isTaxInclusive?: boolean
 
 
 export default function BookingDetailsModalContent({ booking }: BookingDetailsModalContentProps) {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const [provider, setProvider] = useState<ProviderApplication | null>(null);
   const [isLoadingProvider, setIsLoadingProvider] = useState(false);
 
@@ -268,8 +273,8 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
               <TableRow>
                 <TableHead>Service Name</TableHead>
                 <TableHead className="text-center">Qty</TableHead>
-                <TableHead className="text-right">Unit Price (₹)</TableHead>
-                <TableHead className="text-right">Total (₹)</TableHead>
+                <TableHead className="text-right">Unit Price ({symbol})</TableHead>
+                <TableHead className="text-right">Total ({symbol})</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -280,8 +285,8 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
                   <TableRow key={`${service.serviceId}-${index}`}>
                     <TableCell>{service.name}</TableCell>
                     <TableCell className="text-center">{service.quantity}</TableCell>
-                    <TableCell className="text-right">{unitPrice.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{itemTotal.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(unitPrice, symbol, decimals, code)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(itemTotal, symbol, decimals, code)}</TableCell>
                   </TableRow>
                 );
               })}
@@ -297,18 +302,18 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
         <CardContent className="space-y-2 text-sm">
           <div className="flex justify-between">
               <span className="text-muted-foreground">Items Total (Displayed Prices):</span>
-              <span>₹{sumOfDisplayedItemPrices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span>{formatCurrency(sumOfDisplayedItemPrices, symbol, decimals, code)}</span>
           </div>
           {booking.discountAmount != null && booking.discountAmount > 0 && (
               <div className="flex justify-between text-green-600">
                   <span className="text-muted-foreground">Discount ({booking.discountCode || 'Applied'}):</span>
-                  <span>- ₹{booking.discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span>- {formatCurrency(booking.discountAmount, symbol, decimals, code)}</span>
               </div>
           )}
           {booking.visitingCharge != null && booking.visitingCharge > 0 && (
                <div className="flex justify-between">
                   <span className="text-muted-foreground">Visiting Charge (Base):</span>
-                  <span>+ ₹{booking.visitingCharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span>+ {formatCurrency(booking.visitingCharge, symbol, decimals, code)}</span>
               </div>
           )}
           {booking.appliedPlatformFees && booking.appliedPlatformFees.length > 0 && booking.appliedPlatformFees.map((fee, index) => (
@@ -316,12 +321,12 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
                   <span className="text-muted-foreground flex items-center">
                       <HandCoins className="mr-1 h-3.5 w-3.5 text-muted-foreground"/> {fee.name}{fee.taxRatePercentOnFee > 0 && <span className="text-xs ml-1">(incl. tax)</span>}:
                   </span>
-                  <span>+ ₹{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}</span>
+                  <span>+ {formatCurrency(fee.calculatedFeeAmount + fee.taxAmountOnFee, symbol, decimals, code)}</span>
               </div>
           ))}
           <div className="flex justify-between">
               <span className="text-muted-foreground">Total Tax:</span> 
-              <span>+ ₹{booking.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span>+ {formatCurrency(booking.taxAmount, symbol, decimals, code)}</span>
           </div>
 
           {booking.additionalCharges && booking.additionalCharges.length > 0 && (
@@ -332,7 +337,7 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
                 {booking.additionalCharges.map((charge, idx) => (
                   <div key={idx} className="flex justify-between text-amber-900 font-medium">
                     <span className="flex items-center gap-1.5"><Plus size={12}/> {charge.name}</span>
-                    <span>+ ₹{charge.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span>+ {formatCurrency(charge.amount, symbol, decimals, code)}</span>
                   </div>
                 ))}
               </div>
@@ -342,7 +347,7 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
           <Separator />
           <div className="flex justify-between font-bold text-md text-primary">
               <span>Total Amount:</span>
-              <span>₹{booking.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span>{formatCurrency(booking.totalAmount, symbol, decimals, code)}</span>
           </div>
         </CardContent>
       </Card>

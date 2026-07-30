@@ -295,7 +295,8 @@ function buildSystemPrompt(params: {
   let cancellationDetails = `Please refer to our [Cancellation Policy](${baseUrl}/cancellation-policy) for details.`;
   if (appConfig) {
     const time = `${appConfig.freeCancellationDays || 0}d ${appConfig.freeCancellationHours || 0}h ${appConfig.freeCancellationMinutes || 0}m`;
-    const fee = appConfig.cancellationFeeType === 'fixed' ? `₹${appConfig.cancellationFeeValue}` : `${appConfig.cancellationFeeValue}%`;
+    const symbol = appConfig.currencySymbol || '₹';
+    const fee = appConfig.cancellationFeeType === 'fixed' ? `${symbol}${appConfig.cancellationFeeValue}` : `${appConfig.cancellationFeeValue}%`;
     cancellationDetails = `Free cancellation is available up to ${time} before the service. After this period, a cancellation fee of ${fee} will apply. Detailed policy: ${baseUrl}/cancellation-policy`;
   }
 
@@ -404,8 +405,9 @@ const chatAgentFlow = ai.defineFlow(
     if (isPolicyIntent(message)) {
         let cancellationText = `You can view our full policy here: ${baseUrl}/cancellation-policy. `;
         if (appConfig) {
-            const time = `${appConfig.freeCancellationDays || 0}d ${appConfig.freeCancellationHours || 0}h ${appConfig.freeCancellationMinutes || 0}m`;
-            const fee = appConfig.cancellationFeeType === 'fixed' ? `₹${appConfig.cancellationFeeValue}` : `${appConfig.cancellationFeeValue}%`;
+             const time = `${appConfig.freeCancellationDays || 0}d ${appConfig.freeCancellationHours || 0}h ${appConfig.freeCancellationMinutes || 0}m`;
+             const symbol = appConfig.currencySymbol || '₹';
+             const fee = appConfig.cancellationFeeType === 'fixed' ? `${symbol}${appConfig.cancellationFeeValue}` : `${appConfig.cancellationFeeValue}%`;
             cancellationText = `Our policy allows free cancellation up to ${time} before the service starts. After that, a fee of ${fee} applies. Check details here: ${baseUrl}/cancellation-policy`;
         }
         return { response: cancellationText };

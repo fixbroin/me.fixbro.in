@@ -25,6 +25,8 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from "@/components/ui/input";
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { getCache, setCache } from '@/lib/client-cache';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { formatCurrency } from '@/lib/utils';
 import { getAdminServices, getAdminCategories, getAdminSubCategories, getTaxes } from '@/lib/webServerUtils';
 
 const generateSlug = (name: string) => {
@@ -38,6 +40,10 @@ const isFirebaseStorageUrl = (url: string | null | undefined): boolean => {
 };
 
 export default function AdminServicesPage() {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const [services, setServices] = useState<FirestoreService[]>([]);
   const [parentCategories, setParentCategories] = useState<FirestoreCategory[]>([]);
   const [subCategories, setSubCategories] = useState<FirestoreSubCategory[]>([]);
@@ -375,7 +381,7 @@ export default function AdminServicesPage() {
                             <TableHead className="p-2">Name</TableHead>
                             <TableHead className="p-2 text-center">Order</TableHead>
                             <TableHead className="p-2">Slug</TableHead>
-                            <TableHead className="text-right p-2">Price (₹)</TableHead>
+                            <TableHead className="text-right p-2">Price ({symbol})</TableHead>
                             <TableHead className="text-right p-2">Tax</TableHead>
                             <TableHead className="text-center p-2">Pay Later</TableHead>
                             <TableHead className="text-center p-2">Active</TableHead>
@@ -398,10 +404,10 @@ export default function AdminServicesPage() {
                                 <TableCell className="text-center p-2 text-xs text-muted-foreground">{service.order || 0}</TableCell>
                                 <TableCell className="p-2 text-xs text-muted-foreground">{service.slug}</TableCell>
                                 <TableCell className="text-right p-2 text-xs">
-                                  <div>₹{service.price.toLocaleString()}</div>
+                                  <div>{formatCurrency(service.price, symbol, decimals, code)}</div>
                                   {service.discountedPrice && (
                                     <div className="text-[10px] text-green-600 font-semibold">
-                                      Disc: ₹{service.discountedPrice.toLocaleString()}
+                                      Disc: {formatCurrency(service.discountedPrice, symbol, decimals, code)}
                                     </div>
                                   )}
                                 </TableCell>

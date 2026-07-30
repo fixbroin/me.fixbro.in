@@ -18,6 +18,7 @@ import { Loader2, CalendarIcon, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { getTimestampMillis } from "@/lib/utils";
+import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 
 const promoCodeFormSchemaBase = z.object({
   code: z.string()
@@ -76,6 +77,8 @@ export default function PromoCodeForm({
   isSubmitting = false,
   allPromoCodes
 }: PromoCodeFormProps) {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
   const [isFromCalendarOpen, setIsFromCalendarOpen] = useState(false);
   const [isUntilCalendarOpen, setIsUntilCalendarOpen] = useState(false);
   const [isTypePickerOpen, setIsTypePickerOpen] = useState(false);
@@ -186,7 +189,7 @@ export default function PromoCodeForm({
                                 disabled={isSubmitting}
                                 type="button"
                             >
-                                {field.value === "percentage" ? "Percentage (%)" : field.value === "fixed" ? "Fixed Amount (₹)" : "Select type..."}
+                                {field.value === "percentage" ? "Percentage (%)" : field.value === "fixed" ? `Fixed Amount (${symbol})` : "Select type..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                         </DialogTrigger>
@@ -222,7 +225,7 @@ export default function PromoCodeForm({
                                         }}
                                         type="button"
                                     >
-                                        <span className="text-sm font-medium">Fixed Amount (₹)</span>
+                                        <span className="text-sm font-medium">Fixed Amount ({symbol})</span>
                                         {field.value === "fixed" && (
                                             <Check className="absolute right-3 top-3 h-4 w-4 text-green-500" />
                                         )}
@@ -240,7 +243,7 @@ export default function PromoCodeForm({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField control={form.control} name="minBookingAmount" render={({ field }) => (
-                    <FormItem><FormLabel>Min. Booking Amount (₹) (Optional)</FormLabel><FormControl><Input type="number" placeholder="e.g., 500" {...field} value={field.value ?? ""} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Min. Booking Amount ({symbol}) (Optional)</FormLabel><FormControl><Input type="number" placeholder="e.g., 500" {...field} value={field.value ?? ""} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>
                 )}/>
                 <FormField control={form.control} name="maxUses" render={({ field }) => (
                     <FormItem><FormLabel>Max Total Uses (Optional)</FormLabel><FormControl><Input type="number" placeholder="e.g., 100" {...field} value={field.value ?? ""} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem>

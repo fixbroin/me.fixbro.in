@@ -25,7 +25,7 @@ import { Separator } from "@/components/ui/separator";
 import AppImage from "@/components/ui/AppImage";
 import { triggerPushNotification } from "@/lib/fcmUtils";
 import { ADMIN_EMAIL } from "@/contexts/AuthContext";
-import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from "@/lib/utils";
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, formatCurrency } from "@/lib/utils";
 
 
 // Enriched booking type to include provider details
@@ -112,6 +112,9 @@ export default function MyBookingsPage() {
   
   const { settings: globalCompanySettings, isLoading: isLoadingCompanySettings } = useGlobalSettings();
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const router = useRouter();
   const { showLoading } = useLoading();
 
@@ -271,10 +274,10 @@ export default function MyBookingsPage() {
     if (!eligibility.eligibleForFree) {
         if (eligibility.feeType === 'percentage') {
             feeAmount = (booking.totalAmount * eligibility.fee) / 100;
-            feeDisplay = `${eligibility.fee}% (₹${feeAmount.toFixed(2)})`;
+            feeDisplay = `${eligibility.fee}% (${formatCurrency(feeAmount, symbol, decimals, code)})`;
         } else {
             feeAmount = eligibility.fee;
-            feeDisplay = `₹${feeAmount.toFixed(2)}`;
+            feeDisplay = formatCurrency(feeAmount, symbol, decimals, code);
         }
         finalRefundAmount = (booking.totalAmount || 0) - feeAmount;
     }
@@ -356,6 +359,7 @@ export default function MyBookingsPage() {
                 smtpUser: appConfig.smtpUser,
                 smtpPass: appConfig.smtpPass,
                 senderEmail: appConfig.senderEmail,
+                currencySymbol: symbol,
             };
             try {
   await sendUserCancellationEmail(emailInput);
@@ -441,6 +445,7 @@ export default function MyBookingsPage() {
         contactMobile: globalCompanySettings?.contactMobile || "+91-7353113455",
         logoUrl: globalCompanySettings?.logoUrl || undefined,
         timezone: appConfig?.timezone || "Asia/Kolkata",
+        currencySymbol: appConfig?.currencySymbol || "₹",
       };
       await generateInvoicePdf(booking, companyDetailsForInvoice);
     } catch (error) {
@@ -510,12 +515,12 @@ export default function MyBookingsPage() {
                                 </div>
                                 <div className="min-w-0">
                                   <p className="font-bold text-xs truncate text-foreground" title={service.name}>{service.name}</p>
-                                  <p className="text-[10px] text-muted-foreground">₹{service.pricePerUnit} per unit</p>
+                                  <p className="text-[10px] text-muted-foreground">{formatCurrency(service.pricePerUnit, symbol, decimals, code)} per unit</p>
                                 </div>
                               </div>
                               <div className="text-right shrink-0">
                                 <p className="text-[10px] font-black text-primary">Qty: {service.quantity}</p>
-                                <p className="font-black text-xs text-foreground">₹{service.pricePerUnit * service.quantity}</p>
+                                <p className="font-black text-xs text-foreground">{formatCurrency(service.pricePerUnit * service.quantity, symbol, decimals, code)}</p>
                               </div>
                             </div>
                           ))}
@@ -603,7 +608,7 @@ export default function MyBookingsPage() {
                   )}
                   <div>
                     <p className="text-muted-foreground">Total Amount</p>
-                    <p className="font-medium">₹{booking.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="font-medium">{formatCurrency(booking.totalAmount, symbol, decimals, code)}</p>
                   </div>
                   <div className="sm:col-span-2 md:col-span-3">
                     <p className="text-muted-foreground">Booked On</p>

@@ -11,6 +11,7 @@ import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { getAggregateRating } from '@/lib/homepageUtils';
+import { getGlobalAppSettings } from '@/lib/webServerUtils';
 import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
 
 export const revalidate = false; // Persistent Cache (Smart Revalidation Only)
@@ -178,11 +179,13 @@ export async function generateMetadata(
 
 export default async function ServiceDetailPage({ params }: ServicePageProps) {
   const { slug } = await params;
-  const [serviceData, aggregateRating, seoSettings] = await Promise.all([
+  const [serviceData, aggregateRating, seoSettings, appConfig] = await Promise.all([
     getServiceData(slug),
     getAggregateRating(),
-    getGlobalSEOSettings()
+    getGlobalSEOSettings(),
+    getGlobalAppSettings()
   ]);
+  const symbol = appConfig?.currencySymbol || "₹";
 
   if (!serviceData) {
     notFound();
@@ -222,7 +225,7 @@ export default async function ServiceDetailPage({ params }: ServicePageProps) {
       "@type": "LocalBusiness",
       "name": "Wecanfix",
       "telephone": seoSettings.structuredDataTelephone,
-      "priceRange": "₹₹",
+      "priceRange": `${symbol}${symbol}`,
       "image": schemaImage,
       "address": {
         "@type": "PostalAddress",

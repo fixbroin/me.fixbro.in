@@ -5,7 +5,7 @@ import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import HomePageClient from '@/components/home/HomePageClient';
 import { getBaseUrl } from '@/lib/config';
 import { getHomepageData, getAggregateRating } from '@/lib/homepageUtils';
-import { getGlobalWebSettings } from '@/lib/webServerUtils';
+import { getGlobalWebSettings, getGlobalAppSettings } from '@/lib/webServerUtils';
 import JsonLdScript from '@/components/shared/JsonLdScript';
 
 export const dynamic = 'force-dynamic';
@@ -53,10 +53,12 @@ export async function generateMetadata(
 }
 
 export default async function Page() {
-  const [homepageData, aggregateRating] = await Promise.all([
+  const [homepageData, aggregateRating, appConfig] = await Promise.all([
     getHomepageData(),
-    getAggregateRating()
+    getAggregateRating(),
+    getGlobalAppSettings()
   ]);
+  const symbol = appConfig?.currencySymbol || "₹";
 
   const appBaseUrl = getBaseUrl();
   const siteName = homepageData.seoSettings.siteName || 'Wecanfix';
@@ -96,7 +98,7 @@ export default async function Page() {
       "closes": "20:00"
     },
     "sameAs": Object.values(seoSettings.socialProfileUrls || {}).filter(url => !!url),
-    "priceRange": "₹₹",
+    "priceRange": `${symbol}${symbol}`,
     "areaServed": [
       {
         "@type": "City",

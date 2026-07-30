@@ -15,10 +15,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useLoading } from '@/contexts/LoadingContext';
-import { triggerPushNotification } from '@/lib/fcmUtils';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import { getTimestampMillis } from '@/lib/utils';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 const formatTimestampForDisplay = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
@@ -43,6 +43,8 @@ export default function ProviderBookingDetailsPage() {
   const bookingId = params.bookingId as string;
   const router = useRouter();
   const { toast } = useToast();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
   const { user: providerUser, isLoading: authIsLoading } = useAuth();
   const { showLoading } = useLoading();
 
@@ -291,7 +293,7 @@ export default function ProviderBookingDetailsPage() {
             <h3 className="text-lg font-semibold mb-2 flex items-center"><ListOrdered className="mr-2 text-primary"/>Services Booked</h3>
             <ul className="space-y-1 text-sm list-disc list-inside">
               {booking.services.map(service => (
-                <li key={service.serviceId}>{service.name} (Qty: {service.quantity}) - ₹{service.pricePerUnit.toFixed(2)} each</li>
+                <li key={service.serviceId}>{service.name} (Qty: {service.quantity}) - {symbol}{service.pricePerUnit.toFixed(2)} each</li>
               ))}
             </ul>
           </section>
@@ -299,12 +301,12 @@ export default function ProviderBookingDetailsPage() {
            <section>
             <h3 className="text-lg font-semibold mb-2 flex items-center"><DollarSign className="mr-2 text-primary"/>Payment Details</h3>
              <div className="text-sm space-y-1">
-                <p><strong>Subtotal:</strong> ₹{booking.subTotal.toFixed(2)}</p>
-                {booking.discountAmount && booking.discountAmount > 0 && <p><strong>Discount:</strong> - ₹{booking.discountAmount.toFixed(2)} ({booking.discountCode})</p>}
-                {booking.visitingCharge && booking.visitingCharge > 0 && <p><strong>Visiting Charge:</strong> + ₹{booking.visitingCharge.toFixed(2)}</p>}
+                <p><strong>Subtotal:</strong> {symbol}{booking.subTotal.toFixed(2)}</p>
+                {booking.discountAmount && booking.discountAmount > 0 && <p><strong>Discount:</strong> - {symbol}{booking.discountAmount.toFixed(2)} ({booking.discountCode})</p>}
+                {booking.visitingCharge && booking.visitingCharge > 0 && <p><strong>Visiting Charge:</strong> + {symbol}{booking.visitingCharge.toFixed(2)}</p>}
                 
                 {booking.appliedPlatformFees && booking.appliedPlatformFees.length > 0 && booking.appliedPlatformFees.map((fee, idx) => (
-                  <p key={idx}><strong>{fee.name}:</strong> + ₹{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}</p>
+                  <p key={idx}><strong>{fee.name}:</strong> + {symbol}{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}</p>
                 ))}
 
                 {booking.additionalCharges && booking.additionalCharges.length > 0 && (
@@ -313,14 +315,14 @@ export default function ProviderBookingDetailsPage() {
                     {booking.additionalCharges.map((c, i) => (
                       <div key={i} className="flex justify-between text-amber-900">
                         <span>{c.name}</span>
-                        <span>+ ₹{c.amount.toFixed(2)}</span>
+                        <span>+ {symbol}{c.amount.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
                 )}
 
-                <p><strong>Tax:</strong> + ₹{booking.taxAmount.toFixed(2)}</p>
-                <p className="font-bold text-lg text-primary mt-2"><strong>Total Amount:</strong> ₹{booking.totalAmount.toFixed(2)}</p>
+                <p><strong>Tax:</strong> + {symbol}{booking.taxAmount.toFixed(2)}</p>
+                <p className="font-bold text-lg text-primary mt-2"><strong>Total Amount:</strong> {symbol}{booking.totalAmount.toFixed(2)}</p>
                 <p><strong>Payment Method:</strong> {booking.paymentMethod}</p>
              </div>
            </section>

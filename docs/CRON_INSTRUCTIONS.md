@@ -7,12 +7,12 @@ This document lists all active automated cron jobs for the Wecanfix server, how 
 ## 1. Google Indexing Cron Job
 Automatically compiles your dynamic URLs and submits them to Google Indexing in daily batches.
 
-* **Endpoint:** `https://wecanfix.in/api/indexing-cron?secret=YOUR_CRON_SECRET`
+* **Endpoint:** `https://me.fixbro.in/api/indexing-cron?secret=YOUR_CRON_SECRET`
 * **Schedule:** Every day at 1:00 AM server time (recommended).
 * **Control:** Can be paused/started or monitored from the **Google Indexing Dashboard** inside your Admin Panel. Once all pages are submitted, it automatically stops querying the database.
 * **VPS Cron Command:**
   ```bash
-  0 1 * * * curl -s "https://wecanfix.in/api/indexing-cron?secret=wecanfix123" >/dev/null 2>&1
+  0 1 * * * curl -s "https://me.fixbro.in/api/indexing-cron?secret=wecanfix123" >/dev/null 2>&1
   ```
 
 ---
@@ -20,12 +20,12 @@ Automatically compiles your dynamic URLs and submits them to Google Indexing in 
 ## 2. Marketing Automation Cron Job
 Handles email automated flows, including abandoned cart reminders, booking reminders, and customer re-engagement.
 
-* **Endpoint:** `https://wecanfix.in/api/marketing-cron?secret=YOUR_CRON_SECRET`
+* **Endpoint:** `https://me.fixbro.in/api/marketing-cron?secret=YOUR_CRON_SECRET`
 * **Schedule:** Every 2 hours (recommended).
 * **Control:** Configured through the **Marketing Automation Settings** dashboard.
 * **VPS Cron Command:**
   ```bash
-  0 */2 * * * curl -s "https://wecanfix.in/api/marketing-cron?secret=wecanfix123" >/dev/null 2>&1
+  0 */2 * * * curl -s "https://me.fixbro.in/api/marketing-cron?secret=wecanfix123" >/dev/null 2>&1
   ```
 
 ---
@@ -34,7 +34,7 @@ Handles email automated flows, including abandoned cart reminders, booking remin
 Before Google will accept any indexing requests, you **MUST** authorize the Google Cloud Service Account as an **Owner** of your site in Google Search Console:
 
 1. Open the [Google Search Console Dashboard](https://search.google.com/search-console).
-2. Select your property: **`https://wecanfix.in`**
+2. Select your property: **`https://me.fixbro.in`**
 3. Go to **Settings** (bottom left menu) > **Users and permissions**.
 4. Click the blue **Add User** button.
 5. Enter this service account email:
@@ -52,13 +52,13 @@ To manually test either of the cron jobs from your VPS terminal, run the followi
 
 **Test Indexing (Using your actual secret key `wecanfix123`):**
 ```bash
-curl 'https://wecanfix.in/api/indexing-cron?secret=wecanfix123'
+curl 'https://me.fixbro.in/api/indexing-cron?secret=wecanfix123'
 ```
 *(Always wrap the URL in single quotes `'...'` to prevent terminal shell syntax errors).*
 
 **Test Marketing:**
 ```bash
-curl 'https://wecanfix.in/api/marketing-cron?secret=wecanfix123'
+curl 'https://me.fixbro.in/api/marketing-cron?secret=wecanfix123'
 ```
 
 ---
@@ -84,10 +84,10 @@ crontab -e
 Go to the very bottom of the file and paste:
 ```bash
 # 1. Google Indexing Cron (Runs Daily at 1:00 AM)
-0 1 * * * curl -s "https://wecanfix.in/api/indexing-cron?secret=wecanfix123" >/dev/null 2>&1
+0 1 * * * curl -s "https://me.fixbro.in/api/indexing-cron?secret=wecanfix123" >/dev/null 2>&1
 
 # 2. Marketing Automation Cron (Runs Every 2 Hours)
-0 */2 * * * curl -s "https://wecanfix.in/api/marketing-cron?secret=wecanfix123" >/dev/null 2>&1
+0 */2 * * * curl -s "https://me.fixbro.in/api/marketing-cron?secret=wecanfix123" >/dev/null 2>&1
 ```
 
 ### Step 3: Save and Exit

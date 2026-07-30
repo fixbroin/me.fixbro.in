@@ -10,6 +10,7 @@ import { replacePlaceholders } from '@/lib/seoUtils';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config';
 import JsonLdScript from '@/components/shared/JsonLdScript';
+import { getGlobalAppSettings } from '@/lib/webServerUtils';
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
@@ -100,12 +101,14 @@ export default async function CityHomePage({ params }: CityPageProps) {
     notFound();
   }
   
-  const [cityData, homepageData, aggregateRating, seoSettings] = await Promise.all([
+  const [cityData, homepageData, aggregateRating, seoSettings, appConfig] = await Promise.all([
     getCityData(citySlug),
     getHomepageData(),
     getAggregateRating(),
-    getGlobalSEOSettings()
+    getGlobalSEOSettings(),
+    getGlobalAppSettings()
   ]);
+  const symbol = appConfig?.currencySymbol || "₹";
   
   if (!cityData) {
     notFound();
@@ -136,7 +139,7 @@ export default async function CityHomePage({ params }: CityPageProps) {
     "description": cityData.seo_description || cityData.metaDescription || `Professional home services in ${cityData.name}. Trusted experts by Wecanfix.`,
     "telephone": seoSettings.structuredDataTelephone,
     "image": schemaImage,
-    "priceRange": "₹₹",
+    "priceRange": `${symbol}${symbol}`,
     "address": {
       "@type": "PostalAddress",
       "addressLocality": cityData.name,

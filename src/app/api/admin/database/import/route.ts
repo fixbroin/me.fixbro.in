@@ -37,14 +37,23 @@ export async function POST(req: Request) {
         // Clear existing table data to ensure clean restore state
         await conn.query(`DELETE FROM \`${table}\``);
 
-        for (const row of rows) {
-          const { _id, _parentId, ...data } = row;
-          const serializedData = { ...data, id: _id };
+        if (rows.length === 0) continue;
+
+        // Bulk insert rows in batches to avoid connection timeout on shared hosting
+        const batchSize = 100;
+        for (let i = 0; i < rows.length; i += batchSize) {
+          const batchRows = rows.slice(i, i + batchSize);
+          const values = batchRows.map(row => {
+            const { _id, _parentId, ...data } = row;
+            const serializedData = { ...data, id: _id };
+            return [_id, _parentId || null, JSON.stringify(serializedData)];
+          });
+
           await conn.query(
-            `INSERT INTO \`${table}\` (\`id\`, \`parent_id\`, \`data\`) VALUES (?, ?, ?)`,
-            [_id, _parentId || null, JSON.stringify(serializedData)]
+            `INSERT INTO \`${table}\` (\`id\`, \`parent_id\`, \`data\`) VALUES ?`,
+            [values]
           );
-          totalCount++;
+          totalCount += batchRows.length;
         }
       }
 

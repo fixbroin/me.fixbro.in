@@ -13,6 +13,8 @@ import { collection, onSnapshot, query, orderBy, limit } from '@/lib/mysqlDb';
 import { useToast } from "@/hooks/use-toast";
 import { useAdminStats } from "@/hooks/useAdminStats";
 import { useAuth } from "@/hooks/useAuth";
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { formatCurrency } from '@/lib/utils';
 import PermissionGuard from "@/components/admin/PermissionGuard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -38,6 +40,10 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export default function AdminReportsPage() {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const { stats: globalStats } = useAdminStats();
   const [allBookings, setAllBookings] = useState<FirestoreBooking[]>([]);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -248,7 +254,7 @@ export default function AdminReportsPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{statsForSelectedYear.totalRevenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatCurrency(statsForSelectedYear.totalRevenue, symbol, decimals, code)}</div>
           </CardContent>
         </Card>
         <Card>
@@ -356,14 +362,14 @@ export default function AdminReportsPage() {
                   }}
                 />
                 <YAxis 
-                  tickFormatter={(value) => `₹${value.toLocaleString()}`}
+                  tickFormatter={(value) => formatCurrency(value, symbol, decimals, code)}
                 />
                 <ChartTooltipRecharts 
                   cursor={{ fill: 'hsl(var(--muted))' }} 
                   content={
                     <ChartTooltipContent 
                       hideLabel 
-                      formatter={(value) => `₹${Number(value).toLocaleString()}`}
+                      formatter={(value) => formatCurrency(Number(value), symbol, decimals, code)}
                     />
                   } 
                 />
@@ -393,24 +399,24 @@ export default function AdminReportsPage() {
               <div className="space-y-1">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Yearly ABV ({selectedYear})</span>
                 <p className="text-3xl font-black text-primary">
-                  ₹{statsForSelectedYear.completedBookings > 0 
-                    ? (statsForSelectedYear.totalRevenue / statsForSelectedYear.completedBookings).toFixed(2) 
-                    : "0.00"}
+                  {formatCurrency(statsForSelectedYear.completedBookings > 0 
+                    ? (statsForSelectedYear.totalRevenue / statsForSelectedYear.completedBookings) 
+                    : 0, symbol, decimals, code)}
                 </p>
                 <p className="text-[11px] text-muted-foreground leading-tight">
-                  Based on <strong className="text-foreground">{statsForSelectedYear.completedBookings}</strong> completed bookings totaling <strong className="text-foreground">₹{statsForSelectedYear.totalRevenue.toLocaleString()}</strong> in {selectedYear}.
+                  Based on <strong className="text-foreground">{statsForSelectedYear.completedBookings}</strong> completed bookings totaling <strong className="text-foreground">{formatCurrency(statsForSelectedYear.totalRevenue, symbol, decimals, code)}</strong> in {selectedYear}.
                 </p>
               </div>
 
               <div className="border-t border-primary/10 pt-4 space-y-1">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Lifetime ABV</span>
                 <p className="text-2xl font-black text-foreground/80">
-                  ₹{statsLifetime.completedBookings > 0 
-                    ? (statsLifetime.totalRevenue / statsLifetime.completedBookings).toFixed(2) 
-                    : "0.00"}
+                  {formatCurrency(statsLifetime.completedBookings > 0 
+                    ? (statsLifetime.totalRevenue / statsLifetime.completedBookings) 
+                    : 0, symbol, decimals, code)}
                 </p>
                 <p className="text-[11px] text-muted-foreground leading-tight">
-                  Based on <strong className="text-foreground">{statsLifetime.completedBookings}</strong> completed bookings totaling <strong className="text-foreground">₹{statsLifetime.totalRevenue.toLocaleString()}</strong> overall.
+                  Based on <strong className="text-foreground">{statsLifetime.completedBookings}</strong> completed bookings totaling <strong className="text-foreground">{formatCurrency(statsLifetime.totalRevenue, symbol, decimals, code)}</strong> overall.
                 </p>
               </div>
             </div>
@@ -443,8 +449,8 @@ export default function AdminReportsPage() {
                         <tr key={month.monthYear} className="hover:bg-muted/50 transition-colors">
                           <td className="p-3 font-medium">{monthLabel}</td>
                           <td className="p-3 text-right">{monthlyCompleted}</td>
-                          <td className="p-3 text-right">₹{month.earnings.toLocaleString()}</td>
-                          <td className="p-3 text-right font-bold text-primary">₹{monthlyAbv.toFixed(2)}</td>
+                          <td className="p-3 text-right">{formatCurrency(month.earnings, symbol, decimals, code)}</td>
+                          <td className="p-3 text-right font-bold text-primary">{formatCurrency(monthlyAbv, symbol, decimals, code)}</td>
                         </tr>
                       );
                     })}
@@ -473,11 +479,11 @@ export default function AdminReportsPage() {
                       <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                         <div>
                           <p className="text-muted-foreground">Monthly Revenue</p>
-                          <p className="font-semibold text-foreground">₹{month.earnings.toLocaleString()}</p>
+                          <p className="font-semibold text-foreground">{formatCurrency(month.earnings, symbol, decimals, code)}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-muted-foreground font-semibold text-primary">Avg Booking Value</p>
-                          <p className="font-bold text-primary text-sm">₹{monthlyAbv.toFixed(2)}</p>
+                          <p className="font-bold text-primary text-sm">{formatCurrency(monthlyAbv, symbol, decimals, code)}</p>
                         </div>
                       </div>
                     </Card>

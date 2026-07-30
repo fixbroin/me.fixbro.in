@@ -117,7 +117,7 @@ export const defaultSeoValues: FirestoreSEOSettings = {
   structuredDataTelephone: '+91-7353113455',
 
   structuredDataImage:
-    'https://wecanfix.in/android-chrome-512x512.png',
+    'https://me.fixbro.in/android-chrome-512x512.png',
 
   socialProfileUrls: {
     facebook: 'https://www.facebook.com/wecanfix.in',

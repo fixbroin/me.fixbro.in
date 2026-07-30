@@ -15,4 +15,4 @@ Disallow: /auth/*
 Disallow: /_next/
 Disallow: /_next/*
 
-Sitemap: https://wecanfix.in/sitemap.xml
+Sitemap: https://me.fixbro.in/sitemap.xml

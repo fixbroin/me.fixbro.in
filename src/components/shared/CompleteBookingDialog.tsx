@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Plus, Trash2, IndianRupee, CheckCircle2, Loader2, CreditCard } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { formatCurrency } from '@/lib/utils';
 
 interface AdditionalCharge {
   name: string;
@@ -35,6 +37,10 @@ export default function CompleteBookingDialog({
   currentPaymentMethod,
   isProcessing 
 }: CompleteBookingDialogProps) {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const [charges, setCharges] = useState<AdditionalCharge[]>([]);
   const [paymentMethod, setPaymentMethod] = useState(currentPaymentMethod || "Cash");
 
@@ -97,7 +103,7 @@ export default function CompleteBookingDialog({
                         className="h-9 text-sm"
                     />
                     <div className="w-28 relative">
-                        <IndianRupee className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="absolute left-2.5 top-2 text-sm text-muted-foreground">{symbol}</span>
                         <Input 
                             type="number" 
                             placeholder="0" 
@@ -141,18 +147,18 @@ export default function CompleteBookingDialog({
           <div className="bg-primary/5 p-4 rounded-2xl space-y-2 border border-primary/10">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Original Booking:</span>
-              <span className="font-semibold text-foreground">₹{originalAmount.toFixed(2)}</span>
+              <span className="font-semibold text-foreground">{formatCurrency(originalAmount, symbol, decimals, code)}</span>
             </div>
             {additionalTotal > 0 && (
                 <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Extra Charges:</span>
-                    <span className="font-semibold text-green-600">+ ₹{additionalTotal.toFixed(2)}</span>
+                    <span className="font-semibold text-green-600">+ {formatCurrency(additionalTotal, symbol, decimals, code)}</span>
                 </div>
             )}
             <Separator className="my-1 opacity-50" />
             <div className="flex justify-between text-xl font-black text-primary">
               <span>Final Total:</span>
-              <span>₹{finalTotal.toFixed(2)}</span>
+              <span>{formatCurrency(finalTotal, symbol, decimals, code)}</span>
             </div>
           </div>
         </div>

@@ -93,33 +93,38 @@ export function useGlobalSettings() {
       return;
     }
 
-    // Direct fast fetch to dedicated /api/global-settings REST endpoint
-    fetch('/api/global-settings')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.webSettings) {
-          const processed = processSettingsData(data.webSettings);
-          setSettings(processed);
-          setCache(CACHE_KEY, processed, true);
+    const fetchSettings = async () => {
+      try {
+        const remoteVersions = await getRemoteCacheVersions();
+        const remoteVersion = remoteVersions.global || 0;
+        
+        const localVersion = parseInt(localStorage.getItem(`${CACHE_KEY}-version`) || "0");
+        const cached = getCache<GlobalWebSettings>(CACHE_KEY, true);
+        
+        if (cached && !isAdmin && remoteVersion <= localVersion) {
+          setSettings(processSettingsData(cached));
+          setIsLoading(false);
+          return;
         }
-      })
-      .catch(err => console.warn("Global settings REST fetch fallback:", err))
-      .finally(() => setIsLoading(false));
 
-    const settingsDocRef = doc(db, WEB_SETTINGS_COLLECTION, WEB_SETTINGS_DOC_ID);
-    const unsubscribe = onSnapshot(settingsDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const processed = processSettingsData(docSnap.data());
-        setSettings(processed);
-        setCache(CACHE_KEY, processed, true);
+        const res = await fetch('/api/global-settings', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.webSettings) {
+            const processed = processSettingsData(data.webSettings);
+            setSettings(processed);
+            setCache(CACHE_KEY, processed, true);
+            localStorage.setItem(`${CACHE_KEY}-version`, remoteVersion.toString());
+          }
+        }
+      } catch (err) {
+        console.warn("Global settings REST fetch fallback:", err);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
-      hasLoadedRef.current = true;
-    }, (err: any) => {
-      setIsLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    fetchSettings();
   }, [isAdmin]);
 
   return { settings, isLoading, error };

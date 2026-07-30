@@ -21,6 +21,8 @@ declare module 'jspdf' {
   }
 }
 
+import { robotoFontBase64 } from './pdfFonts';
+
 const formatDateForIndiaDisplay = (timestamp?: Timestamp): string => {
     if (!timestamp) return 'N/A';
     try {
@@ -34,6 +36,12 @@ const formatDateForIndiaDisplay = (timestamp?: Timestamp): string => {
 // Changed function name and parameter type to FirestoreInvoice
 export const generateInvoicePdf = async (invoice: FirestoreInvoice, companyDetails?: CompanyDetailsForPdf): Promise<string> => {
   const doc = new jsPDF();
+  doc.addFileToVFS('Roboto-Regular.ttf', robotoFontBase64);
+  doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+  doc.addFont('Roboto-Regular.ttf', 'Roboto', 'bold');
+  doc.setFont('Roboto', 'normal');
+
+  const sym = companyDetails?.currencySymbol || '₹';
 
   const defaultCompanyDetails: CompanyDetailsForPdf = {
     name: companyDetails?.name || "Wecanfix.in",
@@ -45,10 +53,10 @@ export const generateInvoicePdf = async (invoice: FirestoreInvoice, companyDetai
   
   // Header Section
   doc.setFontSize(18);
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.text(defaultCompanyDetails.name, 14, 22);
   doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   const addressLines = doc.splitTextToSize(defaultCompanyDetails.address, 100);
   doc.text(addressLines[0], 14, 28);
   if (addressLines.length > 1) doc.text(addressLines[1], 14, 32); // Adjusted Y for closer spacing
@@ -56,9 +64,9 @@ export const generateInvoicePdf = async (invoice: FirestoreInvoice, companyDetai
 
 
   doc.setFontSize(22);
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.text("INVOICE", 196, 22, { align: "right" });
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
 
   doc.setFontSize(10);
   doc.text(`Invoice #: ${invoice.invoiceNumber}`, 196, 30, { align: "right" });
@@ -70,9 +78,9 @@ export const generateInvoicePdf = async (invoice: FirestoreInvoice, companyDetai
   // Customer Details Section
   let startYCustomer = invoice.dueDate ? 50 : 45; // Adjust based on whether due date is present
   doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.text("Bill To:", 14, startYCustomer);
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.setFontSize(10);
   startYCustomer += 5; doc.text(invoice.customerName, 14, startYCustomer);
   // Assuming invoice might not always have full address breakdown like booking
@@ -84,25 +92,34 @@ export const generateInvoicePdf = async (invoice: FirestoreInvoice, companyDetai
 
   // Items Table
   const tableColumnStyles: { [key: string]: Partial<ExtendedHeadCellDef> } = {
-    0: { cellWidth: 10 }, // #
-    1: { cellWidth: 'auto' }, // Description
+    0: { cellWidth: 10, halign: 'center' }, // #
+    1: { cellWidth: 'auto', halign: 'left' }, // Description
     2: { cellWidth: 20, halign: 'center' }, // Qty
     3: { cellWidth: 30, halign: 'right' }, // Rate
     4: { cellWidth: 30, halign: 'right' }, // Total
   };
 
-  const head = [["#", "Description", "Qty", "Rate (Rs)", "Amount (Rs)"]];
+  const head = [["#", "Description", "Qty", `Rate (${sym})`, `Amount (${sym})` ]];
   const body = invoice.items.map((item, index) => [
-    index + 1,
+    (index + 1).toString(),
     item.itemName,
-    item.quantity,
+    item.quantity.toString(),
     item.ratePerUnit.toFixed(2),
     item.total.toFixed(2),
   ]);
 
   doc.autoTable({
-    head: head, body: body, startY: startYCustomer + 10, theme: 'striped',
-    headStyles: { fillColor: [70, 160, 162] }, columnStyles: tableColumnStyles,
+    head: head, 
+    body: body, 
+    startY: startYCustomer + 10, 
+    theme: 'grid',
+    headStyles: { fillColor: [70, 160, 162] }, 
+    columnStyles: tableColumnStyles,
+    styles: { 
+      font: 'Roboto',
+      lineColor: [220, 220, 220],
+      lineWidth: 0.1
+    },
   });
 
   // Totals Section
@@ -115,33 +132,33 @@ export const generateInvoicePdf = async (invoice: FirestoreInvoice, companyDetai
   };
 
   doc.setFontSize(10);
-  drawRightAlignedText("Subtotal:", `Rs. ${invoice.subtotal.toFixed(2)}`, finalY);
+  drawRightAlignedText("Subtotal:", `${sym} ${invoice.subtotal.toFixed(2)}`, finalY);
 
   if (invoice.discountAmount && invoice.discountAmount > 0) {
     finalY += 5;
-    drawRightAlignedText(`Discount (${invoice.discountPercent?.toFixed(1) || ''}%):`, `- Rs. ${invoice.discountAmount.toFixed(2)}`, finalY);
+    drawRightAlignedText(`Discount (${invoice.discountPercent?.toFixed(1) || ''}%):`, `- ${sym} ${invoice.discountAmount.toFixed(2)}`, finalY);
   }
   
   if (invoice.taxAmount && invoice.taxAmount > 0) {
     finalY += 5;
-    drawRightAlignedText(`Tax (${invoice.taxPercent?.toFixed(1) || ''}%):`, `+ Rs. ${invoice.taxAmount.toFixed(2)}`, finalY);
+    drawRightAlignedText(`Tax (${invoice.taxPercent?.toFixed(1) || ''}%):`, `+ ${sym} ${invoice.taxAmount.toFixed(2)}`, finalY);
   }
 
   finalY += 7;
   doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  drawRightAlignedText("Grand Total:", `Rs. ${invoice.totalAmount.toFixed(2)}`, finalY);
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "bold");
+  drawRightAlignedText("Grand Total:", `${sym} ${invoice.totalAmount.toFixed(2)}`, finalY);
+  doc.setFont("Roboto", "normal");
 
   if (invoice.amountPaid && invoice.amountPaid > 0) {
     finalY += 5;
     doc.setFontSize(10);
-    drawRightAlignedText("Amount Paid:", `Rs. ${invoice.amountPaid.toFixed(2)}`, finalY);
+    drawRightAlignedText("Amount Paid:", `${sym} ${invoice.amountPaid.toFixed(2)}`, finalY);
     if (invoice.amountDue && invoice.amountDue !== invoice.totalAmount) { // Show due only if different from total or if paid
       finalY += 5;
-      doc.setFont("helvetica", "bold");
-      drawRightAlignedText("Amount Due:", `Rs. ${invoice.amountDue.toFixed(2)}`, finalY);
-      doc.setFont("helvetica", "normal");
+      doc.setFont("Roboto", "bold");
+      drawRightAlignedText("Amount Due:", `${sym} ${invoice.amountDue.toFixed(2)}`, finalY);
+      doc.setFont("Roboto", "normal");
     }
   }
 
@@ -161,9 +178,9 @@ export const generateInvoicePdf = async (invoice: FirestoreInvoice, companyDetai
   }
   if (invoice.additionalNotes) {
     finalY += 5;
-    doc.setFont("helvetica", "bold");
+    doc.setFont("Roboto", "bold");
     doc.text("Additional Notes:", 14, finalY);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("Roboto", "normal");
     finalY += 5;
     const additionalNotesLines = doc.splitTextToSize(invoice.additionalNotes, 180);
     doc.text(additionalNotesLines, 14, finalY);

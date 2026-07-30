@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { generateInvoicePdf } from '@/lib/sriinvoiceGenerator';
 import { uploadPdfToStorage, triggerPdfDownload, dataUriToBlob } from '@/lib/pdfUtils';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { getTimestampMillis } from '@/lib/utils';
 import { deleteObject } from '@/lib/mysqlStorage';
 
@@ -38,6 +39,8 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const { toast } = useToast();
   const { settings: companySettings, isLoading: isLoadingCompanySettings } = useGlobalSettings();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
 
   useEffect(() => {
     setIsLoading(true);
@@ -108,6 +111,7 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
         contactEmail: companySettings?.contactEmail || "",
         contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
+        currencySymbol: appConfig?.currencySymbol || "₹",
       };
       const pdfDataUri = await generateInvoicePdf(invoice, companyInfo);
       const pdfBlob = dataUriToBlob(pdfDataUri);
@@ -145,6 +149,7 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
         contactEmail: companySettings?.contactEmail || "",
         contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
+        currencySymbol: appConfig?.currencySymbol || "₹",
       };
       const pdfDataUri = await generateInvoicePdf(invoice, companyInfo);
       triggerPdfDownload(pdfDataUri, `Invoice-${invoice.invoiceNumber}.pdf`);
@@ -190,7 +195,7 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
                     <p>{formatDate(invoice.invoiceDate)}</p>
                 </div>
                 <div>
-                    <p className="text-xs text-muted-foreground">Amount (₹)</p>
+                    <p className="text-xs text-muted-foreground">Amount ({symbol})</p>
                     <p>{invoice.totalAmount.toFixed(2)}</p>
                 </div>
             </div>
@@ -271,7 +276,7 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
                 <TableHead>Invoice #</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead className="text-right">Amount (₹)</TableHead>
+                <TableHead className="text-right">Amount ({symbol})</TableHead>
                 <TableHead>Payment Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
                 </TableRow>

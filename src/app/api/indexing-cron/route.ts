@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const baseUrl = getBaseUrl() || 'https://wecanfix.in';
+    const baseUrl = getBaseUrl() || 'https://me.fixbro.in';
     const urls: string[] = [];
 
     console.log("[Indexing Cron] Compiling all site URLs...");

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Info, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useLoading } from '@/contexts/LoadingContext';
+import { formatCurrency } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { db, auth } from '@/lib/firebase';
@@ -79,6 +80,9 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
   const router = useRouter();
   const { showLoading, hideLoading } = useLoading();
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || '₹';
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const code = appConfig?.currencyCode || 'INR';
   const { settings: globalSettings } = useGlobalSettings();
 
   const [cartEntries, setCartEntries] = useState<CartEntry[]>([]);
@@ -113,14 +117,22 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
     const policyDesc = (categoryOverrides && categoryOverrides.minimumBookingPolicyDescription) ? categoryOverrides.minimumBookingPolicyDescription : appConfig.minimumBookingPolicyDescription;
 
     if (!policyDesc || typeof minBooking !== 'number' || typeof vcAmount !== 'number') {
-      return `A visiting charge of ₹${vcAmount || 0} will be applied if your booking total is below ₹${minBooking || 0}.`;
+      return `A visiting charge of ${formatCurrency(vcAmount || 0, symbol, decimals, code)} will be applied if your booking total is below ${formatCurrency(minBooking || 0, symbol, decimals, code)}.`;
     }
-    return policyDesc
-      .replace(/{MINIMUM_BOOKING_AMOUNT}/g, minBooking.toString())
-      .replace(/{VISITING_CHARGE}/g, vcAmount.toString())
-      .replace("{MINIMUM_BOOKING_AMOUNT}", minBooking.toString())
-      .replace("{VISITING_CHARGE}", vcAmount.toString());
-  }, [appConfig, categoryOverrides]);
+    const escapedSymbol = (symbol || "₹").replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const patternVc = new RegExp(`(?:₹|\\$|${escapedSymbol})?{VISITING_CHARGE}`, 'g');
+    const patternMin = new RegExp(`(?:₹|\\$|${escapedSymbol})?{MINIMUM_BOOKING_AMOUNT}`, 'g');
+
+    const normalizedPolicy = policyDesc
+      .replace(patternMin, "{MINIMUM_BOOKING_AMOUNT}")
+      .replace(patternVc, "{VISITING_CHARGE}");
+
+    return normalizedPolicy
+      .replace(/{MINIMUM_BOOKING_AMOUNT}/g, formatCurrency(minBooking, symbol, decimals, code))
+      .replace(/{VISITING_CHARGE}/g, formatCurrency(vcAmount, symbol, decimals, code))
+      .replace("{MINIMUM_BOOKING_AMOUNT}", formatCurrency(minBooking, symbol, decimals, code))
+      .replace("{VISITING_CHARGE}", formatCurrency(vcAmount, symbol, decimals, code));
+  }, [appConfig, categoryOverrides, symbol, decimals, code]);
 
   const dynamicPlatformFeeTitle = useMemo(() => {
     if (!appConfig?.platformFees) return "Fee Details";
@@ -134,11 +146,11 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       .filter(fee => fee.isActive)
       .map(fee => {
         if (fee.description) return fee.description;
-        const rateText = fee.type === 'percentage' ? `${fee.value}% of items total` : `₹${fee.value} flat fee`;
+        const rateText = fee.type === 'percentage' ? `${fee.value}% of items total` : `${formatCurrency(fee.value, symbol, decimals, code)} flat fee`;
         return `${fee.name} is a ${rateText} applied to your booking to support secure payments, background checks, and digital infrastructure maintenance.`;
       })
       .join("\n\n");
-  }, [appConfig]);
+  }, [appConfig, symbol, decimals, code]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -244,11 +256,17 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
         displayedVC = vcAmount;
         baseVC = getBasePrice(displayedVC, appConfig.isVisitingChargeTaxInclusive, appConfig.visitingChargeTaxPercent);
         if (policyDesc) {
-          currentPolicy = policyDesc
-            .replace(/{MINIMUM_BOOKING_AMOUNT}/g, minBooking.toString())
-            .replace(/{VISITING_CHARGE}/g, displayedVC.toString())
-            .replace("{MINIMUM_BOOKING_AMOUNT}", minBooking.toString())
-            .replace("{VISITING_CHARGE}", displayedVC.toString());
+          const escapedSymbol = (symbol || "₹").replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+          const patternVc = new RegExp(`(?:₹|\\$|${escapedSymbol})?{VISITING_CHARGE}`, 'g');
+          const patternMin = new RegExp(`(?:₹|\\$|${escapedSymbol})?{MINIMUM_BOOKING_AMOUNT}`, 'g');
+          const normalizedPolicy = policyDesc
+            .replace(patternMin, "{MINIMUM_BOOKING_AMOUNT}")
+            .replace(patternVc, "{VISITING_CHARGE}");
+          currentPolicy = normalizedPolicy
+            .replace(/{MINIMUM_BOOKING_AMOUNT}/g, `${symbol}${minBooking}`)
+            .replace(/{VISITING_CHARGE}/g, `${symbol}${displayedVC}`)
+            .replace("{MINIMUM_BOOKING_AMOUNT}", `${symbol}${minBooking}`)
+            .replace("{VISITING_CHARGE}", `${symbol}${displayedVC}`);
         }
       }
     }
@@ -393,12 +411,12 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Items Total</span>
-            <span>₹{sumOfDisplayedItemPrices.toLocaleString()}</span>
+            <span>{formatCurrency(sumOfDisplayedItemPrices, symbol, decimals, code)}</span>
           </div>
           {discountAmount > 0 && (
             <div className="flex justify-between text-green-600 font-medium">
               <span>Discount {appliedPromo ? `(${appliedPromo.code})` : ''}</span>
-              <span>-₹{discountAmount.toLocaleString()}</span>
+              <span>-{formatCurrency(discountAmount, symbol, decimals, code)}</span>
             </div>
           )}
           {visitingCharge > 0 && (
@@ -407,7 +425,7 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
                 <span>Visiting Charge</span>
                 <Info className="h-3 w-3 cursor-pointer hover:text-primary transition-colors" onClick={() => setIsVisitingChargeInfoOpen(true)} />
               </div>
-              <span>₹{(((categoryOverrides && typeof categoryOverrides.visitingChargeAmount === 'number') ? categoryOverrides.visitingChargeAmount : appConfig.visitingChargeAmount) || 0).toLocaleString()}</span>
+              <span>{formatCurrency((((categoryOverrides && typeof categoryOverrides.visitingChargeAmount === 'number') ? categoryOverrides.visitingChargeAmount : appConfig.visitingChargeAmount) || 0), symbol, decimals, code)}</span>
             </div>
           )}
           {calculatedPlatformFees.map(fee => (
@@ -416,7 +434,7 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
                 <span>{fee.name}</span>
                 <Info className="h-3 w-3 cursor-pointer hover:text-primary transition-colors" onClick={() => setIsPlatformFeeInfoOpen(true)} />
               </div>
-              <span>₹{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toLocaleString()}</span>
+              <span>{formatCurrency(fee.calculatedFeeAmount + fee.taxAmountOnFee, symbol, decimals, code)}</span>
             </div>
           ))}
           {taxAmount > 0 && (
@@ -425,12 +443,12 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
                 Tax
                 <Info className="h-3 w-3 cursor-pointer hover:text-primary transition-colors" onClick={() => setIsTaxBreakdownOpen(true)} />
               </div>
-              <span>₹{taxAmount.toLocaleString()}</span>
+              <span>{formatCurrency(taxAmount, symbol, decimals, code)}</span>
             </div>
           )}
           <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2">
             <span>Total Amount</span>
-            <span className="text-primary">₹{totalAmountDue.toLocaleString()}</span>
+            <span className="text-primary">{formatCurrency(totalAmountDue, symbol, decimals, code)}</span>
           </div>
         </div>
 
