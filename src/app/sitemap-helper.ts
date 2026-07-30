@@ -1,11 +1,8 @@
-import { MetadataRoute } from 'next';
+// src/app/sitemap-helper.ts
 import { adminDb } from '@/lib/firebaseAdmin'; 
 import { Timestamp } from '@/lib/mysqlDbAdmin'; 
 import type { FirestoreCategory, FirestoreService, FirestoreCity, FirestoreArea, FirestoreBlogPost, ContentPage, AreaServiceSeoSetting } from '@/types/firestore';
 import { getBaseUrl } from '@/lib/config'; 
-import { unstable_cache } from 'next/cache';
-
-export const dynamic = 'force-dynamic';
 
 const safeToISOString = (timestamp: Timestamp | undefined | string | Date, fallbackDate: string): string => {
   try {
@@ -27,9 +24,9 @@ const safeToISOString = (timestamp: Timestamp | undefined | string | Date, fallb
   }
 };
 
-async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
+export async function getSitemapEntries() {
   const appBaseUrl = getBaseUrl(); 
-  const entries: MetadataRoute.Sitemap = [];
+  const entries: { url: string; lastModified: string; changeFrequency: string; priority: number }[] = [];
   const currentDate = new Date().toISOString();
 
   const staticPages = [
@@ -138,15 +135,12 @@ async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
   }
 
   try {
-    // Fetch cities and areas in single parallel calls
     const [citiesSnapshot, areasSnapshot] = await Promise.all([
       adminDb.collection('cities').where('isActive', '==', true).get(),
       adminDb.collection('areas').where('isActive', '==', true).get(),
     ]);
 
     const areas = areasSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FirestoreArea));
-    
-    // Group areas by cityId in memory
     const areasByCityId = new Map<string, FirestoreArea[]>();
     areas.forEach(area => {
       if (area.cityId) {
@@ -206,7 +200,6 @@ async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
     console.error("Sitemap: Error fetching cities/areas/categories:", e);
   }
 
-  // Add localized service-wise SEO overrides sitemap entries
   try {
     const serviceSeoSnapshot = await adminDb
       .collection('areaServiceSeoSettings')
@@ -232,46 +225,37 @@ async function getSitemapEntries(): Promise<MetadataRoute.Sitemap> {
   return uniqueEntries;
 }
 
-const SITEMAP_SIZE = 45000;
+let sitemapCache: {
+  entries: any[];
+  timestamp: number;
+} | null = null;
 
-const getCachedSitemapEntries = unstable_cache(
-  async () => {
-    return await getSitemapEntries();
-  },
-  ['sitemap-data-v2'],
-  { 
-    revalidate: false, 
-    tags: ['sitemap', 'global-cache'] 
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes cache
+
+export async function getCachedSitemapEntries() {
+  const now = Date.now();
+  if (sitemapCache && (now - sitemapCache.timestamp < CACHE_TTL)) {
+    return sitemapCache.entries;
   }
-);
-
-export async function generateSitemaps() {
+  
   try {
-    const entries = await getCachedSitemapEntries();
-    const numSitemaps = Math.ceil(entries.length / SITEMAP_SIZE);
-    return Array.from({ length: Math.max(1, numSitemaps) }, (_, i) => ({ id: i }));
-  } catch (error) {
-    console.error("Error in generateSitemaps:", error);
-    return [{ id: 0 }];
+    const entries = await getSitemapEntries();
+    sitemapCache = {
+      entries,
+      timestamp: now
+    };
+    return entries;
+  } catch (err) {
+    console.error("Sitemap compilation failed:", err);
+    if (sitemapCache) {
+      console.warn("Using expired sitemap cache as fallback");
+      return sitemapCache.entries;
+    }
+    throw err;
   }
 }
 
-export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
-  try {
-    const allEntries = await getCachedSitemapEntries();
-    const start = id * SITEMAP_SIZE;
-    const end = start + SITEMAP_SIZE;
-    return allEntries.slice(start, end);
-  } catch (error) {
-    console.error("SITEMAP_GENERATION_ERROR: Failed to generate sitemap entries:", error);
-    const appBaseUrl = getBaseUrl(); 
-    return [
-      {
-        url: appBaseUrl,
-        lastModified: new Date().toISOString(),
-        changeFrequency: 'yearly' as const,
-        priority: 0.1,
-      },
-    ];
-  }
+export function clearSitemapCache() {
+  sitemapCache = null;
+  console.log("[SitemapCache] In-memory sitemap cache cleared.");
 }

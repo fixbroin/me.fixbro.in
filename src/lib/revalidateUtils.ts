@@ -4,6 +4,7 @@
 import { revalidateTag, revalidatePath } from 'next/cache';
 import { adminDb } from './firebaseAdmin';
 import { FieldValue } from './mysqlDbAdmin';
+import { clearSitemapCache } from '@/app/sitemap-helper';
 
 /**
  * Smart Trigger: Tells the server to clear the cache for specific data
@@ -44,6 +45,10 @@ export async function triggerRefresh(tag: 'services' | 'categories' | 'cities' |
     }
     
     await versionDoc.set(updates, { merge: true });
+
+    if (tag === 'sitemap' || tag === 'global-cache' || isGlobalChange) {
+      clearSitemapCache();
+    }
 
     console.log(`[SmartSync] Cache invalidated for tag: ${tag} and version bumped (Global: ${isGlobalChange}).`);
     return { success: true };
