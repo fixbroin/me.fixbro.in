@@ -1510,6 +1510,38 @@ export default function AdminSettingsPage() {
                   disabled={isSaving}
                 />
               </div>
+
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="enableAccountDisabledEmail" className="text-base">Account Disabled Notification & Email</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Send notification and email to users when their account is disabled by the admin.
+                  </p>
+                </div>
+                <Switch
+                  id="enableAccountDisabledEmail"
+                  name="enableAccountDisabledEmail" 
+                  checked={settings.enableAccountDisabledEmail}
+                  onCheckedChange={(checked) => handleSwitchChange('enableAccountDisabledEmail', checked)}
+                  disabled={isSaving}
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="enableAccountActivatedEmail" className="text-base">Account Activated Email</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Send email to users when their account is activated (unblocked) by the admin.
+                  </p>
+                </div>
+                <Switch
+                  id="enableAccountActivatedEmail"
+                  name="enableAccountActivatedEmail" 
+                  checked={settings.enableAccountActivatedEmail}
+                  onCheckedChange={(checked) => handleSwitchChange('enableAccountActivatedEmail', checked)}
+                  disabled={isSaving}
+                />
+              </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
               <PermissionGuard moduleId="settings" action="write">

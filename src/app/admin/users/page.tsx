@@ -27,6 +27,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getArchivedUsers } from '@/lib/adminDashboardUtils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { getTimestampMillis } from '@/lib/utils';
+import { toggleUserStatusAction } from '@/app/actions/userStatusActions';
 
 import { initializeUserNumbers } from '@/lib/systemStatsUtils';
 
@@ -254,10 +255,13 @@ export default function AdminUsersPage() {
     if (!userId) return;
     setIsUpdatingStatus(userId);
     try {
-      await updateDoc(doc(db, "users", userId), { isActive: !currentStatus });
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive: !currentStatus } : u));
-      await triggerRefresh('users'); // SmartSync
-      toast({ title: "Status Updated", description: `User is now ${!currentStatus ? 'Active' : 'Disabled'}.` });
+      const res = await toggleUserStatusAction(userId, currentStatus);
+      if (res.success) {
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive: !currentStatus } : u));
+        toast({ title: "Status Updated", description: `User is now ${!currentStatus ? 'Active' : 'Disabled'}.` });
+      } else {
+        toast({ title: "Error Updating Status", description: res.message, variant: "destructive" });
+      }
     } catch (error) {
       toast({ title: "Error Updating Status", variant: "destructive" });
     } finally {

@@ -644,7 +644,8 @@ export interface AppSettings {
   loaderType?: string; // Added for compatibility with appDefaults.ts
 
   timezone?: string; // NEW: Configurable application timezone
-
+  enableAccountDisabledEmail?: boolean; // Toggle for account disabled emails
+  enableAccountActivatedEmail?: boolean; // Toggle for account activated emails
   updatedAt?: Timestamp; // For tracking updates in Firestore
 }
 

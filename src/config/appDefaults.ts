@@ -76,7 +76,8 @@ export const defaultAppSettings: AppSettings = {
   providerFeeValue: 0, // Default to 0, meaning no fee
 
   enableStatusUpdateEmails: true,
-
+  enableAccountDisabledEmail: true,
+  enableAccountActivatedEmail: true,
   timezone: 'Asia/Kolkata', // Default timezone
 
   currencyCode: 'INR',

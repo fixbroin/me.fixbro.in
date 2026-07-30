@@ -152,6 +152,22 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
     }
   }, [user]);
 
+  // Block disabled users in real-time
+  useEffect(() => {
+    if (firestoreUser && firestoreUser.isActive === false && user) {
+      toast({
+        title: "Account Disabled",
+        description: "Your account has been disabled. Please contact support.",
+        variant: "destructive"
+      });
+      signOut(auth).then(() => {
+        setUser(null);
+        setFirestoreUser(null);
+        router.push('/auth/login');
+      });
+    }
+  }, [firestoreUser, user, router, toast]);
+
   // NEW: Real-time Provider Application Status Sync
   useEffect(() => {
     if (user?.uid) {
@@ -253,6 +269,17 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       const userDocRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(userDocRef);
       const userData = docSnap.data();
+
+      if (userData && userData.isActive === false) {
+        toast({
+          title: "Account Disabled",
+          description: "Your account has been disabled. Please contact support.",
+          variant: "destructive"
+        });
+        await signOut(auth);
+        setIsLoading(false);
+        return;
+      }
 
       const isProfileIncomplete = !docSnap.exists() || !userData?.displayName || !userData?.mobileNumber || !userData?.email;
 

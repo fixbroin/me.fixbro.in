@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { submitToGoogleIndexing } from '@/lib/googleIndexing';
 import { useAuth } from '@/hooks/useAuth';
-import { executeDbClearTable, executeBulkServiceSeoGenerate } from '@/app/actions/dbActions';
+import { executeDbClearTable, executeBulkServiceSeoGenerate, executeBulkDeleteByAreaAction, executeBulkDeleteByCategoryAction } from '@/app/actions/dbActions';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { getAdminServices, getCities, getAreas, getAreaServiceSeoSettings, getAdminCategories, getAdminSubCategories } from '@/lib/webServerUtils';
@@ -65,6 +65,13 @@ export default function ServiceSeoPage() {
   const [deleteRunning, setDeleteRunning] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState(0);
   const [deleteStatus, setDeleteStatus] = useState("");
+
+  // Bulk Delete State
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [bulkDeleteType, setBulkDeleteType] = useState<"area" | "category" | "">("");
+  const [bulkDeleteAreaId, setBulkDeleteAreaId] = useState<string>("");
+  const [bulkDeleteCategoryId, setBulkDeleteCategoryId] = useState<string>("");
+  const [bulkDeleteRunning, setBulkDeleteRunning] = useState(false);
 
   // Dialog Picker Open States
   const [isCitySearchOpen, setIsCitySearchOpen] = useState(false);
@@ -177,6 +184,58 @@ export default function ServiceSeoPage() {
       toast({ title: "Delete Failed", description: (err as Error).message || "An error occurred.", variant: "destructive" });
     } finally {
       setDeleteRunning(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteType) {
+      toast({ title: "Validation Error", description: "Please select a deletion type (Area or Category).", variant: "destructive" });
+      return;
+    }
+    
+    if (bulkDeleteType === 'area' && !bulkDeleteAreaId) {
+      toast({ title: "Validation Error", description: "Please select a target area.", variant: "destructive" });
+      return;
+    }
+    
+    if (bulkDeleteType === 'category' && !bulkDeleteCategoryId) {
+      toast({ title: "Validation Error", description: "Please select a target category.", variant: "destructive" });
+      return;
+    }
+
+    setBulkDeleteRunning(true);
+
+    try {
+      if (bulkDeleteType === 'area') {
+        const areaName = areas.find(a => a.id === bulkDeleteAreaId)?.name || "Selected Area";
+        await executeBulkDeleteByAreaAction(bulkDeleteAreaId);
+        toast({
+          title: "Bulk Delete Success",
+          description: `Successfully deleted all overrides for area: ${areaName}.`,
+          className: "bg-green-100 border-green-300 text-green-700"
+        });
+      } else {
+        const catName = categories.find(c => c.id === bulkDeleteCategoryId)?.name || "Selected Category";
+        await executeBulkDeleteByCategoryAction(bulkDeleteCategoryId);
+        toast({
+          title: "Bulk Delete Success",
+          description: `Successfully deleted all overrides for category: ${catName}.`,
+          className: "bg-green-100 border-green-300 text-green-700"
+        });
+      }
+
+      setIsBulkDeleteOpen(false);
+      setBulkDeleteType("");
+      setBulkDeleteAreaId("");
+      setBulkDeleteCategoryId("");
+      await triggerRefresh('seo-settings');
+      await triggerRefresh('sitemap');
+      await fetchData(true);
+    } catch (err) {
+      console.error("Error running bulk delete:", err);
+      toast({ title: "Delete Failed", description: (err as Error).message || "An error occurred.", variant: "destructive" });
+    } finally {
+      setBulkDeleteRunning(false);
     }
   };
 
@@ -406,7 +465,14 @@ export default function ServiceSeoPage() {
             <PermissionGuard moduleId="seo_overrides" action="create">
               <Button variant="outline" onClick={() => setIsBatchOpen(true)} disabled={isSubmitting || cities.length === 0}><Zap className="mr-2 h-4 w-4 text-amber-500" />Batch Generate (Free)</Button>
               {settings.length > 0 && (
-                <Button variant="destructive" onClick={() => setIsDeleteAllOpen(true)} disabled={isSubmitting}><Trash2 className="mr-2 h-4 w-4" />Delete All</Button>
+                <>
+                  <Button variant="outline" className="text-destructive border-destructive hover:bg-destructive/10" onClick={() => setIsBulkDeleteOpen(true)} disabled={isSubmitting}>
+                    <Trash2 className="mr-2 h-4 w-4" /> Bulk Delete
+                  </Button>
+                  <Button variant="destructive" onClick={() => setIsDeleteAllOpen(true)} disabled={isSubmitting}>
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete All
+                  </Button>
+                </>
               )}
               <Button onClick={handleAddSetting} disabled={isSubmitting || cities.length === 0 || services.length === 0}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Page
@@ -864,6 +930,91 @@ export default function ServiceSeoPage() {
             <Button variant="destructive" onClick={handleDeleteAll} disabled={deleteRunning}>
               {deleteRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {deleteRunning ? "Deleting..." : "Yes, Delete All"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBulkDeleteOpen} onOpenChange={(open) => { if (!bulkDeleteRunning) setIsBulkDeleteOpen(open); }}>
+        <DialogContent className="max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="h-6 w-6" /> Bulk Delete SEO Overrides
+            </DialogTitle>
+            <DialogDescription>
+              Delete SEO overrides selectively by Area or by Category.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Delete by Filter Type</label>
+              <Select value={bulkDeleteType} onValueChange={(val: any) => setBulkDeleteType(val)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select deletion type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="area">Delete by Area</SelectItem>
+                  <SelectItem value="category">Delete by Category</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {bulkDeleteType === 'area' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Area</label>
+                <Select value={bulkDeleteAreaId} onValueChange={setBulkDeleteAreaId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose Area..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {areas.map(area => (
+                      <SelectItem key={area.id} value={area.id}>
+                        {area.name} ({cities.find(c => c.id === area.cityId)?.name || 'Unknown City'})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {bulkDeleteType === 'category' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Category</label>
+                <Select value={bulkDeleteCategoryId} onValueChange={setBulkDeleteCategoryId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose Category..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {bulkDeleteRunning && (
+              <div className="pt-2 animate-pulse text-xs text-muted-foreground">
+                Executing bulk deletion from database...
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => {
+              setIsBulkDeleteOpen(false);
+              setBulkDeleteType("");
+              setBulkDeleteAreaId("");
+              setBulkDeleteCategoryId("");
+            }} disabled={bulkDeleteRunning}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={bulkDeleteRunning || !bulkDeleteType || (bulkDeleteType === 'area' && !bulkDeleteAreaId) || (bulkDeleteType === 'category' && !bulkDeleteCategoryId)}>
+              {bulkDeleteRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {bulkDeleteRunning ? "Delete Selected" : "Delete Selected"}
             </Button>
           </div>
         </DialogContent>

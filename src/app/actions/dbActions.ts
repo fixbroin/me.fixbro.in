@@ -669,3 +669,105 @@ export async function executeBulkOverridesSeoGenerate(params: {
     return { success: true, createdCount, updatedCount, skippedCount };
   });
 }
+
+export async function executeBulkDeleteByAreaAction(areaId: string) {
+  return withRetry(async () => {
+    try {
+      const pool = await getPool();
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        
+        // 1. Delete from areaServiceSeoSettings
+        await conn.query(
+          "DELETE FROM `areaServiceSeoSettings` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.areaId')) = ?",
+          [areaId]
+        );
+        
+        // 2. Delete from areaCategorySeoSettings
+        await conn.query(
+          "DELETE FROM `areaCategorySeoSettings` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.areaId')) = ?",
+          [areaId]
+        );
+
+        await conn.commit();
+      } catch (error) {
+        await conn.rollback();
+        throw error;
+      } finally {
+        conn.release();
+      }
+      clearDocCache('areaServiceSeoSettings');
+      clearDocCache('areaCategorySeoSettings');
+      return { success: true };
+    } catch (error: any) {
+      console.error("Error in executeBulkDeleteByAreaAction:", error);
+      throw new Error(error.message || 'Database deletion error');
+    }
+  });
+}
+
+export async function executeBulkDeleteByCategoryAction(categoryId: string) {
+  return withRetry(async () => {
+    try {
+      const pool = await getPool();
+      
+      // 1. Fetch subcategories and services to map the category to serviceIds
+      const [subCategoriesRaw, servicesRaw] = await Promise.all([
+        getDocsInternal(pool, 'adminSubCategories', []),
+        getDocsInternal(pool, 'adminServices', [])
+      ]);
+      
+      const subCatIds = subCategoriesRaw
+        .map((doc: any) => ({ id: doc.id, ...doc.data }))
+        .filter((sc: any) => String(sc.parentId) === String(categoryId))
+        .map((sc: any) => String(sc.id));
+        
+      const serviceIds = servicesRaw
+        .map((doc: any) => ({ id: doc.id, ...doc.data }))
+        .filter((srv: any) => subCatIds.includes(String(srv.subCategoryId)))
+        .map((srv: any) => String(srv.id));
+
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        
+        // 2. Delete from cityCategorySeoSettings
+        await conn.query(
+          "DELETE FROM `cityCategorySeoSettings` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.categoryId')) = ?",
+          [categoryId]
+        );
+        
+        // 3. Delete from areaCategorySeoSettings
+        await conn.query(
+          "DELETE FROM `areaCategorySeoSettings` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.categoryId')) = ?",
+          [categoryId]
+        );
+
+        // 4. Delete from areaServiceSeoSettings (matching serviceIds)
+        if (serviceIds.length > 0) {
+          const placeholders = serviceIds.map(() => '?').join(', ');
+          await conn.query(
+            `DELETE FROM \`areaServiceSeoSettings\` WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.serviceId')) IN (${placeholders})`,
+            serviceIds
+          );
+        }
+
+        await conn.commit();
+      } catch (error) {
+        await conn.rollback();
+        throw error;
+      } finally {
+        conn.release();
+      }
+      clearDocCache('cityCategorySeoSettings');
+      clearDocCache('areaCategorySeoSettings');
+      clearDocCache('areaServiceSeoSettings');
+      return { success: true };
+    } catch (error: any) {
+      console.error("Error in executeBulkDeleteByCategoryAction:", error);
+      throw new Error(error.message || 'Database deletion error');
+    }
+  });
+}
+
