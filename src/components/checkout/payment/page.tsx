@@ -495,10 +495,16 @@ export default function PaymentPage() {
     if (!scriptLoaded) { toast({ title: "Error", description: "Could not load Razorpay checkout. Please try again.", variant: "destructive" }); setIsProcessingPayment(false); hideLoading(); return; }
 
     try {
+      const currencyCode = appConfig?.currencyCode || 'INR';
+      const currencyDecimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+
       const orderCreationResponse = await fetch('/api/razorpay/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount: Math.round(totalAmountDue * 100) }),
+          body: JSON.stringify({ 
+              amount: Math.round(totalAmountDue * Math.pow(10, currencyDecimals)),
+              currency: currencyCode
+          }),
       });
 
       if (!orderCreationResponse.ok) {
@@ -515,7 +521,7 @@ export default function PaymentPage() {
       const paymentDescription = isCancellationFeeMode && cancellationFeeDetails?.humanReadableBookingId ? `Cancellation Fee for Booking ${cancellationFeeDetails.humanReadableBookingId}` : "Service Booking Payment";
 
       const options = {
-        key: appConfig.razorpayKeyId, amount: orderDetails.amount, currency: "INR", name: globalSettings?.websiteName || "Wecanfix Services",
+        key: appConfig.razorpayKeyId, amount: orderDetails.amount, currency: currencyCode, name: globalSettings?.websiteName || "Wecanfix Services",
         description: paymentDescription, order_id: orderDetails.id,
         handler: (response: any) => {
           localStorage.setItem('razorpayPaymentId', response.razorpay_payment_id);

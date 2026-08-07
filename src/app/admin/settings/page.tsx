@@ -387,10 +387,18 @@ export default function AdminSettingsPage() {
   };
 
   const handleSelectCurrency = (currency: CurrencyOption) => {
+    let decimals = 2;
+    if (['JPY', 'VND'].includes(currency.code)) {
+      decimals = 0;
+    } else if (['KWD', 'BHD', 'OMR'].includes(currency.code)) {
+      decimals = 3;
+    }
+
     setSettings(prev => ({
       ...prev,
       currencyCode: currency.code,
       currencySymbol: currency.symbol,
+      currencyDecimalPoints: decimals,
     }));
   };
 
@@ -857,6 +865,7 @@ export default function AdminSettingsPage() {
                         <option value={0}>0</option>
                         <option value={1}>1</option>
                         <option value={2}>2</option>
+                        <option value={3}>3</option>
                       </select>
                     </div>
                   </div>
