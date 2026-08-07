@@ -23,7 +23,15 @@ const calculateProviderFee = (bookingAmount: number, feeType?: ProviderFeeType, 
     return 0;
 };
 
-const isCashPayment = (method: string) => method === 'Pay After Service' || method === 'Cash on Delivery';
+const isCashPayment = (method: string) => {
+    if (!method) return true;
+    const lower = method.toLowerCase();
+    return lower === 'cash' || 
+           lower === 'pay after service' || 
+           lower === 'cash on delivery' || 
+           lower === 'cod' || 
+           lower === 'offline';
+};
 
 export default function ProviderEarningsPage() {
   const { user: providerUser, firestoreUser, isLoading: authIsLoading } = useAuth();
@@ -93,9 +101,16 @@ export default function ProviderEarningsPage() {
             const isCash = isCashPayment(b.paymentMethod);
             const bDate = b.scheduledDate || "";
 
+            const extraCharges = (b.additionalCharges || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+            const originalAmount = b.totalAmount - extraCharges;
+
             // All-time calculation
             totalNetEarnings += (b.totalAmount - commission);
-            if (isCash) totalCashCollected += b.totalAmount;
+            if (isCash) {
+                totalCashCollected += b.totalAmount;
+            } else {
+                totalCashCollected += extraCharges;
+            }
 
             // Monthly calculation (if date is this month)
             if (bDate >= startOfMonthStr) {
@@ -105,7 +120,10 @@ export default function ProviderEarningsPage() {
                     mStats.cashCollected += b.totalAmount;
                     mStats.cashCommission += commission;
                 } else {
-                    mStats.onlineNet += (b.totalAmount - commission);
+                    mStats.cashCollected += extraCharges;
+                    const extraCommission = calculateProviderFee(extraCharges, appConfig.providerFeeType, appConfig.providerFeeValue);
+                    mStats.cashCommission += extraCommission;
+                    mStats.onlineNet += (originalAmount - commission);
                 }
             }
         });

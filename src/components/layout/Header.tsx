@@ -59,12 +59,12 @@ const NavLink = ({ href, children, onClick, isButton = false }: { href?: string;
 };
 
 
-const Header = () => {
+const Header = ({ initialWebSettings }: { initialWebSettings?: any }) => {
   const [isSearchPopupOpen, setIsSearchPopupOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const { user, firestoreUser, logOut, isLoading: authIsLoading, triggerAuthRedirect, providerStatus } = useAuth();
-  const { settings: globalSettings, isLoading: settingsAreLoading } = useGlobalSettings();
+  const { settings: globalSettings, isLoading: settingsAreLoading } = useGlobalSettings(initialWebSettings);
   const { config: appConfig, isLoading: isLoadingAppConfig } = useApplicationConfig(); 
   const symbol = appConfig?.currencySymbol || '₹';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;

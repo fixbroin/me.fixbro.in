@@ -157,7 +157,7 @@ const Footer = () => {
 
   if (!isMounted || isLoadingGlobalSettings || isLoadingCategories) {
     return (
-      <footer className="bg-muted/30 border-t">
+      <footer className="hidden md:block bg-muted/30 border-t">
         <div className="container mx-auto px-4 py-16">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
             <div className="space-y-4">
@@ -179,7 +179,7 @@ const Footer = () => {
   }
 
   return (
-    <footer className="bg-muted/30 border-t text-foreground">
+    <footer className="hidden md:block bg-muted/30 border-t text-foreground">
       <LocalSiloLinks />
       <div className="container mx-auto px-4 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 mb-12">

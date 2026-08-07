@@ -100,7 +100,7 @@ type ServiceFormDataInternal = z.infer<typeof serviceFormSchema>;
 
 interface ServiceFormProps {
   onSubmit: (data: Omit<FirestoreService, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => Promise<void>;
-  initialData?: FirestoreService | null;
+  initialData?: (Omit<FirestoreService, 'id'> & { id?: string }) | null;
   onCancel: () => void;
   parentCategories: FirestoreCategory[];
   subCategories: FirestoreSubCategory[];

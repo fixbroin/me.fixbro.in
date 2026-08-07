@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Edit, Trash2, ShoppingBag, Loader2, Search } from "lucide-react";
+import { PlusCircle, Edit, Trash2, ShoppingBag, Loader2, Search, Copy } from "lucide-react";
 import type { FirestoreService, FirestoreSubCategory, FirestoreTax, FirestoreCategory } from '@/types/firestore';
 import ServiceForm from '@/components/admin/ServiceForm';
 import { db, storage } from '@/lib/firebase';
@@ -50,6 +50,7 @@ export default function AdminServicesPage() {
   const [taxes, setTaxes] = useState<FirestoreTax[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingService, setEditingService] = useState<FirestoreService | null>(null);
+  const [isCloning, setIsCloning] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true); // Combined loading state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -123,11 +124,19 @@ export default function AdminServicesPage() {
 
   const handleAddService = () => {
     setEditingService(null);
+    setIsCloning(false);
     setIsFormOpen(true);
   };
 
   const handleEditService = (service: FirestoreService) => {
     setEditingService(service);
+    setIsCloning(false);
+    setIsFormOpen(true);
+  };
+
+  const handleCloneService = (service: FirestoreService) => {
+    setEditingService(service);
+    setIsCloning(true);
     setIsFormOpen(true);
   };
 
@@ -205,9 +214,25 @@ export default function AdminServicesPage() {
     setIsSubmitting(true);
     const selectedTax = taxes.find(t => t.id === data.taxId);
 
+    // Resolve slug uniqueness dynamically
+    let baseSlug = data.slug || generateSlug(data.name);
+    let finalSlug = baseSlug;
+    let counter = 1;
+    let isSlugUnique = false;
+    
+    while (!isSlugUnique) {
+      const existing = services.find(s => s.slug === finalSlug && s.id !== data.id);
+      if (!existing) {
+        isSlugUnique = true;
+      } else {
+        finalSlug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+    }
+
     const payloadForFirestore: Partial<FirestoreService> = {
       name: data.name, 
-      slug: data.slug || generateSlug(data.name), 
+      slug: finalSlug, 
       subCategoryId: data.subCategoryId, 
       description: data.description,
       price: data.price,
@@ -435,6 +460,9 @@ export default function AdminServicesPage() {
                                     <PermissionGuard moduleId="services" action="write">
                                       <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleEditService(service)} disabled={isSubmitting}><Edit className="h-3.5 w-3.5" /></Button>
                                     </PermissionGuard>
+                                    <PermissionGuard moduleId="services" action="create">
+                                      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleCloneService(service)} disabled={isSubmitting} title="Clone Service"><Copy className="h-3.5 w-3.5" /></Button>
+                                    </PermissionGuard>
                                     <PermissionGuard moduleId="services" action="delete">
                                       <AlertDialog>
                                         <AlertDialogTrigger asChild><Button variant="destructive" size="icon" className="h-7 w-7" disabled={isSubmitting}><Trash2 className="h-3.5 w-3.5" /></Button></AlertDialogTrigger>
@@ -463,13 +491,27 @@ export default function AdminServicesPage() {
         </Accordion>
       )}
 
-      <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) { setIsFormOpen(open); if (!open) setEditingService(null); } }}>
+      <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) { setIsFormOpen(open); if (!open) { setEditingService(null); setIsCloning(false); } } }}>
         <DialogContent className="w-[calc(100%-6px)] sm:max-w-md md:max-w-lg lg:max-w-2xl max-h-[90vh] p-0 flex flex-col">
-          <DialogHeader className="p-3 pb-4 border-b"><DialogTitle>{editingService ? 'Edit Service' : 'Add New Service'}</DialogTitle><DialogDescription>{editingService ? 'Update details.' : 'Fill in details for a new service.'}</DialogDescription></DialogHeader>
+          <DialogHeader className="p-3 pb-4 border-b">
+            <DialogTitle>{editingService ? (isCloning ? 'Clone Service' : 'Edit Service') : 'Add New Service'}</DialogTitle>
+            <DialogDescription>
+              {editingService ? (isCloning ? 'Adjust details to create a new cloned service.' : 'Update details.') : 'Fill in details for a new service.'}
+            </DialogDescription>
+          </DialogHeader>
           {(parentCategories.length === 0 && !editingService && !isLoadingData) || (subCategories.length === 0 && !editingService && !isLoadingData) ? (
              <div className="p-3 py-8 text-center"><p className="text-destructive">{(parentCategories.length === 0 && "No parent categories exist. ")}{(subCategories.length === 0 && "No sub-categories exist. ")}</p><p className="text-muted-foreground text-sm mt-2">Please add categories/sub-categories first.</p></div>
           ) : (
-            <ServiceForm onSubmit={handleFormSubmit} initialData={editingService} parentCategories={parentCategories} subCategories={subCategories} taxes={taxes} allServices={services} onCancel={() => { setIsFormOpen(false); setEditingService(null); }} isSubmitting={isSubmitting}/>
+            <ServiceForm 
+              onSubmit={handleFormSubmit} 
+              initialData={isCloning && editingService ? { ...editingService, id: undefined } : editingService} 
+              parentCategories={parentCategories} 
+              subCategories={subCategories} 
+              taxes={taxes} 
+              allServices={services} 
+              onCancel={() => { setIsFormOpen(false); setEditingService(null); setIsCloning(false); }} 
+              isSubmitting={isSubmitting}
+            />
           )}
         </DialogContent>
       </Dialog>

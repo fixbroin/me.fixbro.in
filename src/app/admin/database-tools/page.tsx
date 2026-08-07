@@ -186,35 +186,7 @@ export default function DatabaseToolsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* FIREBASE MIGRATION CARD */}
-        <Card className="md:col-span-2 border-primary/30 bg-primary/5">
-          <CardHeader>
-            <CardTitle className="flex items-center text-lg text-primary">
-              <Database className="mr-2 h-5 w-5" /> Merge Firebase Data to MySQL
-            </CardTitle>
-            <CardDescription>
-              Copy and merge all collections and documents from your Firebase Firestore directly into your local MySQL database tables.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert className="bg-blue-50/50 border-blue-100 text-blue-800 dark:bg-blue-950/20 dark:border-blue-900/50 dark:text-blue-300">
-              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <AlertTitle>Full Data Synchronization</AlertTitle>
-              <AlertDescription>
-                This process reads all existing categories, services, subcategories, bookings, users, settings, slides, and FAQs from Firebase Firestore and writes them into your MySQL tables.
-              </AlertDescription>
-            </Alert>
-            <PermissionGuard moduleId="database_tools" action="write">
-              <Button
-                onClick={handleMigrateFirebase}
-                disabled={isMigratingFirebase}
-                className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-6 text-base"
-              >
-                {isMigratingFirebase ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Database className="mr-2 h-5 w-5" />}
-                {isMigratingFirebase ? "Migrating All Firebase Data to MySQL..." : "Migrate & Merge All Firebase Data to MySQL"}
-              </Button>
-            </PermissionGuard>
-          </CardContent>
-        </Card>
+        
 
         {/* DATABASE EXPORT & IMPORT CARD */}
         <Card className="flex flex-col">

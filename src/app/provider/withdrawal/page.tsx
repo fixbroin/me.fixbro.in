@@ -87,7 +87,15 @@ const calculateProviderFee = (bookingAmount: number, feeType?: ProviderFeeType, 
     if (feeType === 'percentage') return (bookingAmount * feeValue) / 100;
     return 0;
 };
-const isCashPayment = (method: string) => method === 'Pay After Service' || method === 'Cash on Delivery';
+const isCashPayment = (method: string) => {
+    if (!method) return true;
+    const lower = method.toLowerCase();
+    return lower === 'cash' || 
+           lower === 'pay after service' || 
+           lower === 'cash on delivery' || 
+           lower === 'cod' || 
+           lower === 'offline';
+};
 
 function WithdrawalPageContent() {
   const { user: providerUser, firestoreUser, isLoading: authIsLoading } = useAuth();

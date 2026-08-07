@@ -96,12 +96,16 @@ export default function ProviderWithdrawalsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingProviders, setIsLoadingProviders] = useState(false);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [isClearingWallet, setIsClearingWallet] = useState<string | null>(null);
   const { toast } = useToast();
 
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectionDialog, setShowRejectionDialog] = useState(false);
   const [requestToActOn, setRequestToActOn] = useState<WithdrawalRequest | null>(null);
   const [actionType, setActionType] = useState<'rejected' | 're_submit' | null>(null);
+
+  const [showClearWalletDialog, setShowClearWalletDialog] = useState(false);
+  const [providerToClear, setProviderToClear] = useState<FirestoreUser | null>(null);
 
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedRequestForDetails, setSelectedRequestForDetails] = useState<WithdrawalRequest | null>(null);
@@ -150,6 +154,35 @@ export default function ProviderWithdrawalsPage() {
         toast({ title: "Error", description: "Could not load provider balances.", variant: "destructive" });
     } finally {
         setIsLoadingProviders(false);
+    }
+  };
+
+  const handleClearWalletExecute = async (uid: string, displayName: string) => {
+    setIsClearingWallet(uid);
+    try {
+      const userDocRef = doc(db, "users", uid);
+      await updateDoc(userDocRef, {
+        withdrawableBalance: 0
+      });
+
+      toast({
+        title: "Wallet Cleared",
+        description: `Successfully reset wallet balance to 0 for ${displayName}.`,
+        className: "bg-green-100 border-green-300 text-green-700 font-medium"
+      });
+
+      await loadProviders();
+    } catch (err) {
+      console.error("Error clearing wallet:", err);
+      toast({
+        title: "Clear Wallet Failed",
+        description: (err as Error).message || "An error occurred.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsClearingWallet(null);
+      setShowClearWalletDialog(false);
+      setProviderToClear(null);
     }
   };
 
@@ -460,9 +493,8 @@ export default function ProviderWithdrawalsPage() {
                 <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
               ) : providers.length === 0 ? (
                 <p className="text-center py-10 text-muted-foreground">No providers found.</p>
-              ) : (
-                <Table>
-                  <TableHeader><TableRow><TableHead>Provider</TableHead><TableHead>Month Gross</TableHead><TableHead>Month Net</TableHead><TableHead>Wallet Balance</TableHead><TableHead>Lifetime Paid</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              ) : (                 <Table>
+                  <TableHeader><TableRow><TableHead>Provider</TableHead><TableHead>Month Gross</TableHead><TableHead>Month Net</TableHead><TableHead>Wallet Balance</TableHead><TableHead>Lifetime Paid</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {providers.map(p => {
                        const now = new Date();
@@ -490,6 +522,27 @@ export default function ProviderWithdrawalsPage() {
                                 <Badge variant="outline">Cleared</Badge>
                             )}
                           </TableCell>
+                          <TableCell className="text-right">
+                            <PermissionGuard moduleId="provider_withdrawals" action="write">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setProviderToClear(p);
+                                  setShowClearWalletDialog(true);
+                                }}
+                                disabled={(p.withdrawableBalance || 0) === 0 || isClearingWallet === p.uid}
+                                className="h-8 px-2 text-xs border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive rounded-lg font-medium"
+                              >
+                                {isClearingWallet === p.uid ? (
+                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                ) : (
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                )}
+                                Clear Wallet
+                              </Button>
+                            </PermissionGuard>
+                          </TableCell>
                        </TableRow>
                     ); })}
                   </TableBody>
@@ -513,6 +566,33 @@ export default function ProviderWithdrawalsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => { if(requestToActOn) handleUpdateStatus(requestToActOn, actionType!, rejectionReason)}} disabled={!rejectionReason.trim()} className="bg-destructive hover:bg-destructive/90">Confirm Action</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showClearWalletDialog} onOpenChange={setShowClearWalletDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear Wallet Balance</AlertDialogTitle>
+            <AlertDialogDescriptionComponent>
+              Are you sure you want to clear/reset the wallet balance for <span className="font-semibold text-foreground">{providerToClear?.displayName}</span>? This will set their withdrawable balance to {formatCurrency(0, symbol, decimals, code)} permanently.
+            </AlertDialogDescriptionComponent>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowClearWalletDialog(false);
+              setProviderToClear(null);
+            }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (providerToClear) {
+                  handleClearWalletExecute(providerToClear.uid, providerToClear.displayName || "Unknown");
+                }
+              }}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Confirm Clear
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

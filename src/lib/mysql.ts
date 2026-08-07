@@ -497,7 +497,7 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
     params.push(resolved.parentId);
   }
 
-  let orderByClause = '';
+  const orderByClauses: string[] = [];
   let limitClause = '';
   let offsetClause = '';
 
@@ -621,11 +621,11 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
       const field = c.field;
       const direction = c.direction || 'asc';
       if (field === 'createdAt' || field === 'updatedAt') {
-        orderByClause = ` ORDER BY \`${field}\` ${direction.toUpperCase()}`;
+        orderByClauses.push(`\`${field}\` ${direction.toUpperCase()}`);
       } else if (['order', 'price', 'rating', 'reviewCount', 'discountedPrice', 'minQuantity', 'maxQuantity'].includes(field)) {
-        orderByClause = ` ORDER BY CAST(${jsonExtractText(field)} AS SIGNED) ${direction.toUpperCase()}`;
+        orderByClauses.push(`CAST(${jsonExtractText(field)} AS SIGNED) ${direction.toUpperCase()}`);
       } else {
-        orderByClause = ` ORDER BY ${jsonExtractText(field)} ${direction.toUpperCase()}`;
+        orderByClauses.push(`${jsonExtractText(field)} ${direction.toUpperCase()}`);
       }
     } else if (c.type === 'limit') {
       limitClause = ` LIMIT ?`;
@@ -690,7 +690,9 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
     sql += ` WHERE ${whereClauses.join(' AND ')}`;
   }
 
-  sql += orderByClause;
+  if (orderByClauses.length > 0) {
+    sql += ` ORDER BY ${orderByClauses.join(', ')}`;
+  }
   if (limitClause) {
     sql += limitClause;
     if (offsetClause) sql += offsetClause;

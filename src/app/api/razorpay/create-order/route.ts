@@ -3,6 +3,8 @@ import { type NextRequest, NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
 import { nanoid } from 'nanoid';
 
+import { adminDb } from '@/lib/firebaseAdmin';
+
 export async function POST(req: NextRequest) {
   try {
     const { amount, currency = 'INR' } = await req.json();
@@ -11,11 +13,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid amount provided.' }, { status: 400 });
     }
 
-    const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
-    const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
+    const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
+    const appConfig = appConfigSnap.exists ? appConfigSnap.data() as any : null;
+
+    const razorpayKeyId = appConfig?.razorpayKeyId || process.env.RAZORPAY_KEY_ID;
+    const razorpayKeySecret = appConfig?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
 
     if (!razorpayKeyId || !razorpayKeySecret) {
-      console.error("Razorpay API keys are not set in environment variables.");
+      console.error("Razorpay API keys are not set in database settings or environment variables.");
       return NextResponse.json({ success: false, error: 'Payment gateway not configured on server.' }, { status: 500 });
     }
 

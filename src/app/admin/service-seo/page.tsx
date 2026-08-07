@@ -36,6 +36,7 @@ export default function ServiceSeoPage() {
   const [services, setServices] = useState<FirestoreService[]>([]);
   const [categories, setCategories] = useState<FirestoreCategory[]>([]);
   const [displayLimit, setDisplayLimit] = useState(500);
+  const [categoryFilterId, setCategoryFilterId] = useState<string>("all");
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSetting, setEditingSetting] = useState<AreaServiceSeoSetting | null>(null);
@@ -433,6 +434,13 @@ export default function ServiceSeoPage() {
     }
   };
 
+  const filteredSettings = categoryFilterId === 'all'
+    ? settings
+    : settings.filter(setting => {
+        const service = services.find(s => s.id === setting.serviceId);
+        return service && service.parentCategoryId === categoryFilterId;
+      });
+
   if (!isMounted || isLoading) {
     return (
       <div className="space-y-6">
@@ -481,6 +489,26 @@ export default function ServiceSeoPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {settings.length > 0 && (
+            <div className="flex items-center gap-2 mb-4 pb-2 border-b">
+              <span className="text-sm font-medium text-muted-foreground">Filter by Category:</span>
+              <Select value={categoryFilterId} onValueChange={setCategoryFilterId}>
+                <SelectTrigger className="w-[220px] h-9">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id!}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {categoryFilterId !== 'all' && (
+                <Button variant="ghost" size="sm" onClick={() => setCategoryFilterId('all')} className="h-9">Reset</Button>
+              )}
+            </div>
+          )}
+
           {settings.length === 0 ? (
             <div className="text-center py-12">
               <PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
@@ -490,6 +518,11 @@ export default function ServiceSeoPage() {
                   Create First Override
                 </Button>
               </PermissionGuard>
+            </div>
+          ) : filteredSettings.length === 0 ? (
+            <div className="text-center py-12">
+              <PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">No overrides found for the selected category.</p>
             </div>
           ) : (
             <Table>
@@ -505,7 +538,7 @@ export default function ServiceSeoPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {settings.slice(0, displayLimit).map((setting) => (
+                {filteredSettings.slice(0, displayLimit).map((setting) => (
                   <TableRow key={setting.id}>
                     <TableCell className="font-semibold">{setting.cityName}</TableCell>
                     <TableCell>{setting.areaName}</TableCell>
@@ -559,17 +592,17 @@ export default function ServiceSeoPage() {
             </Table>
           )}
 
-          {settings.length > displayLimit && (
+          {filteredSettings.length > displayLimit && (
             <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground border-t pt-4">
               <div>
-                Showing first {Math.min(displayLimit, settings.length)} of {settings.length} overrides.
+                Showing first {Math.min(displayLimit, filteredSettings.length)} of {filteredSettings.length} overrides.
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => setDisplayLimit(prev => prev + 500)}>
                   Load More (+500)
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setDisplayLimit(settings.length)}>
-                  Load All ({settings.length})
+                <Button variant="outline" size="sm" onClick={() => setDisplayLimit(filteredSettings.length)}>
+                  Load All ({filteredSettings.length})
                 </Button>
               </div>
             </div>

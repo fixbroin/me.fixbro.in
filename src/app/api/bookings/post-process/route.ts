@@ -276,7 +276,15 @@ export async function POST(request: Request) {
     }
 
     // --- NEW: Update Provider's withrawableBalance and System Stats on Completion ---
-    const isCashPayment = (method: string) => method === 'Pay After Service' || method === 'Cash on Delivery';
+    const isCashPayment = (method: string) => {
+        if (!method) return true;
+        const lower = method.toLowerCase();
+        return lower === 'cash' || 
+               lower === 'pay after service' || 
+               lower === 'cash on delivery' || 
+               lower === 'cod' || 
+               lower === 'offline';
+    };
     if (isCompleted && booking.providerId) {
         const calculateProviderFee = (bookingAmount: number, feeType?: string, feeValue?: number): number => {
             if (!feeType || !feeValue || feeValue <= 0) return 0;
@@ -319,13 +327,20 @@ export async function POST(request: Request) {
             stats.gross += booking.totalAmount;
             stats.commission += commission;
 
+            const extraCharges = (booking.additionalCharges || []).reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
+            const originalAmount = booking.totalAmount - extraCharges;
+
             if (isCashPayment(booking.paymentMethod)) {
                 balanceChange = -commission;
                 stats.cashCollected += booking.totalAmount;
                 stats.cashCommission += commission;
             } else {
-                balanceChange = (booking.totalAmount - commission);
-                stats.onlineNet += (booking.totalAmount - commission);
+                // Customer prepaid online, but extra charges are collected by provider on-site (Pay After Service)
+                balanceChange = originalAmount - commission;
+                stats.cashCollected += extraCharges;
+                const extraCommission = calculateProviderFee(extraCharges, appConfig.providerFeeType, appConfig.providerFeeValue);
+                stats.cashCommission += extraCommission;
+                stats.onlineNet += (originalAmount - commission);
             }
             
             transaction.set(providerDocRef, { 

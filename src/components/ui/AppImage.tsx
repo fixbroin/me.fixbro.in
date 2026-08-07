@@ -84,29 +84,34 @@ export default function AppImage({
     }
   }, [src]);
 
+  const shouldBypassPlaceholder = priority || isSeenBefore;
+  const isLoaded = loaded || shouldBypassPlaceholder;
+
   return (
     <div className={cn("relative overflow-hidden", fill ? "w-full h-full" : "inline-block", className)}>
 
       {/* 
           SMOOTH PLACEHOLDER (Logo + Pulse):
           Only pulses if NEVER seen before. 
-          If seen before, it stays static (no flickering) until the image is painted.
+          If seen before or has priority, skip placeholder overlay entirely to prevent LCP metric delays.
       */}
-      <div 
-        className={cn(
-            "absolute inset-0 z-10 flex items-center justify-center bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-[2px] transition-opacity duration-300",
-            loaded ? "opacity-0 pointer-events-none" : "opacity-100"
-        )}
-      >
-          <img
-            src="/default-image.png"
-            alt="loading..."
-            className={cn(
-                "w-full h-full object-contain p-4",
-                !isSeenBefore && "animate-pulse"
-            )}
-          />
-      </div>
+      {!shouldBypassPlaceholder && (
+        <div 
+          className={cn(
+              "absolute inset-0 z-10 flex items-center justify-center bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-[2px] transition-opacity duration-300",
+              loaded ? "opacity-0 pointer-events-none" : "opacity-100"
+          )}
+        >
+            <img
+              src="/default-image.png"
+              alt="loading..."
+              className={cn(
+                  "w-full h-full object-contain p-4",
+                  !isSeenBefore && "animate-pulse"
+              )}
+            />
+        </div>
+      )}
 
       {/* ACTUAL IMAGE (Next.js Powered) */}
       <Image
@@ -132,11 +137,11 @@ export default function AppImage({
         className={cn(
           "transition-opacity duration-300 ease-in-out",
           isDefaultImage ? "object-contain bg-muted" : "object-cover",
-          loaded ? "opacity-100" : "opacity-0"
+          isLoaded ? "opacity-100" : "opacity-0"
         )}
         style={{ 
           objectPosition,
-          zIndex: loaded ? 20 : 0 
+          zIndex: isLoaded ? 20 : 0 
         }}
       />
     </div>

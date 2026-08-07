@@ -27,23 +27,12 @@ const generateAiHint = (hint?: string, name?: string): string => {
 };
 
 const CategoryCard: React.FC<CategoryCardProps> = ({ category, priority = false, index = 0 }) => {
-  const [displayName, setDisplayName] = useState<string | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
   const { showLoading } = useLoading(); 
   const { user, triggerAuthRedirect } = useAuth();
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (isMounted && category) {
-      setDisplayName(category.name);
-    }
-  }, [isMounted, category]);
   
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!category) return;
     const intendedHref = `/category/${category.slug}`;
     showLoading();
     if (!user) {
@@ -51,9 +40,9 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ category, priority = false,
       return;
     }
     router.push(intendedHref);
-  }, [router, category.slug, showLoading, user, triggerAuthRedirect]);
+  }, [router, category?.slug, showLoading, user, triggerAuthRedirect]);
 
-  if (!isMounted || displayName === null || !category) {
+  if (!category) {
     return (
       <div className="flex flex-col items-center gap-4">
         <Skeleton className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 lg:w-48 lg:h-48 rounded-full bg-muted" />
@@ -62,6 +51,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ category, priority = false,
     );
   }
   
+  const displayName = category.name;
   const displayCategoryImageUrl = category.imageUrl && category.imageUrl.trim() !== '' ? category.imageUrl : "/default-image.png";
   const categoryAiHintValue = generateAiHint(category.imageHint, category.name);
 

@@ -15,13 +15,20 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, limit, doc, updateDoc, Timestamp, serverTimestamp } from '@/lib/mysqlDb';
 import BottomNavigationBar from './BottomNavigationBar';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ApplicationConfigProvider } from '@/hooks/useApplicationConfig';
 import { cn } from '@/lib/utils';
 import CookieConsentBanner from '@/components/shared/CookieConsentBanner';
 import CompleteProfileDialog from '@/components/auth/CompleteProfileDialog';
 import AdminCompleteProfileDialog from '@/components/admin/AdminCompleteProfileDialog';
 import PwaInstallButton from '@/components/shared/PwaInstallButton';
 
-const AppLayout: React.FC<PropsWithChildren> = ({ children }) => {
+interface AppLayoutProps {
+  children: React.ReactNode;
+  initialWebSettings?: any;
+  initialAppConfig?: any;
+}
+
+const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, initialAppConfig }) => {
   const pathname = usePathname();
   const [isClientMounted, setIsClientMounted] = useState(false);
   
@@ -286,7 +293,7 @@ const AppLayout: React.FC<PropsWithChildren> = ({ children }) => {
     fetchPendingReview(); 
   }, [fetchPendingReview]);
 
-  const shouldShowHeader = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !pathname.startsWith('/auth/');
+  const shouldShowHeader = !pathname.startsWith('/admin') && !pathname.startsWith('/provider') && !pathname.startsWith('/auth/');
   const shouldShowNewsletterPopupManager = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider');
   const shouldShowGlobalAdminPopup = isClientMounted && !pathname.startsWith('/admin') && !pathname.startsWith('/provider');
   const shouldShowPwaInstallButton = isClientMounted && !pathname.startsWith('/category/') && !pathname.includes('/category/');
@@ -297,56 +304,58 @@ const AppLayout: React.FC<PropsWithChildren> = ({ children }) => {
   const shouldShowBottomNav = isClientMounted && isMobile && bottomNavActivePaths.includes(pathname);
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {shouldShowHeader && (
-       <div data-site-header className={cn(
-            "fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out",
-            isHeaderVisible ? "translate-y-0" : "-translate-y-full"
-        )}>
-            <Header />
-        </div>
-      )}
-     <main
-  className={cn(
-    "flex-grow",
-    shouldShowBottomNav && "pb-16",
-    shouldShowHeader && "pt-[var(--header-height,64px)]"
-  )}
->
-
-
-        {children}
-      </main>
-      {showFooter && <Footer />}
-      {shouldShowBottomNav && <BottomNavigationBar />}
-      {shouldShowNewsletterPopupManager && <PopupDisplayManager />}
-      {shouldShowGlobalAdminPopup && <GlobalAdminPopup />}
-      {isClientMounted && pendingReviewBooking && (
-        <ReviewSubmissionModal
-          booking={pendingReviewBooking}
-          isOpen={isReviewPopupOpen}
-          onReviewSubmitted={handleReviewSubmitted}
-        />
-      )}
-      {isClientMounted && userCredentialForProfileCompletion && isCompletingProfile && (
-        <CompleteProfileDialog
-            isOpen={isCompletingProfile}
-            userCredential={userCredentialForProfileCompletion}
-            onSubmit={completeProfileSetup}
-            onClose={cancelProfileCompletion}
-        />
-      )}
-      {isClientMounted && userCredentialForProfileCompletion && isCompletingProfileAsAdmin && (
-        <AdminCompleteProfileDialog
-            isOpen={isCompletingProfileAsAdmin}
-            userCredential={userCredentialForProfileCompletion}
-            onSubmit={completeProfileSetup}
-            onClose={cancelProfileCompletion}
-        />
-      )}
-      {isClientMounted && <CookieConsentBanner />}
-      {shouldShowPwaInstallButton && <PwaInstallButton />}
-    </div>
+    <ApplicationConfigProvider initialConfig={initialAppConfig}>
+      <div className="flex flex-col min-h-screen">
+        {shouldShowHeader && (
+         <div data-site-header className={cn(
+              "fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out",
+              isHeaderVisible ? "translate-y-0" : "-translate-y-full"
+          )}>
+              <Header initialWebSettings={initialWebSettings} />
+          </div>
+        )}
+       <main
+    className={cn(
+      "flex-grow",
+      shouldShowBottomNav && "pb-16",
+      shouldShowHeader && "pt-[var(--header-height,64px)]"
+    )}
+  >
+  
+  
+          {children}
+        </main>
+        {showFooter && <Footer />}
+        {shouldShowBottomNav && <BottomNavigationBar />}
+        {shouldShowNewsletterPopupManager && <PopupDisplayManager />}
+        {shouldShowGlobalAdminPopup && <GlobalAdminPopup />}
+        {isClientMounted && pendingReviewBooking && (
+          <ReviewSubmissionModal
+            booking={pendingReviewBooking}
+            isOpen={isReviewPopupOpen}
+            onReviewSubmitted={handleReviewSubmitted}
+          />
+        )}
+        {isClientMounted && userCredentialForProfileCompletion && isCompletingProfile && (
+          <CompleteProfileDialog
+              isOpen={isCompletingProfile}
+              userCredential={userCredentialForProfileCompletion}
+              onSubmit={completeProfileSetup}
+              onClose={cancelProfileCompletion}
+          />
+        )}
+        {isClientMounted && userCredentialForProfileCompletion && isCompletingProfileAsAdmin && (
+          <AdminCompleteProfileDialog
+              isOpen={isCompletingProfileAsAdmin}
+              userCredential={userCredentialForProfileCompletion}
+              onSubmit={completeProfileSetup}
+              onClose={cancelProfileCompletion}
+          />
+        )}
+        {isClientMounted && <CookieConsentBanner />}
+        {shouldShowPwaInstallButton && <PwaInstallButton />}
+      </div>
+    </ApplicationConfigProvider>
   );
 };
 

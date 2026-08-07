@@ -18,35 +18,72 @@ interface UseApplicationConfigReturn {
   error: string | null;
 }
 
-export function useApplicationConfig(): UseApplicationConfigReturn {
-  const [config, setConfig] = useState<AppSettings>(() => getCache<AppSettings>(CACHE_KEY, true) || defaultAppSettings);
-  const [isLoading, setIsLoading] = useState(!getCache(CACHE_KEY, true));
+const processData = (firestoreData: Partial<AppSettings>): AppSettings => {
+  return {
+    ...defaultAppSettings,
+    ...firestoreData,
+    timeSlotSettings: {
+      ...defaultAppSettings.timeSlotSettings,
+      ...(firestoreData.timeSlotSettings || {}),
+      weeklyAvailability: {
+        ...defaultAppSettings.timeSlotSettings.weeklyAvailability,
+        ...(firestoreData.timeSlotSettings?.weeklyAvailability || {}),
+      }
+    },
+    platformFees: firestoreData.platformFees || defaultAppSettings.platformFees || [],
+    enableCancellationPolicy: typeof firestoreData.enableCancellationPolicy === 'boolean' ? firestoreData.enableCancellationPolicy : defaultAppSettings.enableCancellationPolicy,
+    isProviderRegistrationEnabled: typeof firestoreData.isProviderRegistrationEnabled === 'boolean' ? firestoreData.isProviderRegistrationEnabled : defaultAppSettings.isProviderRegistrationEnabled,
+    isCancelledChequeCompulsory: typeof firestoreData.isCancelledChequeCompulsory === 'boolean' ? firestoreData.isCancelledChequeCompulsory : defaultAppSettings.isCancelledChequeCompulsory,
+    enableEmailPasswordLogin: typeof firestoreData.enableEmailPasswordLogin === 'boolean' ? firestoreData.enableEmailPasswordLogin : defaultAppSettings.enableEmailPasswordLogin,
+    enableOtpLogin: typeof firestoreData.enableOtpLogin === 'boolean' ? firestoreData.enableOtpLogin : defaultAppSettings.enableOtpLogin,
+    enableGoogleLogin: typeof firestoreData.enableGoogleLogin === 'boolean' ? firestoreData.enableGoogleLogin : defaultAppSettings.enableGoogleLogin,
+    isReferralSystemEnabled: typeof firestoreData.isReferralSystemEnabled === 'boolean' ? firestoreData.isReferralSystemEnabled : defaultAppSettings.isReferralSystemEnabled,
+  };
+};
+
+import React, { createContext, useContext } from 'react';
+
+export const ApplicationConfigContext = createContext<AppSettings | null>(null);
+
+export const ApplicationConfigProvider: React.FC<{
+  children: React.ReactNode;
+  initialConfig: AppSettings;
+}> = ({ children, initialConfig }) => {
+  const { config } = useApplicationConfig(initialConfig);
+  return React.createElement(ApplicationConfigContext.Provider, { value: config }, children);
+};
+
+export function useApplicationConfig(initialData?: AppSettings | null): UseApplicationConfigReturn {
+  const contextConfig = useContext(ApplicationConfigContext);
+  
+  // If we are inside a provider and didn't explicitly pass initialData, return the provider's config
+  if (contextConfig && !initialData) {
+    return { config: contextConfig, isLoading: false, error: null };
+  }
+
+  const [config, setConfig] = useState<AppSettings>(() => {
+    if (initialData) return processData(initialData);
+    const cached = getCache<AppSettings>(CACHE_KEY, true);
+    return cached ? processData(cached) : defaultAppSettings;
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    if (initialData) return false;
+    return !getCache(CACHE_KEY, true);
+  });
   const [error, setError] = useState<string | null>(null);
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith('/admin');
 
-  const processData = useCallback((firestoreData: Partial<AppSettings>): AppSettings => {
-    return {
-      ...defaultAppSettings,
-      ...firestoreData,
-      timeSlotSettings: {
-        ...defaultAppSettings.timeSlotSettings,
-        ...(firestoreData.timeSlotSettings || {}),
-        weeklyAvailability: {
-          ...defaultAppSettings.timeSlotSettings.weeklyAvailability,
-          ...(firestoreData.timeSlotSettings?.weeklyAvailability || {}),
-        }
-      },
-      platformFees: firestoreData.platformFees || defaultAppSettings.platformFees || [],
-      enableCancellationPolicy: typeof firestoreData.enableCancellationPolicy === 'boolean' ? firestoreData.enableCancellationPolicy : defaultAppSettings.enableCancellationPolicy,
-      isProviderRegistrationEnabled: typeof firestoreData.isProviderRegistrationEnabled === 'boolean' ? firestoreData.isProviderRegistrationEnabled : defaultAppSettings.isProviderRegistrationEnabled,
-      isCancelledChequeCompulsory: typeof firestoreData.isCancelledChequeCompulsory === 'boolean' ? firestoreData.isCancelledChequeCompulsory : defaultAppSettings.isCancelledChequeCompulsory,
-      enableEmailPasswordLogin: typeof firestoreData.enableEmailPasswordLogin === 'boolean' ? firestoreData.enableEmailPasswordLogin : defaultAppSettings.enableEmailPasswordLogin,
-      enableOtpLogin: typeof firestoreData.enableOtpLogin === 'boolean' ? firestoreData.enableOtpLogin : defaultAppSettings.enableOtpLogin,
-      enableGoogleLogin: typeof firestoreData.enableGoogleLogin === 'boolean' ? firestoreData.enableGoogleLogin : defaultAppSettings.enableGoogleLogin,
-      isReferralSystemEnabled: typeof firestoreData.isReferralSystemEnabled === 'boolean' ? firestoreData.isReferralSystemEnabled : defaultAppSettings.isReferralSystemEnabled,
-    };
-  }, []);
+  // Load cached settings on mount if initialData is not provided
+  useEffect(() => {
+    if (!initialData) {
+      const cached = getCache<AppSettings>(CACHE_KEY, true);
+      if (cached) {
+        setConfig(processData(cached));
+        setIsLoading(false);
+      }
+    }
+  }, [initialData]);
 
   useEffect(() => {
     const configDocRef = doc(db, APP_CONFIG_COLLECTION, APP_CONFIG_DOC_ID);
@@ -82,7 +119,7 @@ export function useApplicationConfig(): UseApplicationConfigReturn {
     };
 
     fetchConfig();
-  }, [processData, isAdmin]);
+  }, [isAdmin]);
 
   return { config, isLoading, error };
 }

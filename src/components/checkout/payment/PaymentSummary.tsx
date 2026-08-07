@@ -357,14 +357,17 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       const res = await fetch('/api/razorpay/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount: Math.round(totalAmountDue * 100) }),
+          body: JSON.stringify({ 
+              amount: Math.round(totalAmountDue * Math.pow(10, decimals)),
+              currency: code
+          }),
       });
       const orderDetails = await res.json();
 
       const options = {
         key: appConfig.razorpayKeyId,
         amount: orderDetails.amount,
-        currency: "INR",
+        currency: code,
         name: globalSettings?.websiteName || "Wecanfix",
         description: "Service Booking",
         order_id: orderDetails.id,

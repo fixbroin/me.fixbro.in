@@ -17,7 +17,7 @@ import ThemeInjector from '@/components/layout/ThemeInjector';
 import DynamicManifest from '@/components/layout/DynamicManifest';
 import ScrollMemory from '@/components/layout/ScrollMemory';
 import { DEFAULT_LIGHT_THEME_COLORS_HSL, DEFAULT_DARK_THEME_COLORS_HSL, hslStringToHex, generatePaletteCssVariables } from '@/lib/colorUtils';
-import { getGlobalWebSettings } from '@/lib/webServerUtils';
+import { getGlobalWebSettings, getGlobalAppSettings } from '@/lib/webServerUtils';
 
 const roboto = Roboto({
   weight: ['300', '400', '500', '700'],
@@ -109,7 +109,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const webSettings = await getGlobalWebSettings();
+  const [webSettings, appConfig] = await Promise.all([
+    getGlobalWebSettings(),
+    getGlobalAppSettings()
+  ]);
   
   // Pre-generate the CSS variables for server injection to eliminate flicker
   const serverThemeStyles = `
@@ -130,9 +133,8 @@ export default async function RootLayout({
           href="wecanfix-dynamic-theme-styles"
           dangerouslySetInnerHTML={{ __html: serverThemeStyles }} 
         />
-        <Script
+        <script
           id="wecanfix-initial-theme"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
@@ -169,7 +171,7 @@ export default async function RootLayout({
             <Suspense fallback={null}>
               <PageViewTracker />
             </Suspense>
-            <AppLayout>
+            <AppLayout initialWebSettings={webSettings} initialAppConfig={appConfig}>
               {children}
             </AppLayout>
             <GlobalActionLoader />

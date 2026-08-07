@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import type { HomepageData } from '@/lib/homepageUtils';
 import { LazySection } from '@/components/shared/LazySection';
 import CategoryCard from './CategoryCard';
+import HomeCategoriesSection from '@/components/home/HomeCategoriesSection';
 
 const isBot = (): boolean => {
   if (typeof window === 'undefined') return true;
@@ -53,19 +54,7 @@ const HeroCarousel = dynamic(() => import('@/components/home/HeroCarousel').then
   loading: () => <Skeleton className="h-[180px] sm:h-[250px] md:h-[300px] lg:h-[400px] xl:h-[450px] w-full rounded-lg" />,
 });
 
-const HomeCategoriesSection = dynamic(() => import('@/components/home/HomeCategoriesSection'), {
-  ssr: true,
-  loading: () => (
-    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 md:gap-4">
-      {[...Array(6)].map((_, i) => (
-        <div key={i} className="overflow-hidden h-full flex flex-col group">
-          <Skeleton className="w-full aspect-square bg-muted" />
-          <div className="p-3 text-center"><Skeleton className="h-5 w-3/4 mx-auto bg-muted mt-1" /></div>
-        </div>
-      ))}
-    </div>
-  ),
-});
+
 
 const HomeBlogSection = dynamic(() => import('@/components/home/HomeBlogSection'), {
   loading: () => (
@@ -807,7 +796,7 @@ export default function HomePageClient({ citySlug, areaSlug, breadcrumbItems, in
                 isH1={true}
                 subtitle={`Discover a wide range of services to meet your needs${citySlug ? ` in ${citySlug.charAt(0).toUpperCase() + citySlug.slice(1).replace(/-/g, ' ')}` : ''}${areaSlug ? `, ${areaSlug.charAt(0).toUpperCase() + areaSlug.slice(1).replace(/-/g, ' ')}` : ''}.`}
             />
-            <HomeCategoriesSection />
+            <HomeCategoriesSection initialCategories={initialData?.allCategories} />
             
             <div className="text-center mt-8 md:mt-12">
               <Button

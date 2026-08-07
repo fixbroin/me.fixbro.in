@@ -15,9 +15,13 @@ const getItemsLimit = (width: number): number => {
   return 11; // Desktop
 };
 
-const HomeCategoriesSection = () => {
-  const [categories, setCategories] = useState<FirestoreCategory[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+interface HomeCategoriesSectionProps {
+  initialCategories?: FirestoreCategory[];
+}
+
+const HomeCategoriesSection = ({ initialCategories }: HomeCategoriesSectionProps) => {
+  const [categories, setCategories] = useState<FirestoreCategory[]>(initialCategories || []);
+  const [isLoading, setIsLoading] = useState(!initialCategories || initialCategories.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [itemsLimit, setItemsLimit] = useState(getItemsLimit(typeof window !== 'undefined' ? window.innerWidth : 1024));
@@ -31,6 +35,12 @@ const HomeCategoriesSection = () => {
   }, []);
 
   useEffect(() => {
+    if (initialCategories && initialCategories.length > 0) {
+      setCategories(initialCategories);
+      setIsLoading(false);
+      return;
+    }
+
     const cachedCats = getCache<FirestoreCategory[]>('home_categories', true);
     if (cachedCats && cachedCats.length > 0) {
       setCategories(cachedCats);
@@ -57,7 +67,7 @@ const HomeCategoriesSection = () => {
       }
     };
     fetchCategories();
-  }, []);
+  }, [initialCategories]);
 
   const displayedCategories = showAll ? categories : categories.slice(0, itemsLimit);
 

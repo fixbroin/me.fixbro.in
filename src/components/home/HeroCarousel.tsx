@@ -253,16 +253,16 @@ export function HeroCarousel() {
         )}
       </Carousel>
 
-      {/* Premium Animated Progress Indicators - BELOW the image */}
+      {/* Premium Animated Progress Indicators - Overlaying the image at the bottom */}
       {slides.length > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center justify-center gap-2">
             {slides.map((_, i) => (
                 <button
                     key={i}
                     onClick={() => api?.scrollTo(i)}
                     className={cn(
                         "h-1.5 transition-all duration-500 rounded-full",
-                        current === i ? "w-8 bg-primary shadow-sm shadow-primary/20" : "w-2 bg-muted hover:bg-muted-foreground/40"
+                        current === i ? "w-8 bg-primary shadow-sm shadow-primary/20" : "w-2 bg-white/40 hover:bg-white/70"
                     )}
                     aria-label={`Go to slide ${i + 1}`}
                 />

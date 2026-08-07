@@ -46,7 +46,6 @@ const Logo = ({ className = "", size = "normal", logoUrl, websiteName, href }: L
           fill
           sizes={size === "large" ? "32px" : "24px"}
           className="object-contain"
-          priority
         />
       </div>
       <span className={cn("font-headline font-bold", textSizeClass, "group-data-[collapsible=icon]:hidden")}>

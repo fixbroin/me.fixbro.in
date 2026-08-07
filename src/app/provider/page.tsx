@@ -8,6 +8,7 @@ import { Briefcase, CheckCircle, Clock, Loader2, PackageSearch, ExternalLink, Sh
 import type { FirestoreBooking, BookingStatus } from '@/types/firestore';
 import { db, auth } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, Timestamp, collectionGroup, getDoc, addDoc, getDocs, limit } from '@/lib/mysqlDb';
+import { getProviderBookingCountsAction } from '@/app/actions/dbActions';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -198,6 +199,8 @@ export default function ProviderDashboardPage() {
   const [bookings, setBookings] = useState<FirestoreBooking[]>([]);
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
   const [processingBookingAction, setProcessingBookingAction] = useState<string | null>(null);
+  const [displayLimit, setDisplayLimit] = useState(50);
+  const [bookingCounts, setBookingCounts] = useState({ completed: 0, newRequests: 0, ongoing: 0 });
 
   // Completion Dialog State
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
@@ -213,20 +216,25 @@ export default function ProviderDashboardPage() {
     const q = query(
       bookingsColGroupRef, 
       where("providerId", "==", providerUser.uid), 
+      orderBy("scheduledDate", "desc"),
       orderBy("createdAt", "desc"),
-      limit(50)
+      limit(displayLimit)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setBookings(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FirestoreBooking)));
       setIsLoadingBookings(false);
+      // Fetch true counts from DB
+      getProviderBookingCountsAction(providerUser.uid)
+        .then(setBookingCounts)
+        .catch(err => console.error("Error fetching booking counts:", err));
     }, (error) => {
       console.error("Error fetching provider bookings:", error);
       toast({ title: "Error", description: "Could not fetch your assigned jobs.", variant: "destructive" });
       setIsLoadingBookings(false);
     });
     return () => unsubscribe();
-  }, [providerUser, authIsLoading, toast]);
+  }, [providerUser, authIsLoading, toast, displayLimit]);
 
   const updateBookingStatus = async (bookingId: string, newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
     // SINGLE COMPLETION POPUP (Charges + Payment Method)
@@ -313,9 +321,9 @@ export default function ProviderDashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title="New Requests" value={newJobRequests.length} icon={Tag} colorClass="bg-primary" delay="0" />
-        <StatCard title="Ongoing Jobs" value={ongoingJobs.length} icon={Clock} colorClass="bg-blue-500" delay="100ms" />
-        <StatCard title="Completed" value={completedJobs.length} icon={CheckCircle} colorClass="bg-green-500" delay="200ms" />
+        <StatCard title="New Requests" value={bookingCounts.newRequests} icon={Tag} colorClass="bg-primary" delay="0" />
+        <StatCard title="Ongoing Jobs" value={bookingCounts.ongoing} icon={Clock} colorClass="bg-blue-500" delay="100ms" />
+        <StatCard title="Completed" value={bookingCounts.completed} icon={CheckCircle} colorClass="bg-green-500" delay="200ms" />
       </div>
 
       <Separator className="bg-muted/50" />

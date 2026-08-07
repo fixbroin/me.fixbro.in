@@ -27,6 +27,7 @@ interface CompleteBookingDialogProps {
   originalAmount: number;
   currentPaymentMethod: string;
   isProcessing: boolean;
+  isAdmin?: boolean;
 }
 
 export default function CompleteBookingDialog({ 
@@ -35,14 +36,16 @@ export default function CompleteBookingDialog({
   onConfirm, 
   originalAmount,
   currentPaymentMethod,
-  isProcessing 
+  isProcessing,
+  isAdmin = false
 }: CompleteBookingDialogProps) {
   const { config: appConfig } = useApplicationConfig();
   const symbol = appConfig?.currencySymbol || '₹';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
   const code = appConfig?.currencyCode || 'INR';
   const [charges, setCharges] = useState<AdditionalCharge[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState(currentPaymentMethod || "Cash");
+  const isPrepaidOnline = currentPaymentMethod?.toLowerCase() === 'online';
+  const [paymentMethod, setPaymentMethod] = useState(isPrepaidOnline ? "Online" : "Cash");
 
   const addCharge = () => {
     setCharges([...charges, { name: "", amount: 0 }]);
@@ -120,28 +123,27 @@ export default function CompleteBookingDialog({
             </div>
           </div>
 
-          <Separator />
-
-          {/* Payment Method Section */}
-          <div className="space-y-3">
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1">
-                <CreditCard className="h-3 w-3" /> Final Payment Method
-            </Label>
-            <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="grid grid-cols-1 gap-2">
-              <div className="flex items-center space-x-2 border p-3 rounded-xl cursor-pointer hover:bg-muted transition-colors">
-                <RadioGroupItem value="Cash" id="cash" />
-                <Label htmlFor="cash" className="flex-1 cursor-pointer font-medium">Cash / Pay after service</Label>
+          {isAdmin && !isPrepaidOnline && (
+            <>
+              <Separator />
+              {/* Payment Method Section */}
+              <div className="space-y-3">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1">
+                    <CreditCard className="h-3 w-3" /> Final Payment Method
+                </Label>
+                <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="grid grid-cols-1 gap-2">
+                  <div className="flex items-center space-x-2 border p-3 rounded-xl cursor-pointer hover:bg-muted transition-colors">
+                    <RadioGroupItem value="Cash" id="cash" />
+                    <Label htmlFor="cash" className="flex-1 cursor-pointer font-medium">Cash / Pay after service</Label>
+                  </div>
+                  <div className="flex items-center space-x-2 border p-3 rounded-xl cursor-pointer hover:bg-muted transition-colors">
+                    <RadioGroupItem value="Online" id="online" />
+                    <Label htmlFor="online" className="flex-1 cursor-pointer font-medium">Online Payment (Admin Collected)</Label>
+                  </div>
+                </RadioGroup>
               </div>
-              <div className="flex items-center space-x-2 border p-3 rounded-xl cursor-pointer hover:bg-muted transition-colors">
-                <RadioGroupItem value="Online" id="online" />
-                <Label htmlFor="online" className="flex-1 cursor-pointer font-medium">Online Payment</Label>
-              </div>
-              <div className="flex items-center space-x-2 border p-3 rounded-xl cursor-pointer hover:bg-muted transition-colors">
-                <RadioGroupItem value="Pending" id="pending" />
-                <Label htmlFor="pending" className="flex-1 cursor-pointer font-medium text-amber-600">Mark as Payment Pending</Label>
-              </div>
-            </RadioGroup>
-          </div>
+            </>
+          )}
 
           {/* Summary Box */}
           <div className="bg-primary/5 p-4 rounded-2xl space-y-2 border border-primary/10">

@@ -771,3 +771,53 @@ export async function executeBulkDeleteByCategoryAction(categoryId: string) {
   });
 }
 
+export async function getProviderBookingCountsAction(providerId: string) {
+  return withRetry(async () => {
+    try {
+      const pool = await getPool();
+      
+      const queryStr = `
+        SELECT 
+          JSON_UNQUOTE(JSON_EXTRACT(data, '$.status')) as status,
+          COUNT(*) as count
+        FROM bookings 
+        WHERE JSON_UNQUOTE(JSON_EXTRACT(data, '$.providerId')) = ?
+        GROUP BY JSON_UNQUOTE(JSON_EXTRACT(data, '$.status'))
+      `;
+      
+      const [rows]: any = await pool.query(queryStr, [providerId]);
+      
+      let completed = 0;
+      let newRequests = 0;
+      let ongoing = 0;
+      let other = 0;
+      
+      rows.forEach((row: any) => {
+        const status = row.status;
+        const count = parseInt(row.count, 10) || 0;
+        
+        if (status === 'Completed') {
+          completed += count;
+        } else if (status === 'AssignedToProvider' || status === 'Rescheduled') {
+          newRequests += count;
+        } else if (status === 'ProviderAccepted' || status === 'InProgressByProvider') {
+          ongoing += count;
+        } else {
+          other += count;
+        }
+      });
+      
+      return {
+        completed,
+        newRequests,
+        ongoing,
+        other,
+        total: completed + newRequests + ongoing + other
+      };
+    } catch (error: any) {
+      console.error("Error in getProviderBookingCountsAction:", error);
+      return { completed: 0, newRequests: 0, ongoing: 0, other: 0, total: 0 };
+    }
+  });
+}
+

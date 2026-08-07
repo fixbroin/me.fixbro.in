@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import type { FirestoreBooking, BookingStatus, FirestoreNotification } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { collectionGroup, query, where, onSnapshot, orderBy, doc, updateDoc, Timestamp, getDoc, getDocs, limit, addDoc, collection } from '@/lib/mysqlDb';
+import { getProviderBookingCountsAction } from '@/app/actions/dbActions';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import ProviderJobCard from '@/components/provider/ProviderJobCard'; 
@@ -22,6 +24,8 @@ export default function ProviderMyJobsPage() {
   const [bookings, setBookings] = useState<FirestoreBooking[]>([]);
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
   const [processingBookingAction, setProcessingBookingAction] = useState<string | null>(null);
+  const [displayLimit, setDisplayLimit] = useState(50);
+  const [bookingCounts, setBookingCounts] = useState({ completed: 0, newRequests: 0, ongoing: 0, other: 0, total: 0 });
 
   // Completion Dialog State
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
@@ -37,20 +41,25 @@ export default function ProviderMyJobsPage() {
     const q = query(
       bookingsColGroupRef, 
       where("providerId", "==", providerUser.uid), 
+      orderBy("scheduledDate", "desc"),
       orderBy("createdAt", "desc"),
-      limit(50)
+      limit(displayLimit)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setBookings(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as FirestoreBooking)));
       setIsLoadingBookings(false);
+      // Fetch true counts from DB
+      getProviderBookingCountsAction(providerUser.uid)
+        .then(setBookingCounts)
+        .catch(err => console.error("Error fetching booking counts:", err));
     }, (error) => {
       console.error("Error fetching provider jobs:", error);
       toast({ title: "Error", description: "Could not fetch your jobs.", variant: "destructive" });
       setIsLoadingBookings(false);
     });
     return () => unsubscribe();
-  }, [providerUser, authIsLoading, toast]);
+  }, [providerUser, authIsLoading, toast, displayLimit]);
 
   const updateBookingStatus = async (bookingId: string, newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
     // SINGLE COMPLETION POPUP
@@ -122,29 +131,29 @@ export default function ProviderMyJobsPage() {
       <Tabs defaultValue="new" className="w-full">
         <div className="relative mb-6">
           <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
-            <TabsTrigger 
+             <TabsTrigger 
               value="new" 
               className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
             >
-              New Requests <Badge className="ml-2 bg-primary/10 text-primary border-none hover:bg-primary/10">{newJobRequests.length}</Badge>
+              New Requests <Badge className="ml-2 bg-primary/10 text-primary border-none hover:bg-primary/10">{bookingCounts.newRequests}</Badge>
             </TabsTrigger>
             <TabsTrigger 
               value="ongoing" 
               className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
             >
-              Ongoing <Badge className="ml-2 bg-blue-500/10 text-blue-500 border-none hover:bg-blue-500/10">{ongoingJobs.length}</Badge>
+              Ongoing <Badge className="ml-2 bg-blue-500/10 text-blue-500 border-none hover:bg-blue-500/10">{bookingCounts.ongoing}</Badge>
             </TabsTrigger>
             <TabsTrigger 
               value="completed" 
               className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
             >
-              Completed <Badge className="ml-2 bg-green-500/10 text-green-500 border-none hover:bg-green-500/10">{completedJobs.length}</Badge>
+              Completed <Badge className="ml-2 bg-green-500/10 text-green-500 border-none hover:bg-green-500/10">{bookingCounts.completed}</Badge>
             </TabsTrigger>
             <TabsTrigger 
               value="other" 
               className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
             >
-              Other Statuses <Badge className="ml-2 bg-muted text-muted-foreground border-none hover:bg-muted">{otherJobs.length}</Badge>
+              Other Statuses <Badge className="ml-2 bg-muted text-muted-foreground border-none hover:bg-muted">{bookingCounts.other}</Badge>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -193,6 +202,18 @@ export default function ProviderMyJobsPage() {
           ) : <p className="text-muted-foreground text-center py-6">No jobs with other statuses.</p>}
         </TabsContent>
       </Tabs>
+
+      {bookingCounts.total > bookings.length && (
+        <div className="flex justify-center pt-4 pb-8">
+          <Button 
+            variant="outline" 
+            onClick={() => setDisplayLimit(prev => prev + 50)}
+            className="rounded-full px-8 font-bold border-muted-foreground/20 hover:bg-muted"
+          >
+            Load More Jobs
+          </Button>
+        </div>
+      )}
 
       {bookingToComplete && (
         <CompleteBookingDialog 

@@ -69,12 +69,12 @@ const processSettingsData = (data: Partial<GlobalWebSettings>): GlobalWebSetting
   };
 };
 
-export function useGlobalSettings() {
+export function useGlobalSettings(initialData?: GlobalWebSettings | null) {
   const [settings, setSettings] = useState<GlobalWebSettings>(() => {
-    const cached = getCache<GlobalWebSettings>(CACHE_KEY, true);
-    return cached ? processSettingsData(cached) : defaultGlobalWebSettings;
+    if (initialData) return processSettingsData(initialData);
+    return defaultGlobalWebSettings;
   });
-  const [isLoading, setIsLoading] = useState(!getCache(CACHE_KEY, true));
+  const [isLoading, setIsLoading] = useState(!initialData);
   const [error, setError] = useState<string | null>(null);
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith('/admin');
@@ -86,6 +86,16 @@ export function useGlobalSettings() {
       document.cookie = `wecanfix-loader-type=${settings.loaderType}; path=/; max-age=31536000; SameSite=Lax`;
     }
   }, [settings?.loaderType]);
+
+  useEffect(() => {
+    if (!initialData) {
+      const cached = getCache<GlobalWebSettings>(CACHE_KEY, true);
+      if (cached) {
+        setSettings(processSettingsData(cached));
+        setIsLoading(false);
+      }
+    }
+  }, [initialData]);
 
   useEffect(() => {
     if (isVisitorBot.current && !isAdmin) {

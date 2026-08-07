@@ -82,7 +82,7 @@ export const defaultAppSettings: AppSettings = {
 
   currencyCode: 'INR',
   currencySymbol: '₹',
-  currencyDecimalPoints: 2,
+  currencyDecimalPoints: 0,
 
   // UI/UX
   loaderType: 'logo-pulse',

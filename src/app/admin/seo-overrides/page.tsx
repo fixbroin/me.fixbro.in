@@ -42,6 +42,8 @@ export default function SeoOverridesPage() {
   const [areas, setAreas] = useState<FirestoreArea[]>([]);
   const [cityDisplayLimit, setCityDisplayLimit] = useState(500);
   const [areaDisplayLimit, setAreaDisplayLimit] = useState(500);
+  const [cityCategoryFilterId, setCityCategoryFilterId] = useState<string>("all");
+  const [areaCategoryFilterId, setAreaCategoryFilterId] = useState<string>("all");
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSetting, setEditingSetting] = useState<CityCategorySeoSetting | AreaCategorySeoSetting | null>(null);
@@ -477,6 +479,14 @@ export default function SeoOverridesPage() {
   };
 
 
+  const filteredCitySettings = cityCategoryFilterId === 'all'
+    ? cityCategorySettings
+    : cityCategorySettings.filter(s => s.categoryId === cityCategoryFilterId);
+
+  const filteredAreaSettings = areaCategoryFilterId === 'all'
+    ? areaCategorySettings
+    : areaCategorySettings.filter(s => s.categoryId === areaCategoryFilterId);
+
   if (!isMounted || isLoading) {
     return (
       <div className="space-y-6">
@@ -522,13 +532,35 @@ export default function SeoOverridesPage() {
               </div>
             </CardHeader>
             <CardContent>
+              {cityCategorySettings.length > 0 && (
+                <div className="flex items-center gap-2 mb-4 pb-2 border-b">
+                  <span className="text-sm font-medium text-muted-foreground">Filter by Category:</span>
+                  <Select value={cityCategoryFilterId} onValueChange={setCityCategoryFilterId}>
+                    <SelectTrigger className="w-[220px] h-9">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {categories.map(cat => (
+                        <SelectItem key={cat.id} value={cat.id!}>{cat.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {cityCategoryFilterId !== 'all' && (
+                    <Button variant="ghost" size="sm" onClick={() => setCityCategoryFilterId('all')} className="h-9">Reset</Button>
+                  )}
+                </div>
+              )}
+
               {cityCategorySettings.length === 0 ? (
                  <div className="text-center py-10"><PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" /><p className="text-muted-foreground">No City-Category SEO overrides found.</p></div>
+              ) : filteredCitySettings.length === 0 ? (
+                 <div className="text-center py-10"><PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" /><p className="text-muted-foreground">No overrides found for the selected category.</p></div>
               ) : (
                 <Table>
                   <TableHeader><TableRow><TableHead>City</TableHead><TableHead>Category</TableHead><TableHead>Slug Segment</TableHead><TableHead>H1 Title</TableHead><TableHead className="text-center">Active</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {cityCategorySettings.slice(0, cityDisplayLimit).map(setting => (
+                    {filteredCitySettings.slice(0, cityDisplayLimit).map(setting => (
                       <TableRow key={setting.id}>
                         <TableCell>{setting.cityName}</TableCell><TableCell>{setting.categoryName}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{setting.slug}</TableCell>
@@ -556,17 +588,17 @@ export default function SeoOverridesPage() {
                 </Table>
               )}
 
-              {cityCategorySettings.length > cityDisplayLimit && (
+              {filteredCitySettings.length > cityDisplayLimit && (
                 <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground border-t pt-4">
                   <div>
-                    Showing first {Math.min(cityDisplayLimit, cityCategorySettings.length)} of {cityCategorySettings.length} overrides.
+                    Showing first {Math.min(cityDisplayLimit, filteredCitySettings.length)} of {filteredCitySettings.length} overrides.
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => setCityDisplayLimit(prev => prev + 500)}>
                       Load More (+500)
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => setCityDisplayLimit(cityCategorySettings.length)}>
-                      Load All ({cityCategorySettings.length})
+                    <Button variant="outline" size="sm" onClick={() => setCityDisplayLimit(filteredCitySettings.length)}>
+                      Load All ({filteredCitySettings.length})
                     </Button>
                   </div>
                 </div>
@@ -596,55 +628,77 @@ export default function SeoOverridesPage() {
               </div>
             </CardHeader>
             <CardContent>
-            {areaCategorySettings.length === 0 ? (
-                <div className="text-center py-10"><PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" /><p className="text-muted-foreground">No Area-Category SEO overrides found.</p></div>
-            ) : (
-                <Table>
-                    <TableHeader><TableRow><TableHead>City</TableHead><TableHead>Area</TableHead><TableHead>Category</TableHead><TableHead>Slug Segment</TableHead><TableHead>H1 Title</TableHead><TableHead className="text-center">Active</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                    {areaCategorySettings.slice(0, areaDisplayLimit).map(setting => (
-                        <TableRow key={setting.id}>
-                        <TableCell>{setting.cityName}</TableCell><TableCell>{setting.areaName}</TableCell><TableCell>{setting.categoryName}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{setting.slug}</TableCell>
-                        <TableCell className="text-xs max-w-xs truncate" title={setting.h1_title}>{setting.h1_title || "Not set"}</TableCell>
-                        <TableCell className="text-center"><Switch checked={setting.isActive} onCheckedChange={() => handleToggleActive(setting, 'areaCategory')} disabled={isSubmitting || !hasActionPermission(adminPermissions, 'seo_overrides', 'write')}/></TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <PermissionGuard moduleId="seo_overrides" action="write">
-                              <Button variant="outline" size="icon" onClick={() => handleEditSetting(setting, 'areaCategory')} disabled={isSubmitting}><Edit className="h-4 w-4"/></Button>
-                            </PermissionGuard>
-                            <PermissionGuard moduleId="seo_overrides" action="delete">
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild><Button variant="destructive" size="icon" disabled={isSubmitting}><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader><AlertDialogTitle>Delete Confirmation</AlertDialogTitle><AlertDialogDescription>Delete SEO override for {setting.areaName} - {setting.categoryName}?</AlertDialogDescription></AlertDialogHeader>
-                                  <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteSetting(setting.id!, 'areaCategory')} disabled={isSubmitting} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </PermissionGuard>
-                          </div>
-                        </TableCell>
-                        </TableRow>
-                    ))}
-                    </TableBody>
-                </Table>
-            )}
+              {areaCategorySettings.length > 0 && (
+                <div className="flex items-center gap-2 mb-4 pb-2 border-b">
+                  <span className="text-sm font-medium text-muted-foreground">Filter by Category:</span>
+                  <Select value={areaCategoryFilterId} onValueChange={setAreaCategoryFilterId}>
+                    <SelectTrigger className="w-[220px] h-9">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {categories.map(cat => (
+                        <SelectItem key={cat.id} value={cat.id!}>{cat.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {areaCategoryFilterId !== 'all' && (
+                    <Button variant="ghost" size="sm" onClick={() => setAreaCategoryFilterId('all')} className="h-9">Reset</Button>
+                  )}
+                </div>
+              )}
 
-            {areaCategorySettings.length > areaDisplayLimit && (
-              <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground border-t pt-4">
-                <div>
-                  Showing first {Math.min(areaDisplayLimit, areaCategorySettings.length)} of {areaCategorySettings.length} overrides.
+              {areaCategorySettings.length === 0 ? (
+                  <div className="text-center py-10"><PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" /><p className="text-muted-foreground">No Area-Category SEO overrides found.</p></div>
+              ) : filteredAreaSettings.length === 0 ? (
+                  <div className="text-center py-10"><PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" /><p className="text-muted-foreground">No overrides found for the selected category.</p></div>
+              ) : (
+                  <Table>
+                      <TableHeader><TableRow><TableHead>City</TableHead><TableHead>Area</TableHead><TableHead>Category</TableHead><TableHead>Slug Segment</TableHead><TableHead>H1 Title</TableHead><TableHead className="text-center">Active</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                      {filteredAreaSettings.slice(0, areaDisplayLimit).map(setting => (
+                          <TableRow key={setting.id}>
+                          <TableCell>{setting.cityName}</TableCell><TableCell>{setting.areaName}</TableCell><TableCell>{setting.categoryName}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{setting.slug}</TableCell>
+                          <TableCell className="text-xs max-w-xs truncate" title={setting.h1_title}>{setting.h1_title || "Not set"}</TableCell>
+                          <TableCell className="text-center"><Switch checked={setting.isActive} onCheckedChange={() => handleToggleActive(setting, 'areaCategory')} disabled={isSubmitting || !hasActionPermission(adminPermissions, 'seo_overrides', 'write')}/></TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <PermissionGuard moduleId="seo_overrides" action="write">
+                                <Button variant="outline" size="icon" onClick={() => handleEditSetting(setting, 'areaCategory')} disabled={isSubmitting}><Edit className="h-4 w-4"/></Button>
+                              </PermissionGuard>
+                              <PermissionGuard moduleId="seo_overrides" action="delete">
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild><Button variant="destructive" size="icon" disabled={isSubmitting}><Trash2 className="h-4 w-4"/></Button></AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>Delete Confirmation</AlertDialogTitle><AlertDialogDescription>Delete SEO override for {setting.areaName} - {setting.categoryName}?</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteSetting(setting.id!, 'areaCategory')} disabled={isSubmitting} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </PermissionGuard>
+                            </div>
+                          </TableCell>
+                          </TableRow>
+                      ))}
+                      </TableBody>
+                  </Table>
+              )}
+
+              {filteredAreaSettings.length > areaDisplayLimit && (
+                <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground border-t pt-4">
+                  <div>
+                    Showing first {Math.min(areaDisplayLimit, filteredAreaSettings.length)} of {filteredAreaSettings.length} overrides.
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setAreaDisplayLimit(prev => prev + 500)}>
+                      Load More (+500)
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setAreaDisplayLimit(filteredAreaSettings.length)}>
+                      Load All ({filteredAreaSettings.length})
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setAreaDisplayLimit(prev => prev + 500)}>
-                    Load More (+500)
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setAreaDisplayLimit(areaCategorySettings.length)}>
-                    Load All ({areaCategorySettings.length})
-                  </Button>
-                </div>
-              </div>
-            )}
+              )}
             </CardContent>
           </Card>
         </TabsContent>
