@@ -496,7 +496,13 @@ export default function PaymentPage() {
 
     try {
       const currencyCode = appConfig?.currencyCode || 'INR';
-      const currencyDecimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+      const getCurrencySubunitDecimals = (currencyCode: string): number => {
+        const c = currencyCode.toUpperCase();
+        if (['JPY', 'KRW', 'CLP', 'VND', 'UGX'].includes(c)) return 0;
+        if (['BHD', 'JOD', 'KWD', 'OMR', 'TND'].includes(c)) return 3;
+        return 2;
+      };
+      const currencyDecimals = getCurrencySubunitDecimals(currencyCode);
 
       const orderCreationResponse = await fetch('/api/razorpay/create-order', {
           method: 'POST',
