@@ -69,7 +69,13 @@ export async function POST(req: NextRequest) {
 
     // Clean destination subfolder under public/uploads/
     const cleanSubfolder = uploadPath.replace(/^[/\\]+|[/\\]+$/g, '').replace(/[/\\]+/g, '/');
-    const targetDir = path.join(process.cwd(), 'public', 'uploads', cleanSubfolder);
+    
+    // Resolve base directory, handling standalone mode to write to persistent root directory
+    let baseDir = process.cwd();
+    if (baseDir.includes(path.join('.next', 'standalone')) || baseDir.endsWith('standalone')) {
+      baseDir = path.join(baseDir, '..', '..');
+    }
+    const targetDir = path.join(baseDir, 'public', 'uploads', cleanSubfolder);
 
     await fs.mkdir(targetDir, { recursive: true });
 
