@@ -341,7 +341,7 @@ export default function MyBookingsPage() {
             fetch('/api/bookings/post-process', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ bookingDocId: booking.id }),
+                body: JSON.stringify({ bookingDocId: booking.id, cancelledBy: 'user' }),
             }).catch(err => console.error("Error triggering post-process after cancellation:", err));
 
             // Send cancellation email using the NEW dedicated flow

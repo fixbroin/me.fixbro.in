@@ -16,7 +16,7 @@ const ADMIN_EMAIL = "wecanfix.in@gmail.com";
 
 export async function POST(request: Request) {
   try {
-    const { bookingDocId } = await request.json();
+    const { bookingDocId, cancelledBy } = await request.json();
 
     if (!bookingDocId) {
       return NextResponse.json({ error: 'Missing bookingDocId' }, { status: 400 });
@@ -387,53 +387,56 @@ export async function POST(request: Request) {
     };
 
     // C. Admin Dashboard Notification (Notify all active admins)
-    try {
-        const currencySymbol = appConfig?.currencySymbol || "₹";
-        const adminsSnapshot = await adminDb.collection('admins').where('status', '==', 'active').get();
-        if (!adminsSnapshot.empty) {
-            let adminTitle = "Booking Update";
-            let adminMessage = `ID: ${booking.bookingId} by ${booking.customerName} is ${booking.status}.`;
-            let notificationType: 'info' | 'admin_alert' = 'info';
+    // Skip if it is a user cancellation, as the client handles sending user cancellation alerts to user & admin
+    if (!(isCancelled && cancelledBy === 'user')) {
+      try {
+          const currencySymbol = appConfig?.currencySymbol || "₹";
+          const adminsSnapshot = await adminDb.collection('admins').where('status', '==', 'active').get();
+          if (!adminsSnapshot.empty) {
+              let adminTitle = "Booking Update";
+              let adminMessage = `ID: ${booking.bookingId} by ${booking.customerName} is ${booking.status}.`;
+              let notificationType: 'info' | 'admin_alert' = 'info';
 
-            if (isCompleted) {
-                adminTitle = "Job Completed!";
-                adminMessage = `Booking ${booking.bookingId} for ${booking.customerName} is now complete. Total: ${currencySymbol}${booking.totalAmount.toFixed(2)}.`;
-            } else if (isCancelled) {
-                adminTitle = "Booking Cancelled";
-                adminMessage = `Booking ${booking.bookingId} by ${booking.customerName} has been cancelled.`;
-                notificationType = 'admin_alert';
-            } else if (isRescheduled) {
-                adminTitle = "Booking Rescheduled";
-                adminMessage = `Booking ${booking.bookingId} has been rescheduled to ${formatScheduledDate(booking.scheduledDate)} at ${booking.scheduledTimeSlot}.`;
-            } else if (emailType === 'booking_confirmation') {
-                adminTitle = "New Booking Received!";
-                adminMessage = `A new booking ${booking.bookingId} has been placed by ${booking.customerName}.`;
-                notificationType = 'admin_alert';
-            }
+              if (isCompleted) {
+                  adminTitle = "Job Completed!";
+                  adminMessage = `Booking ${booking.bookingId} for ${booking.customerName} is now complete. Total: ${currencySymbol}${booking.totalAmount.toFixed(2)}.`;
+              } else if (isCancelled) {
+                  adminTitle = "Booking Cancelled";
+                  adminMessage = `Booking ${booking.bookingId} by ${booking.customerName} has been cancelled.`;
+                  notificationType = 'admin_alert';
+              } else if (isRescheduled) {
+                  adminTitle = "Booking Rescheduled";
+                  adminMessage = `Booking ${booking.bookingId} has been rescheduled to ${formatScheduledDate(booking.scheduledDate)} at ${booking.scheduledTimeSlot}.`;
+              } else if (emailType === 'booking_confirmation') {
+                  adminTitle = "New Booking Received!";
+                  adminMessage = `A new booking ${booking.bookingId} has been placed by ${booking.customerName}.`;
+                  notificationType = 'admin_alert';
+              }
 
-            adminsSnapshot.forEach(adminDoc => {
-                const adminUid = adminDoc.id;
-                tasks.push(adminDb.collection('userNotifications').add({
-                    userId: adminUid,
-                    title: adminTitle,
-                    message: adminMessage,
-                    type: notificationType,
-                    href: `/admin/bookings`,
-                    read: false,
-                    createdAt: Timestamp.now()
-                }));
+              adminsSnapshot.forEach(adminDoc => {
+                  const adminUid = adminDoc.id;
+                  tasks.push(adminDb.collection('userNotifications').add({
+                      userId: adminUid,
+                      title: adminTitle,
+                      message: adminMessage,
+                      type: notificationType,
+                      href: `/admin/bookings`,
+                      read: false,
+                      createdAt: Timestamp.now()
+                  }));
 
-                // Trigger Push for each admin
-                tasks.push(triggerPush(
-                    adminUid, 
-                    emailType === 'booking_confirmation' ? "New Booking" : adminTitle, 
-                    adminMessage, 
-                    `/admin/bookings`
-                ));
-            });
-        }
-    } catch (adminNotifyErr) {
-        console.error("Error notifying admins:", adminNotifyErr);
+                  // Trigger Push for each admin
+                  tasks.push(triggerPush(
+                      adminUid, 
+                      emailType === 'booking_confirmation' ? "New Booking" : adminTitle, 
+                      adminMessage, 
+                      `/admin/bookings`
+                  ));
+              });
+          }
+      } catch (adminNotifyErr) {
+          console.error("Error notifying admins:", adminNotifyErr);
+      }
     }
 
     if (userId) {
@@ -524,7 +527,9 @@ export async function POST(request: Request) {
     };
 
     // Only send if it's NOT a generic status update, OR if the toggle is enabled
-    const shouldSendEmail = emailType !== 'booking_status_update' || appConfig.enableStatusUpdateEmails !== false;
+    // Do not send booking_cancelled_by_admin if the user was the one who cancelled the booking
+    const shouldSendEmail = (emailType !== 'booking_status_update' || appConfig.enableStatusUpdateEmails !== false) && 
+                            !(isCancelled && cancelledBy === 'user');
     
     if (shouldSendEmail) {
         tasks.push(sendBookingConfirmationEmail(emailFlowInput));

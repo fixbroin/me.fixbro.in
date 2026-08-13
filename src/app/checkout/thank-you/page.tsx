@@ -263,7 +263,7 @@ export default function ThankYouPage() {
                 fetch('/api/bookings/post-process', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ bookingDocId: bookingFirestoreDocIdForCancellation }),
+                    body: JSON.stringify({ bookingDocId: bookingFirestoreDocIdForCancellation, cancelledBy: 'user' }),
                 }).catch(err => console.error("Error triggering post-process after paid cancellation:", err));
 
                 // 4. Send cancellation email
