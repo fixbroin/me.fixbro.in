@@ -1,16 +1,18 @@
 // src/app/admin/database-tools/page.tsx
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Database, UploadCloud, Download, Loader2, AlertTriangle, Image as ImageIcon, CheckCircle, Info } from "lucide-react";
+import { Database, UploadCloud, Download, Loader2, AlertTriangle, Image as ImageIcon, CheckCircle, Info, RefreshCw, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { triggerRefresh } from '@/lib/revalidateUtils';
+import { executeGetNextCacheStatus, executeClearNextCache } from '@/app/actions/dbActions';
+import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 export default function DatabaseToolsPage() {
   const { toast } = useToast();
   const showToast = toast;
@@ -22,6 +24,51 @@ export default function DatabaseToolsPage() {
   const [isExportingImages, setIsExportingImages] = useState(false);
   const [isImportingImages, setIsImportingImages] = useState(false);
   const [imagesFile, setImagesFile] = useState<File | null>(null);
+
+  const [cacheStatus, setCacheStatus] = useState<{ size: number; count: number; exists: boolean; path: string } | null>(null);
+  const [isLoadingCacheStatus, setIsLoadingCacheStatus] = useState(false);
+  const [isClearingCache, setIsClearingCache] = useState(false);
+
+  const fetchCacheStatus = async () => {
+    setIsLoadingCacheStatus(true);
+    try {
+      const res = await executeGetNextCacheStatus();
+      if (res.success) {
+        setCacheStatus({
+          size: res.size || 0,
+          count: res.count || 0,
+          exists: res.exists || false,
+          path: res.path || '',
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load cache status", err);
+    } finally {
+      setIsLoadingCacheStatus(false);
+    }
+  };
+
+  const handleClearCache = async () => {
+    setIsClearingCache(true);
+    showToast({ title: "Clearing Disk Cache", description: "Deleting Next.js fetch-cache files..." });
+    try {
+      const res = await executeClearNextCache();
+      if (res.success) {
+        showToast({ title: "Success", description: "Next.js disk fetch cache cleared." });
+        await fetchCacheStatus();
+      } else {
+        throw new Error(res.error || "Failed to clear cache");
+      }
+    } catch (err: any) {
+      showToast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsClearingCache(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCacheStatus();
+  }, []);
 
   const handleExportDb = async () => {
     setIsExportingDb(true);
@@ -306,6 +353,101 @@ export default function DatabaseToolsPage() {
                   {isImportingImages ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
                   {isImportingImages ? "Uploading & Restoring..." : "Restore Images Archive"}
                 </Button>
+              </PermissionGuard>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* NEXT.JS FETCH CACHE MANAGEMENT CARD */}
+        <Card className="flex flex-col md:col-span-2">
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle className="flex items-center text-lg">
+                  <RefreshCw className="mr-2 h-5 w-5 text-amber-500 animate-pulse" /> Next.js Disk Cache Management
+                </CardTitle>
+                <CardDescription>
+                  Reclaim server disk space by cleaning up expired Next.js pre-rendered HTML and JSON fetch-cache files.
+                </CardDescription>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fetchCacheStatus} 
+                disabled={isLoadingCacheStatus}
+              >
+                {isLoadingCacheStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                <span className="ml-2 hidden sm:inline">Refresh Status</span>
+              </Button>
+            </div>
+          </CardHeader>
+          
+          <CardContent className="space-y-4">
+            <Alert className="bg-amber-50/50 border-amber-100 dark:bg-amber-950/20 dark:border-amber-900/50">
+              <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <AlertTitle className="text-amber-800 dark:text-amber-300">About Next.js Data Cache</AlertTitle>
+              <AlertDescription className="text-amber-700/80 dark:text-amber-400/80 text-xs">
+                To maximize loading speeds, Next.js caches database fetch requests directly on the server's local disk inside <code className="text-[11px] font-mono bg-amber-100/50 px-1 py-0.5 rounded dark:bg-amber-900/50">.next/cache/fetch-cache</code>. If you have thousands of dynamic SEO URLs, this directory can grow to multiple gigabytes. Clearing this cache is 100% safe; Next.js will rebuild it on demand when pages are accessed.
+              </AlertDescription>
+            </Alert>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-3 border rounded-lg bg-muted/20">
+                <div className="text-xs text-muted-foreground font-medium">Cache Directory</div>
+                <div className="text-xs font-mono truncate mt-1 text-primary" title={cacheStatus?.path}>
+                  {cacheStatus?.path ? cacheStatus.path : "Checking..."}
+                </div>
+              </div>
+              <div className="p-3 border rounded-lg bg-muted/20">
+                <div className="text-xs text-muted-foreground font-medium">Total Files Cached</div>
+                <div className="text-lg font-bold mt-1 text-primary">
+                  {cacheStatus ? cacheStatus.count.toLocaleString() : "..."}
+                </div>
+              </div>
+              <div className="p-3 border rounded-lg bg-muted/20">
+                <div className="text-xs text-muted-foreground font-medium">Accumulated Disk Space</div>
+                <div className="text-lg font-bold mt-1 text-primary">
+                  {cacheStatus ? (
+                    cacheStatus.size === 0 
+                      ? "0 Bytes" 
+                      : cacheStatus.size > 1024 * 1024 * 1024
+                        ? `${(cacheStatus.size / (1024 * 1024 * 1024)).toFixed(2)} GB`
+                        : `${(cacheStatus.size / (1024 * 1024)).toFixed(2)} MB`
+                  ) : "..."}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <PermissionGuard moduleId="database_tools" action="write">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive"
+                      disabled={isClearingCache || !cacheStatus?.exists || cacheStatus.count === 0}
+                      className="w-full flex items-center justify-center"
+                    >
+                      {isClearingCache ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                      Clear Next.js Disk Cache (Purge fetch-cache)
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center text-destructive">
+                        <AlertTriangle className="mr-2 h-5 w-5 text-destructive" /> Clear Next.js Disk Cache?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will delete all cached database query results and pre-rendered fetch responses from the server's disk. Next.js will automatically rebuild the cache as visitors request pages.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleClearCache} className="bg-destructive hover:bg-destructive/90 text-white">
+                        Yes, Purge Disk Cache
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </PermissionGuard>
             </div>
           </CardContent>

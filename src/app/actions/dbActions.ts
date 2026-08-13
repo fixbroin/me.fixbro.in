@@ -1,6 +1,8 @@
 // src/app/actions/dbActions.ts
 'use server';
 
+import fs from 'fs';
+import path from 'path';
 import { getPool, getDocInternal, getDocsInternal, addDocInternal, setDocInternal, updateDocInternal, deleteDocInternal } from '@/lib/mysql';
 
 // Fast server-side in-memory cache for high-frequency configuration reads
@@ -819,5 +821,89 @@ export async function getProviderBookingCountsAction(providerId: string) {
       return { completed: 0, newRequests: 0, ongoing: 0, other: 0, total: 0 };
     }
   });
+}
+
+const getFetchCachePath = () => {
+  const possiblePaths = [
+    path.join(process.cwd(), '.next', 'cache', 'fetch-cache'),
+    path.join(process.cwd(), '.next', 'standalone', '.next', 'cache', 'fetch-cache'),
+    path.join(process.cwd(), 'cache', 'fetch-cache'),
+  ];
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      return p;
+    }
+  }
+  return possiblePaths[0];
+};
+
+function getDirInfo(dirPath: string): { size: number; count: number } {
+  let size = 0;
+  let count = 0;
+  try {
+    if (!fs.existsSync(dirPath)) {
+      return { size, count };
+    }
+    const files = fs.readdirSync(dirPath);
+    for (const file of files) {
+      const filePath = path.join(dirPath, file);
+      const stat = fs.statSync(filePath);
+      if (stat.isDirectory()) {
+        const nested = getDirInfo(filePath);
+        size += nested.size;
+        count += nested.count;
+      } else {
+        size += stat.size;
+        count++;
+      }
+    }
+  } catch (err) {
+    console.error("Error reading dir info:", err);
+  }
+  return { size, count };
+}
+
+function deleteDirContent(dirPath: string) {
+  if (!fs.existsSync(dirPath)) return;
+  const files = fs.readdirSync(dirPath);
+  for (const file of files) {
+    const filePath = path.join(dirPath, file);
+    const stat = fs.statSync(filePath);
+    if (stat.isDirectory()) {
+      fs.rmSync(filePath, { recursive: true, force: true });
+    } else {
+      fs.unlinkSync(filePath);
+    }
+  }
+}
+
+export async function executeGetNextCacheStatus() {
+  try {
+    const cachePath = getFetchCachePath();
+    const info = getDirInfo(cachePath);
+    return {
+      success: true,
+      exists: fs.existsSync(cachePath),
+      path: cachePath,
+      size: info.size,
+      count: info.count,
+    };
+  } catch (error: any) {
+    console.error("Error in executeGetNextCacheStatus:", error);
+    return { success: false, error: error.message, exists: false, size: 0, count: 0, path: "" };
+  }
+}
+
+export async function executeClearNextCache() {
+  try {
+    const cachePath = getFetchCachePath();
+    if (fs.existsSync(cachePath)) {
+      deleteDirContent(cachePath);
+    }
+    return { success: true, message: "Next.js disk fetch cache cleared successfully." };
+  } catch (error: any) {
+    console.error("Error in executeClearNextCache:", error);
+    return { success: false, error: error.message };
+  }
 }
 

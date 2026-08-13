@@ -148,7 +148,11 @@ export async function DELETE(req: NextRequest) {
     // 1. Local VPS Disk Deletion
     if (fileUrl.startsWith('/uploads/') || fileUrl.startsWith('uploads/')) {
       const cleanPath = fileUrl.replace(/^\/?uploads\//, '');
-      const filePath = path.join(process.cwd(), 'public', 'uploads', cleanPath);
+      let baseDir = process.cwd();
+      if (baseDir.includes(path.join('.next', 'standalone')) || baseDir.endsWith('standalone')) {
+        baseDir = path.join(baseDir, '..', '..');
+      }
+      const filePath = path.join(baseDir, 'public', 'uploads', cleanPath);
       try {
         await fs.unlink(filePath);
       } catch (err) {

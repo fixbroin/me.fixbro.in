@@ -178,9 +178,20 @@ export default function AdminNotificationsPage() {
   };
 
   const { adminAlerts, userAlerts } = useMemo(() => {
-    const adminTypes: FirestoreNotification['type'][] = ['admin_alert', 'booking_update', 'provider_app_status', 'error', 'warning'];
-    const admin = notifications.filter(n => adminTypes.includes(n.type));
-    const users = notifications.filter(n => !adminTypes.includes(n.type));
+    const admin = notifications.filter(n => {
+      if (n.href && (n.href.startsWith('/admin') || n.href.includes('/admin/'))) {
+        return true;
+      }
+      if (n.type === 'admin_alert' || n.type === 'provider_app_status') {
+        return true;
+      }
+      if (n.href && (n.href.startsWith('/my-bookings') || n.href.startsWith('/notifications') || n.href.startsWith('/provider/dashboard') || n.href.startsWith('/provider/withdrawal'))) {
+        return false;
+      }
+      const adminTypes: FirestoreNotification['type'][] = ['admin_alert', 'booking_update', 'provider_app_status', 'warning'];
+      return adminTypes.includes(n.type);
+    });
+    const users = notifications.filter(n => !admin.includes(n));
     return { adminAlerts: admin, userAlerts: users };
   }, [notifications]);
 
@@ -321,7 +332,7 @@ export default function AdminNotificationsPage() {
               <h2 className="text-xl font-semibold mb-2">No Notifications</h2>
               <p className="text-muted-foreground text-sm">You're all caught up!</p>
             </div>
-          ) : isSuperAdmin ? (
+          ) : (
             <Tabs defaultValue="admin" className="w-full">
                 <TabsList className="grid w-full grid-cols-3 mb-6">
                     <TabsTrigger value="admin" className="relative">
@@ -352,8 +363,6 @@ export default function AdminNotificationsPage() {
                     {renderNotificationList(notifications, "No notifications found.")}
                 </TabsContent>
             </Tabs>
-          ) : (
-            renderNotificationList(notifications, "No personal notifications found.")
           )}
         </CardContent>
     </Card>
