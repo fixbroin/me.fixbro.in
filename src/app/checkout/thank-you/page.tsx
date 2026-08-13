@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
+import Script from 'next/script';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { CheckCircle2, Home, ListOrdered, Mail, Download, Loader2, MapPin, Tag, HandCoins, Ban, Hash, Package, Calendar, Clock, CreditCard, Activity, IndianRupee, Wallet, AlertTriangle } from 'lucide-react';
@@ -538,7 +539,14 @@ export default function ThankYouPage() {
             <CardHeader className="items-center px-4 sm:px-6 pt-10 pb-6">
                 <div className="relative">
                   <div className="absolute inset-0 bg-accent/20 blur-3xl rounded-full scale-150 animate-pulse" />
-                  <CheckCircle2 className="h-20 w-20 sm:h-24 sm:w-24 text-accent relative z-10" />
+                  {React.createElement('lottie-player', {
+                    src: '/animations/success.json',
+                    background: 'transparent',
+                    speed: '1',
+                    style: { width: '96px', height: '96px' },
+                    autoplay: true,
+                    className: 'relative z-10'
+                  })}
                 </div>
                 <CardTitle className="text-3xl sm:text-4xl font-black mt-6 bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Booking Processed</CardTitle>
                 <CardDescription className="text-lg text-muted-foreground font-medium max-w-sm mx-auto">
@@ -572,7 +580,14 @@ export default function ThankYouPage() {
         <CardHeader className="items-center px-4 sm:px-6 pt-10 pb-6 text-center">
           <div className="relative">
             <div className="absolute inset-0 bg-accent/20 blur-3xl rounded-full scale-150 animate-pulse" />
-            <CheckCircle2 className="h-20 w-20 sm:h-24 sm:w-24 text-accent relative z-10" />
+            {React.createElement('lottie-player', {
+              src: '/animations/success.json',
+              background: 'transparent',
+              speed: '1',
+              style: { width: '96px', height: '96px' },
+              autoplay: true,
+              className: 'relative z-10'
+            })}
           </div>
           <CardTitle className="text-3xl sm:text-4xl font-black mt-6 bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
             Booking Confirmed!
@@ -732,6 +747,7 @@ export default function ThankYouPage() {
           </Link>
         </CardFooter>
       </Card>
+      <Script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js" strategy="lazyOnload" />
     </div>
   );
 }
