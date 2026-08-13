@@ -79,10 +79,46 @@ export async function POST(req: NextRequest) {
 
     await fs.mkdir(targetDir, { recursive: true });
 
-    // Generate unique filename preserving original extension
+    // Generate readable sequential filename preserving original extension
     const ext = path.extname(file.name) || '.jpg';
-    const filename = `${Date.now()}-${nanoid(8)}${ext}`;
-    const fullPath = path.join(targetDir, filename);
+    
+    // Map folder name to singular label (e.g. services -> service)
+    const segment = cleanSubfolder.split('/').pop()?.toLowerCase() || 'media';
+    const folderLabelMap: Record<string, string> = {
+      'services': 'service',
+      'slideshows': 'slideshow',
+      'categories': 'category',
+      'banners': 'banner',
+      'popups': 'popup',
+      'blogs': 'blog',
+      'general': 'general'
+    };
+    const label = folderLabelMap[segment] || segment;
+    
+    const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const prefix = `${dateStr}-${label}-fixbro-`;
+    
+    let counter = 1;
+    try {
+      const files = await fs.readdir(targetDir);
+      const matchingFiles = files.filter(f => f.startsWith(prefix));
+      counter = matchingFiles.length + 1;
+    } catch {}
+
+    let filename = `${prefix}${counter}${ext}`;
+    let fullPath = path.join(targetDir, filename);
+
+    // Ensure no collisions by checking file access
+    try {
+      while (true) {
+        await fs.access(fullPath);
+        counter++;
+        filename = `${prefix}${counter}${ext}`;
+        fullPath = path.join(targetDir, filename);
+      }
+    } catch {
+      // File does not exist, safe to write!
+    }
 
     await fs.writeFile(fullPath, buffer);
 

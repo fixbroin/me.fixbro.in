@@ -6,7 +6,11 @@ import fs from 'fs';
 
 export async function GET() {
   try {
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    let baseDir = process.cwd();
+    if (baseDir.includes(path.join('.next', 'standalone')) || baseDir.endsWith('standalone')) {
+      baseDir = path.join(baseDir, '..', '..');
+    }
+    const uploadsDir = path.join(baseDir, 'public', 'uploads');
     const zip = new AdmZip();
 
     if (fs.existsSync(uploadsDir)) {
@@ -18,7 +22,7 @@ export async function GET() {
 
     const buffer = zip.toBuffer();
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="images-backup-${new Date().toISOString().slice(0, 10)}.zip"`

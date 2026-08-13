@@ -4,10 +4,10 @@ import path from 'node:path';
 
 export async function GET(
   req: NextRequest,
-  props: { params: Promise<{ path: string[] }> | { path: string[] } }
+  props: { params: Promise<{ path: string[] }> }
 ) {
   try {
-    const resolvedParams = 'then' in props.params ? await props.params : props.params;
+    const resolvedParams = await props.params;
     const fileSubPath = resolvedParams.path.join('/');
     
     // Determine the absolute path to the file
@@ -28,7 +28,7 @@ export async function GET(
     const contentType = getMimeType(filePath);
 
     // Return file response
-    return new Response(fileBuffer, {
+    return new Response(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000, immutable',

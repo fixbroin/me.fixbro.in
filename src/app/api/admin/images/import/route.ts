@@ -15,7 +15,11 @@ export async function POST(req: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const zip = new AdmZip(buffer);
 
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    let baseDir = process.cwd();
+    if (baseDir.includes(path.join('.next', 'standalone')) || baseDir.endsWith('standalone')) {
+      baseDir = path.join(baseDir, '..', '..');
+    }
+    const uploadsDir = path.join(baseDir, 'public', 'uploads');
     fs.mkdirSync(uploadsDir, { recursive: true });
 
     // Extract all files to public/uploads, overwriting existing ones

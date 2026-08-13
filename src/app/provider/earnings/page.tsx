@@ -176,9 +176,7 @@ export default function ProviderEarningsPage() {
               <CardDescription>Performance summary for {earningsData.monthName}.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-                 <Button variant="ghost" size="sm" className="h-8 text-[10px] text-muted-foreground" onClick={handleSyncBalance} disabled={isSyncing}>
-                    {isSyncing ? <Loader2 className="h-3 w-3 animate-spin mr-1"/> : <RefreshCw className="h-3 w-3 mr-1"/>} Sync Balance
-                </Button>
+               
                 <Badge variant="outline" className="px-3 py-1 bg-primary/5 text-primary border-primary/20 font-bold uppercase tracking-tighter">
                 {earningsData.monthName}
                 </Badge>
