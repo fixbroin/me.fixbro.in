@@ -16,12 +16,16 @@ const NewCustomServiceRequestEmailInputSchema = z.object({
   serviceTitle: z.string().describe("The title of the requested service."),
   userName: z.string().describe("The name of the user who submitted the request."),
   userEmail: z.string().email().describe("The email of the user."),
-  userMobile: z.string().optional().describe("The mobile number of the user."), // Added
+  userMobile: z.string().optional().describe("The mobile number of the user."),
   description: z.string().describe("The user's description of the service needed."),
   category: z.string().describe("The category (pre-defined or custom) selected by the user."),
-  minBudget: z.number().optional().nullable().describe("The minimum budget for the service."), // Added
-  maxBudget: z.number().optional().nullable().describe("The maximum budget for the service."), // Added
+  minBudget: z.number().optional().nullable().describe("The minimum budget for the service."),
+  maxBudget: z.number().optional().nullable().describe("The maximum budget for the service."),
   adminUrl: z.string().describe("Direct URL to view the request in the admin panel."),
+  addressText: z.string().optional().describe("Formatted address of service location."),
+  latitude: z.number().optional().nullable().describe("Address latitude coordinate."),
+  longitude: z.number().optional().nullable().describe("Address longitude coordinate."),
+  preferredStartDateText: z.string().optional().describe("Formatted preferred start date."),
   // SMTP Settings
   smtpHost: z.string().optional().describe("SMTP host for sending emails."),
   smtpPort: z.string().optional().describe("SMTP port (e.g., '587', '465')."),
@@ -114,12 +118,22 @@ const newCustomServiceRequestEmailFlow = ai.defineFlow(
   },
   async (details) => {
     try {
-      const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "Wecanfix", logoUrl, currencySymbol = "₹", ...requestDetails } = details;
+      const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "FixBro", logoUrl, currencySymbol = "₹", ...requestDetails } = details;
 
-      const adminEmail = "wecanfix.in@gmail.com"; 
+      const adminEmail = "fixbro.in@gmail.com"; 
       const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
 
       const emailSubject = `New Custom Service Request: ${requestDetails.serviceTitle}`;
+
+      let mapButtonHtml = '';
+      if (requestDetails.latitude && requestDetails.longitude) {
+        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${requestDetails.latitude},${requestDetails.longitude}`;
+        mapButtonHtml = `<a href="${mapUrl}" class="button" style="background-color: #198754; margin-left: 10px; color: #ffffff !important;">View Location on Google Maps</a>`;
+      } else if (requestDetails.addressText) {
+        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(requestDetails.addressText)}`;
+        mapButtonHtml = `<a href="${mapUrl}" class="button" style="background-color: #198754; margin-left: 10px; color: #ffffff !important;">View Location on Google Maps</a>`;
+      }
+
       const emailBodyContent = `
         <p>A new custom service request has been submitted on ${siteName}.</p>
         <h3>Request Details:</h3>
@@ -131,11 +145,16 @@ const newCustomServiceRequestEmailFlow = ai.defineFlow(
             <li><strong>Service Title:</strong> ${requestDetails.serviceTitle}</li>
             <li><strong>Category:</strong> ${requestDetails.category}</li>
             <li><strong>Budget:</strong> ${currencySymbol}${requestDetails.minBudget || 'N/A'} - ${currencySymbol}${requestDetails.maxBudget || 'N/A'}</li>
+            <li><strong>Preferred Start Date:</strong> ${requestDetails.preferredStartDateText || 'N/A'}</li>
+            ${requestDetails.addressText ? `<li><strong>Service Address:</strong> ${requestDetails.addressText}</li>` : ''}
         </ul>
         <h3>Description:</h3>
         <p>${requestDetails.description}</p>
         <p>Please review the full request in the admin panel:</p>
-        <p><a href="${requestDetails.adminUrl}" class="button">View Full Request</a></p>
+        <p>
+          <a href="${requestDetails.adminUrl}" class="button">View Full Request</a>
+          ${mapButtonHtml}
+        </p>
       `;
 
       const htmlBody = createHtmlTemplate("New Custom Service Request", emailBodyContent, siteName, logoUrl);

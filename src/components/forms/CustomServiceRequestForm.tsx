@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -25,12 +25,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { CalendarIcon, Loader2, Send, UploadCloud, XIcon, Check } from "lucide-react";
-import type { FirestoreCategory, CustomServiceRequest, FirestoreNotification } from "@/types/firestore";
+import { CalendarIcon, Loader2, Send, UploadCloud, XIcon, Check, MapPin, PlusCircle } from "lucide-react";
+import type { FirestoreCategory, CustomServiceRequest, FirestoreNotification, Address, ServiceZone } from "@/types/firestore";
 import { db, storage } from "@/lib/firebase";
 import { triggerPushNotification } from "@/lib/fcmUtils";
-import { collection, addDoc, Timestamp, query, where, getDocs, limit } from '@/lib/mysqlDb';
+import { collection, addDoc, Timestamp, query, where, getDocs, limit, doc, updateDoc, arrayUnion } from '@/lib/mysqlDb';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from '@/lib/mysqlStorage';
+import dynamic from 'next/dynamic';
+import AddressForm, { type AddressFormData } from '@/components/forms/AddressForm';
+
+const MapAddressSelector = dynamic(() => import('@/components/checkout/MapAddressSelector'), {
+  loading: () => <div className="flex items-center justify-center h-64 bg-muted rounded-md"><Loader2 className="h-8 w-8 animate-spin" /></div>,
+  ssr: false,
+});
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import Image from "next/image";
@@ -124,6 +131,108 @@ export default function CustomServiceRequestForm({
 
   const watchedCategoryId = form.watch("categoryId");
 
+  // Address States
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [isAddressFormOpen, setIsAddressFormOpen] = useState(false);
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [initialMapCenter, setInitialMapCenter] = useState<google.maps.LatLngLiteral | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<Partial<Address> | null>(null);
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
+  const [serviceZones, setServiceZones] = useState<ServiceZone[]>([]);
+
+  // Load service zones
+  useEffect(() => {
+    const fetchZones = async () => {
+      try {
+        const zonesQuery = query(collection(db, 'serviceZones'), where('isActive', '==', true));
+        const snapshot = await getDocs(zonesQuery);
+        setServiceZones(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ServiceZone)));
+      } catch (error) {
+        console.error("Error fetching service zones for custom request form:", error);
+      }
+    };
+    fetchZones();
+  }, []);
+
+  // Load user default address on load
+  useEffect(() => {
+    if (firestoreUser?.addresses && firestoreUser.addresses.length > 0) {
+      const defaultAddr = firestoreUser.addresses.find(a => a.isDefault);
+      setSelectedAddressId(defaultAddr ? defaultAddr.id : firestoreUser.addresses[0].id);
+    }
+  }, [firestoreUser]);
+
+  // Geo locate coordinates to center the map selector
+  const handleOpenMapForNewAddress = useCallback(async () => {
+    setEditingAddress(null);
+    setIsLocating(true);
+    try {
+      if (!navigator.geolocation) {
+        setInitialMapCenter(null);
+        setIsMapModalOpen(true);
+        setIsLocating(false);
+        return;
+      }
+      const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+      if (permissionStatus.state === 'granted' || permissionStatus.state === 'prompt') {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setInitialMapCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
+            setIsLocating(false);
+            setIsMapModalOpen(true);
+          },
+          () => {
+            setInitialMapCenter(null);
+            setIsLocating(false);
+            setIsMapModalOpen(true);
+          }
+        );
+      } else {
+        setInitialMapCenter(null);
+        setIsLocating(false);
+        setIsMapModalOpen(true);
+      }
+    } catch (e) {
+      setInitialMapCenter(null);
+      setIsLocating(false);
+      setIsMapModalOpen(true);
+    }
+  }, []);
+
+  const handleMapAddressSelect = useCallback((addressData: Partial<AddressFormData>) => {
+    setEditingAddress(prev => ({
+      ...prev,
+      ...addressData,
+      fullName: firestoreUser?.displayName || user?.displayName || "",
+      email: firestoreUser?.email || user?.email || "",
+      phone: firestoreUser?.mobileNumber || user?.phoneNumber || "",
+    }));
+    setIsMapModalOpen(false);
+    setIsAddressFormOpen(true);
+  }, [user, firestoreUser]);
+
+  const handleAddressSubmit = async (data: AddressFormData) => {
+    if (!user) return;
+    setIsSavingAddress(true);
+    try {
+      const userDocRef = doc(db, 'users', user.uid);
+      const newAddress: Address = { ...data, id: nanoid(), isDefault: !firestoreUser?.addresses || firestoreUser.addresses.length === 0 };
+      await updateDoc(userDocRef, { addresses: arrayUnion(newAddress) });
+      setSelectedAddressId(newAddress.id);
+      setAddressError(null);
+      setIsAddressFormOpen(false);
+      setEditingAddress(null);
+      toast({ title: "Success", description: "Address added successfully." });
+    } catch (error) {
+      console.error("Error saving address in custom service request:", error);
+      toast({ title: "Error", description: "Could not save address.", variant: "destructive" });
+    } finally {
+      setIsSavingAddress(false);
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
@@ -176,6 +285,26 @@ export default function CustomServiceRequestForm({
       toast({
         title: "Authentication Error",
         description: "You must be logged in to submit a request.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedAddressId) {
+      setAddressError("Please select or add a service address.");
+      toast({
+        title: "Address Required",
+        description: "Please select or add a service address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const selectedAddress = firestoreUser?.addresses?.find(a => a.id === selectedAddressId);
+    if (!selectedAddress) {
+      toast({
+        title: "Address Error",
+        description: "Selected address could not be found.",
         variant: "destructive",
       });
       return;
@@ -235,6 +364,7 @@ export default function CustomServiceRequestForm({
         preferredStartDate: Timestamp.fromDate(data.preferredStartDate),
         minBudget: data.minBudget,
         maxBudget: data.maxBudget,
+        address: selectedAddress,
       };
 
       if (data.categoryId !== OTHER_CATEGORY_VALUE) {
@@ -282,8 +412,16 @@ export default function CustomServiceRequestForm({
         });
 
         if (appConfig.smtpHost && appConfig.senderEmail) {
+          const addressText = selectedAddress 
+            ? `${selectedAddress.addressLine1}${selectedAddress.addressLine2 ? ', ' + selectedAddress.addressLine2 : ''}, ${selectedAddress.city}, ${selectedAddress.state} - ${selectedAddress.pincode}` 
+            : undefined;
+          
+          const preferredStartDateText = data.preferredStartDate 
+            ? new Date(data.preferredStartDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) 
+            : undefined;
+
           const emailInput: NewCustomServiceRequestEmailInput = {
-                          requestId: docRef.id,
+              requestId: docRef.id,
               serviceTitle: data.serviceTitle,
               userName: requestData.userName || "N/A",
               userEmail: requestData.userEmail || "N/A",
@@ -293,6 +431,10 @@ export default function CustomServiceRequestForm({
               minBudget: requestData.minBudget,
               maxBudget: requestData.maxBudget,
               adminUrl: `${getBaseUrl()}/admin/custom-service?id=${docRef.id}`,
+              addressText,
+              latitude: selectedAddress?.latitude || null,
+              longitude: selectedAddress?.longitude || null,
+              preferredStartDateText,
               smtpHost: appConfig.smtpHost,
               smtpPort: appConfig.smtpPort,
               smtpUser: appConfig.smtpUser,
@@ -562,6 +704,69 @@ export default function CustomServiceRequestForm({
           )}
         />
 
+        {/* Service Address Selection */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <FormLabel className="text-sm font-medium text-foreground flex items-center gap-1">
+              Service Address <span className="text-destructive">*</span>
+            </FormLabel>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleOpenMapForNewAddress}
+              disabled={isLocating || isSavingAddress || isSubmitting}
+            >
+              {isLocating ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <PlusCircle className="mr-2 h-3.5 w-3.5" />}
+              Add New Address
+            </Button>
+          </div>
+
+          {firestoreUser?.addresses && firestoreUser.addresses.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto p-1">
+              {firestoreUser.addresses.map((addr) => {
+                const isSelected = selectedAddressId === addr.id;
+                return (
+                  <div
+                    key={addr.id}
+                    onClick={() => {
+                      if (!isSubmitting) {
+                        setSelectedAddressId(addr.id);
+                        setAddressError(null);
+                      }
+                    }}
+                    className={cn(
+                      "p-3 border rounded-lg cursor-pointer transition-all hover:bg-muted/50 relative flex flex-col justify-between text-left",
+                      isSelected ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-input"
+                    )}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-semibold text-sm">{addr.fullName}</span>
+                        {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{addr.phone}</p>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                        {addr.addressLine1}{addr.addressLine2 ? `, ${addr.addressLine2}` : ''}, {addr.city}, {addr.state} - {addr.pincode}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-6 border border-dashed rounded-lg bg-muted/20">
+              <MapPin className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+              <p className="text-xs text-muted-foreground">No addresses saved. Please add a new service address.</p>
+            </div>
+          )}
+          {addressError && (
+            <p className="text-sm font-medium text-destructive mt-1">
+              {addressError}
+            </p>
+          )}
+        </div>
+
         {/* Image Upload */}
         <div>
           <FormLabel>Reference Photos (Optional, up to 5)</FormLabel>
@@ -644,6 +849,49 @@ export default function CustomServiceRequestForm({
           </Button>
         </div>
       </form>
+
+      <Dialog open={isMapModalOpen} onOpenChange={setIsMapModalOpen}>
+        <DialogContent 
+          className="max-w-3xl w-[95vw] h-[80vh] p-0 flex flex-col"
+          onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('.pac-container')) {
+              e.preventDefault();
+            }
+          }}
+        >
+          <DialogHeader className="p-3 border-b">
+            <DialogTitle>Locate on Google Maps</DialogTitle>
+          </DialogHeader>
+            {appConfig?.googleMapsApiKey ? (
+              <MapAddressSelector 
+                apiKey={appConfig.googleMapsApiKey} 
+                onAddressSelect={handleMapAddressSelect}
+                onClose={() => setIsMapModalOpen(false)}
+                initialCenter={initialMapCenter}
+                serviceZones={serviceZones}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>
+            )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Address Form Dialog */}
+      <Dialog open={isAddressFormOpen} onOpenChange={setIsAddressFormOpen}>
+        <DialogContent className="max-w-lg w-[95vw] max-h-[85vh] overflow-y-auto p-6">
+          <DialogHeader>
+            <DialogTitle>Complete Address Details</DialogTitle>
+          </DialogHeader>
+          <AddressForm 
+            initialData={editingAddress}
+            onSubmit={handleAddressSubmit}
+            onCancel={() => { setIsAddressFormOpen(false); setEditingAddress(null); }}
+            isSubmitting={isSavingAddress}
+            submitButtonText="Save Address"
+          />
+        </DialogContent>
+      </Dialog>
     </Form>
   );
 }

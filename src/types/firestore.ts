@@ -1491,6 +1491,7 @@ export interface CustomServiceRequest {
   preferredStartDate: Timestamp;
   submittedAt: Timestamp;
   status: CustomRequestStatus;
+  address?: Address;
 }
 
 

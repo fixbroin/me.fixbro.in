@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from '@/components/ui/badge';
-import { Eye, Check, Trash2, Loader2, PackageSearch, Construction, Phone, CheckCircle2, MoreHorizontal } from "lucide-react";
+import { Eye, Check, Trash2, Loader2, PackageSearch, Construction, Phone, CheckCircle2, MoreHorizontal, MapPin } from "lucide-react";
 import { db, storage } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, addDoc, limit } from '@/lib/mysqlDb';
 import { ref as storageRef, deleteObject } from '@/lib/mysqlStorage';
@@ -82,6 +82,58 @@ const CustomRequestDetailsModal = ({ isOpen, onClose, request }: { isOpen: boole
               <p className="text-sm font-medium text-muted-foreground">Description</p>
               <p className="text-base text-foreground whitespace-pre-wrap mt-1">{request.description}</p>
             </div>
+
+            {request.address && (
+              <>
+                <Separator className="my-2" />
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <p className="text-sm font-semibold uppercase text-muted-foreground tracking-wider flex items-center gap-1">
+                      <MapPin className="h-4 w-4 text-primary animate-pulse" /> Service Address Details
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-fit text-xs flex items-center gap-1.5 border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-200 cursor-pointer"
+                      asChild
+                    >
+                      <a
+                        href={
+                          request.address.latitude && request.address.longitude
+                            ? `https://www.google.com/maps/search/?api=1&query=${request.address.latitude},${request.address.longitude}`
+                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                `${request.address.addressLine1}${request.address.addressLine2 ? ', ' + request.address.addressLine2 : ''}, ${request.address.city}, ${request.address.state} - ${request.address.pincode}`
+                              )}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <MapPin className="h-3.5 w-3.5" /> View on Google Maps
+                      </a>
+                    </Button>
+                  </div>
+                  <div className="bg-muted/30 p-3 rounded-lg border text-sm space-y-1">
+                    <p><strong className="text-muted-foreground">Recipient Name:</strong> {request.address.fullName}</p>
+                    <p><strong className="text-muted-foreground">Phone Number:</strong> {request.address.phone}</p>
+                    {request.address.email && <p><strong className="text-muted-foreground">Email:</strong> {request.address.email}</p>}
+                    <p>
+                      <strong className="text-muted-foreground">Address:</strong>{' '}
+                      {request.address.addressLine1}
+                      {request.address.addressLine2 ? `, ${request.address.addressLine2}` : ''}
+                    </p>
+                    <p>
+                      <strong className="text-muted-foreground">City/State/Pincode:</strong>{' '}
+                      {request.address.city}, {request.address.state} - {request.address.pincode}
+                    </p>
+                    {request.address.latitude && request.address.longitude && (
+                      <p className="text-xs text-muted-foreground font-mono mt-1 pt-1 border-t border-dashed">
+                        Coordinates: {request.address.latitude.toFixed(6)}, {request.address.longitude.toFixed(6)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
             
             {request.imageUrls && request.imageUrls.length > 0 && (
               <div>
