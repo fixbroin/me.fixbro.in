@@ -31,7 +31,7 @@ const ProtectedRoute: React.FC<PropsWithChildren> = ({ children }) => {
     const protectedClientRoutes = [
       '/profile', '/my-bookings', '/checkout/schedule', '/checkout/address',
       '/checkout/payment', '/checkout/thank-you', '/notifications', '/chat', '/cart', '/my-address',
-      '/custom-service'
+      '/custom-service', '/cancellation-payment'
     ];
     const isExplicitlyProtectedClientRoute = protectedClientRoutes.some(route => pathname.startsWith(route));
 
