@@ -83,7 +83,7 @@ const calculateIncrementalTotalPriceForItem = (service: FirestoreService, quanti
 
 
 export default function PaymentPage() {
-  const [paymentMethod, setPaymentMethod] = useState("upi");
+  const [paymentMethod, setPaymentMethod] = useState("online");
   const [isMounted, setIsMounted] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -387,8 +387,8 @@ export default function PaymentPage() {
 
   useEffect(() => {
     if (!isLoadingCartDetails && !isLoadingAppSettings) {
-      if (isCancellationFeeMode) { setPaymentMethod("upi"); return; } 
-      if (onlinePaymentEnabled) setPaymentMethod("upi"); 
+      if (isCancellationFeeMode) { setPaymentMethod("online"); return; } 
+      if (onlinePaymentEnabled) setPaymentMethod("online"); 
       else if (payAfterServiceEnabled) setPaymentMethod("later"); 
       else setPaymentMethod("");
     }
@@ -585,10 +585,7 @@ export default function PaymentPage() {
   }
 
   const basePaymentOptions = [
-    { value: 'upi', label: 'UPI', icon: IndianRupee, online: true, available: onlinePaymentEnabled },
-    { value: 'card', label: 'Credit/Debit Card', icon: CreditCard, online: true, available: onlinePaymentEnabled },
-    { value: 'netbanking', label: 'Net Banking', icon: Landmark, online: true, available: onlinePaymentEnabled },
-    { value: 'wallet', label: 'Wallets', icon: Wallet, online: true, available: onlinePaymentEnabled },
+    { value: 'online', label: 'Pay Online (UPI, Cards, Net Banking, Wallets)', icon: CreditCard, online: true, available: onlinePaymentEnabled },
     { value: 'later', label: 'Pay After Service', icon: HandCoins, online: false, available: payAfterServiceEnabled && !isCancellationFeeMode },
   ];
   const currentAvailablePaymentOptions = basePaymentOptions.filter(option => option.available);
@@ -639,7 +636,7 @@ export default function PaymentPage() {
               {currentAvailablePaymentOptions.length > 0 ? (
                 <div className="mt-4"><h3 className="text-lg font-semibold mb-3">Select Payment Method</h3>
                     <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="space-y-3">
-                    {currentAvailablePaymentOptions.map(method => { const Icon = method.icon; return (<Label key={method.value} htmlFor={`payment-${method.value}`} className={`flex items-center space-x-3 border rounded-md p-4 hover:bg-accent/50 cursor-pointer transition-colors ${paymentMethod === method.value ? 'bg-primary text-primary-foreground border-primary ring-2 ring-primary' : 'border-input bg-background'} ${isProcessingPayment ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={() => !isProcessingPayment && setPaymentMethod(method.value)}><RadioGroupItem value={method.value} id={`payment-${method.value}`} className="border-muted-foreground data-[state=checked]:border-primary-foreground" disabled={isProcessingPayment}/><Icon className="h-5 w-5" /><span>{method.label}</span></Label>);})}
+                    {currentAvailablePaymentOptions.map(method => { const Icon = method.icon; return (<Label key={method.value} htmlFor={`payment-${method.value}`} className={`flex items-center space-x-3 border rounded-xl p-4 hover:bg-accent/50 cursor-pointer transition-all ${paymentMethod === method.value ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-input bg-background'} ${isProcessingPayment ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={() => !isProcessingPayment && setPaymentMethod(method.value)}><RadioGroupItem value={method.value} id={`payment-${method.value}`} disabled={isProcessingPayment}/><Icon className="h-5 w-5 text-primary" /><span className="font-medium text-foreground">{method.label}</span></Label>);})}
                     </RadioGroup>
                 </div>
               ) : (<Alert variant="destructive" className="mt-4"><AlertTitle>No Payment Methods Available</AlertTitle><AlertDescription>Contact support or try later. Admin may need to enable a payment option.</AlertDescription></Alert>)}
