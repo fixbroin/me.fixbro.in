@@ -19,6 +19,8 @@ import { sendBookingConfirmationEmail, type BookingConfirmationEmailInput } from
 import { useRouter } from 'next/navigation';
 import { useLoading } from '@/contexts/LoadingContext';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { useGlobalSettings } from '@/hooks/useGlobalSettings';
+import { sendUserCancellationEmail, type UserCancellationEmailInput } from '@/ai/flows/sendUserCancellationEmailFlow';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import { logUserActivity } from '@/lib/activityLogger';
 import { getGuestId } from '@/lib/guestIdManager';
@@ -138,6 +140,7 @@ export default function ThankYouPage() {
   const router = useRouter();
   const { hideLoading } = useLoading();
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
+  const { settings: globalCompanySettings } = useGlobalSettings();
   const symbol = appConfig?.currencySymbol || '₹';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
   const code = appConfig?.currencyCode || 'INR';
@@ -207,6 +210,85 @@ export default function ThankYouPage() {
                     cancellationFeePaid: feeAmount,
                     cancellationPaymentId: razorpayPaymentId,
                 });
+
+                // 1. Create and send notification to USER
+                if (currentUser) {
+                  const userNotificationData: FirestoreNotification = {
+                    userId: currentUser.uid,
+                    title: "Booking Cancelled",
+                    message: `Your booking ${originalBookingData.bookingId} has been successfully cancelled.`,
+                    type: 'error',
+                    href: '/my-bookings',
+                    read: false,
+                    createdAt: Timestamp.now(),
+                  };
+                  await addDoc(collection(db, "userNotifications"), userNotificationData);
+                  triggerPushNotification({
+                    userId: currentUser.uid,
+                    title: userNotificationData.title,
+                    body: userNotificationData.message,
+                    href: userNotificationData.href
+                  });
+                }
+
+                // 2. Create and send notification to ADMIN
+                try {
+                  const usersRef = collection(db, "users");
+                  const adminQuery = query(usersRef, where("email", "==", ADMIN_EMAIL), limit(1));
+                  const adminSnapshot = await getDocs(adminQuery);
+                  if (!adminSnapshot.empty) {
+                    const adminUid = adminSnapshot.docs[0].id;
+                    const adminNotificationData: FirestoreNotification = {
+                      userId: adminUid,
+                      title: "Booking Cancelled by User",
+                      message: `Booking ${originalBookingData.bookingId} was cancelled by ${originalBookingData.customerName || currentUser?.displayName || currentUser?.email}.`,
+                      type: 'admin_alert',
+                      href: `/admin/bookings`,
+                      read: false,
+                      createdAt: Timestamp.now(),
+                    };
+                    await addDoc(collection(db, "userNotifications"), adminNotificationData);
+                    triggerPushNotification({
+                      userId: adminUid,
+                      title: adminNotificationData.title,
+                      body: adminNotificationData.message,
+                      href: adminNotificationData.href
+                    });
+                  }
+                } catch (err) {
+                  console.error("Error notifying admin about user cancellation:", err);
+                }
+
+                // 3. Trigger post-process API for WhatsApp, Stats, etc.
+                fetch('/api/bookings/post-process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bookingDocId: bookingFirestoreDocIdForCancellation }),
+                }).catch(err => console.error("Error triggering post-process after paid cancellation:", err));
+
+                // 4. Send cancellation email
+                try {
+                  const emailInput: UserCancellationEmailInput = {
+                      bookingId: originalBookingData.bookingId,
+                      customerName: originalBookingData.customerName,
+                      customerEmail: originalBookingData.customerEmail,
+                      paymentMethod: originalBookingData.paymentMethod,
+                      paidAmount: originalBookingData.paymentMethod === 'Online' ? originalBookingData.totalAmount : 0,
+                      cancellationFee: feeAmount,
+                      refundableAmount: originalBookingData.paymentMethod === 'Online' ? Math.max(0, originalBookingData.totalAmount - feeAmount) : 0,
+                      siteName: globalCompanySettings?.websiteName || "Wecanfix",
+                      smtpHost: appConfig.smtpHost,
+                      smtpPort: appConfig.smtpPort,
+                      smtpUser: appConfig.smtpUser,
+                      smtpPass: appConfig.smtpPass,
+                      senderEmail: appConfig.senderEmail,
+                      currencySymbol: symbol,
+                  };
+                  await sendUserCancellationEmail(emailInput);
+                } catch (emailError) {
+                  console.error("Cancellation email failed from thank-you page:", emailError);
+                }
+
                 toast({ title: "Booking Cancelled", description: `Booking ${originalBookingData.bookingId} has been cancelled.` });
             } else {
                 toast({ title: "Error", description: "Original booking not found.", variant: "destructive" });
