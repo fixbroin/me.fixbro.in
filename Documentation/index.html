@@ -858,11 +858,42 @@ server {
       <p>Save and restart Nginx once more:</p>
       <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>sudo nginx -t && sudo systemctl restart nginx</code></pre>
 
-      <h3>Step 7: Post-Deployment Verification</h3>
+       <h3>Step 7: Post-Deployment Verification</h3>
       <p>Verify that your Node app process and MySQL database are running without issues:</p>
       <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>pm2 status
 pm2 logs your-app-name
 sudo systemctl status mysql</code></pre>
+
+      <h3>Step 8: Updating the Application (Future Releases / Bug Fixes)</h3>
+      <p>When you push code changes to GitHub and want to deploy them to your VPS in the future, follow this sequence to avoid file lock conflicts and ensure cache is completely cleared:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code># 1. Navigate to your project folder
+cd /var/www/your-app-directory
+
+# 2. STOP the PM2 process first (this unlocks all files in the build directory)
+pm2 stop your-app-name
+
+# 3. Pull the latest code updates from GitHub
+git pull origin main
+
+# 4. Install any new NPM packages (if dependencies changed)
+npm install
+
+# 5. Delete the old build folder completely (wipes Next.js compiler cache and standalone folder)
+rm -rf .next
+
+# 6. Compile the new production build (runs postbuild asset copying automatically)
+npm run build
+
+# 7. START the PM2 process back up
+pm2 start your-app-name</code></pre>
+
+      <div class="alert alert-warning" style="margin-top: 16px;">
+        <strong>⚠️ Browser Caching Note:</strong> Next.js heavily caches assets in the user's browser. If your updates do not reflect immediately after deployment:
+        <ul>
+          <li>Open the website in an <strong>Incognito / Private window</strong>.</li>
+          <li>Or perform a <strong>Hard Reload</strong> (<code>Ctrl + F5</code> on Windows, or <code>Cmd + Shift + R</code> on Mac) to refresh the browser's script cache.</li>
+        </ul>
+      </div>
     </section>
 
     <!-- SECTION 8: LOCAL STANDALONE BUILD DEPLOYMENT (OPTIONAL) -->

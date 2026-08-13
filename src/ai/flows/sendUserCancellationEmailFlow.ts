@@ -17,6 +17,7 @@ const UserCancellationEmailInputSchema = z.object({
   paidAmount: z.number().optional().describe("Amount paid by user before cancellation."),
   cancellationFee: z.number().optional().describe("Cancellation fee charged."),
   refundableAmount: z.number().optional().describe("Calculated refundable amount."),
+  cancellationPaymentId: z.string().optional().describe("Razorpay payment ID for the cancellation fee payment."),
   // SMTP Settings
   smtpHost: z.string().optional().describe("SMTP host for sending emails."),
   smtpPort: z.string().optional().describe("SMTP port (e.g., '587', '465')."),
@@ -116,7 +117,7 @@ const userCancellationEmailFlow = ai.defineFlow(
        const {
         smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "Wecanfix", logoUrl, currencySymbol = "₹",
         customerName, customerEmail, bookingId,
-        paymentMethod, paidAmount, cancellationFee, refundableAmount,
+        paymentMethod, paidAmount, cancellationFee, refundableAmount, cancellationPaymentId,
       } = bookingDetails;
       
       const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
@@ -130,13 +131,17 @@ const userCancellationEmailFlow = ai.defineFlow(
               <p>Cancellation fee: ${currencySymbol}${cancellationFee.toFixed(2)}</p>
               <p><strong>Refundable amount: ${currencySymbol}${refundableAmount.toFixed(2)}</strong></p>
               <p>Your refund will be processed within 7 working days to your original payment method.</p>
+              ${cancellationPaymentId ? `<p style="font-size: 12px; color: #666; margin-top: 8px;">Cancellation Transaction ID: <strong>${cancellationPaymentId}</strong></p>` : ''}
             </div>
           `;
       } else if (paymentMethod !== 'Online' && cancellationFee !== undefined && cancellationFee > 0) {
           paymentInfoHtml = `
             <div class="summary-box">
-              <h3 style="margin-top: 0;">Pending Balance</h3>
-              <p>Since you chose "${paymentMethod}", you now have a pending balance of <strong>${currencySymbol}${cancellationFee.toFixed(2)}</strong> for the cancellation fee. This balance may be added to your next booking.</p>
+              <h3 style="margin-top: 0;">Cancellation Fee Payment</h3>
+              <p>Original Payment Option: Pay After Service</p>
+              <p><strong>Cancellation Fee (Paid Online): ${currencySymbol}${cancellationFee.toFixed(2)}</strong></p>
+              ${cancellationPaymentId ? `<p style="font-size: 13px; color: #333; margin-top: 8px;">Payment Transaction ID: <strong>${cancellationPaymentId}</strong></p>` : ''}
+              <p>Thank you. Your cancellation payment has been successfully received and the booking is now fully cancelled.</p>
             </div>
           `;
       }

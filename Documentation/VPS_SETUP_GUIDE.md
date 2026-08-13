@@ -354,3 +354,41 @@ sudo systemctl restart nginx
    Confirm you have generated and uploaded your customized brand logo assets and favicon images inside the `public/` directory (recommendation: compile your icons using the free tool at `https://usebro.in/tools/favicon-generator` to replace default placeholders).
 4. **Database Check:**
    Log into the admin panel (`https://yourdomain.com/admin/database-tools`) to verify MySQL database health.
+
+---
+
+## 🔄 Step 8: Updating the Application (Future Releases / Bug Fixes)
+
+When you make changes to your codebase and want to deploy them to your VPS in the future, follow these steps to ensure all cache is cleared and the files are updated cleanly without process lock conflicts:
+
+### 🚀 Update Deployment Command Sequence
+
+Run the following commands in order inside your VPS terminal:
+
+```bash
+# 1. Navigate to your project folder
+cd /var/www/your-app-directory
+
+# 2. STOP the PM2 process first (this unlocks all files in the build directory)
+pm2 stop your-app-name
+
+# 3. Pull the latest code updates from GitHub
+git pull origin main
+
+# 4. Install any new NPM packages (if dependencies changed)
+npm install
+
+# 5. Delete the old build folder completely (wipes Next.js compiler cache and standalone folder)
+rm -rf .next
+
+# 6. Compile the new production build (runs postbuild asset copying automatically)
+npm run build
+
+# 7. START the PM2 process back up
+pm2 start your-app-name
+```
+
+> [!IMPORTANT]
+> **Browser Caching:** Next.js heavily caches pages on the client-side. If your changes are not immediately visible in your browser after deployment:
+> 1. Try opening the website in an **Incognito / Private window**.
+> 2. Or perform a **Hard Reload** (`Ctrl + F5` on Windows, or `Cmd + Shift + R` on Mac) to force the browser to retrieve the latest chunks.

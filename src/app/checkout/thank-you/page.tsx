@@ -276,6 +276,7 @@ export default function ThankYouPage() {
                       paidAmount: originalBookingData.paymentMethod === 'Online' ? originalBookingData.totalAmount : 0,
                       cancellationFee: feeAmount,
                       refundableAmount: originalBookingData.paymentMethod === 'Online' ? Math.max(0, originalBookingData.totalAmount - feeAmount) : 0,
+                      cancellationPaymentId: razorpayPaymentId || undefined,
                       siteName: globalCompanySettings?.websiteName || "Wecanfix",
                       smtpHost: appConfig.smtpHost,
                       smtpPort: appConfig.smtpPort,
