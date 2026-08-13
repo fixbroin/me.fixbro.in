@@ -46,6 +46,44 @@ if (fs.existsSync(standalonePath)) {
     fs.cpSync(serverSrc, serverDest, { recursive: true });
     console.log(`[Postbuild] Successfully copied ${serverSrc} -> ${serverDest}`);
   }
+
+  // Create persistent uploads symlink to prevent 404s and data loss on build
+  const uploadsSrc = path.join(root, 'public', 'uploads');
+  const uploadsDest = path.join(standalonePath, 'public', 'uploads');
+
+  if (!fs.existsSync(uploadsSrc)) {
+    fs.mkdirSync(uploadsSrc, { recursive: true });
+  }
+
+  if (fs.existsSync(uploadsDest)) {
+    try {
+      const stats = fs.lstatSync(uploadsDest);
+      if (!stats.isSymbolicLink()) {
+        console.log('[Postbuild] uploads directory exists in standalone but is not a symlink. Removing to link to persistent root.');
+        fs.rmSync(uploadsDest, { recursive: true, force: true });
+      }
+    } catch (e) {
+      console.error('[Postbuild] Error checking uploadsDest stats:', e);
+    }
+  }
+
+  if (!fs.existsSync(uploadsDest)) {
+    try {
+      // Use 'junction' which is compatible on Windows & Linux and doesn't require administrator privileges
+      fs.symlinkSync(uploadsSrc, uploadsDest, 'junction');
+      console.log(`[Postbuild] Created uploads directory symlink: ${uploadsDest} -> ${uploadsSrc}`);
+    } catch (linkErr) {
+      console.error('[Postbuild] Failed to create uploads symlink:', linkErr);
+      // Fallback: copy existing files if symlink fails
+      try {
+        console.log('[Postbuild] Falling back to copying uploads files...');
+        fs.mkdirSync(uploadsDest, { recursive: true });
+        fs.cpSync(uploadsSrc, uploadsDest, { recursive: true });
+      } catch (cpErr) {
+        console.error('[Postbuild] Fallback copy failed:', cpErr);
+      }
+    }
+  }
 } else {
   console.log('[Postbuild] Standalone folder not found. Skipping static files copy.');
 }
