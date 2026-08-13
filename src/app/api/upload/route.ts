@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     const label = folderLabelMap[segment] || segment;
     
     const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const prefix = `${dateStr}-${label}-fixbro-`;
+    const prefix = `${dateStr}-${label}-wecanfix-`;
     
     let counter = 1;
     try {

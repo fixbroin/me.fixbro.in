@@ -118,9 +118,9 @@ const newCustomServiceRequestEmailFlow = ai.defineFlow(
   },
   async (details) => {
     try {
-      const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "FixBro", logoUrl, currencySymbol = "₹", ...requestDetails } = details;
+      const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "Wecanfix", logoUrl, currencySymbol = "₹", ...requestDetails } = details;
 
-      const adminEmail = "fixbro.in@gmail.com"; 
+      const adminEmail = "wecanfix.in@gmail.com"; 
       const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
 
       const emailSubject = `New Custom Service Request: ${requestDetails.serviceTitle}`;
