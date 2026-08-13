@@ -380,7 +380,7 @@ export default function MyBookingsPage() {
         showLoading();
         localStorage.setItem('bookingIdForCancellationFee', booking.id); 
         localStorage.setItem('cancellationFeeAmount', feeAmount.toFixed(2));
-        router.push(`/cancellation-payment?reason=cancellation_fee&booking_id=${booking.bookingId}`);
+        router.push(`/checkout/payment?reason=cancellation_fee&booking_id=${booking.bookingId}`);
         setShowCancellationDialog(false);
     };
 
