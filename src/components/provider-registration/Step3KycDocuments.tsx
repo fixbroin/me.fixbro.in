@@ -24,6 +24,8 @@ import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = 'wecanfix_reg_step3';
 
+
+
 const generateRandomHexString = (length: number) => Array.from({ length }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 const isFirebaseStorageUrl = (url: string | null | undefined): boolean => !!url && typeof url === 'string' && url.includes("firebasestorage.googleapis.com");
 const isValidImageSrc = (url: string | null | undefined): url is string => {
@@ -32,8 +34,8 @@ const isValidImageSrc = (url: string | null | undefined): url is string => {
 };
 
 const step3KycSchema = z.object({
-  aadhaarNumber: z.string().trim().regex(/^[2-9]{1}[0-9]{3}[0-9]{4}[0-9]{4}$/, "Invalid Aadhaar number (12 digits, not starting with 0/1)."),
-  panNumber: z.string().trim().toUpperCase().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN format (e.g., ABCDE1234F)."),
+  aadhaarNumber: z.string().optional().or(z.literal('')),
+  panNumber: z.string().optional().or(z.literal('')),
 });
 
 type Step3FormData = z.infer<typeof step3KycSchema>;
@@ -53,6 +55,7 @@ interface Step3KycDocumentsProps {
   controlOptions: ProviderControlOptions | null;
   isSaving: boolean;
   userUid: string;
+  enableDefaultIndianKyc?: boolean;
 }
 
 export default function Step3KycDocuments({
@@ -62,13 +65,26 @@ export default function Step3KycDocuments({
   controlOptions,
   isSaving, 
   userUid,
+  enableDefaultIndianKyc = true,
 }: Step3KycDocumentsProps) {
   const { toast } = useToast();
   const [isFormBusy, setIsFormBusy] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
+  const schema = useMemo(() => {
+    return enableDefaultIndianKyc
+      ? z.object({
+          aadhaarNumber: z.string().trim().regex(/^[2-9]{1}[0-9]{3}[0-9]{4}[0-9]{4}$/, "Invalid Aadhaar number (12 digits, not starting with 0/1)."),
+          panNumber: z.string().trim().toUpperCase().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN format (e.g., ABCDE1234F)."),
+        })
+      : z.object({
+          aadhaarNumber: z.string().optional().or(z.literal('')),
+          panNumber: z.string().optional().or(z.literal('')),
+        });
+  }, [enableDefaultIndianKyc]);
+
   const form = useForm<Step3FormData>({
-    resolver: zodResolver(step3KycSchema),
+    resolver: zodResolver(schema),
     defaultValues: {
       aadhaarNumber: initialData.aadhaar?.docNumber || "",
       panNumber: initialData.pan?.docNumber || "",
@@ -215,9 +231,11 @@ export default function Step3KycDocuments({
   const handleSubmit = async (data: Step3FormData) => {
     const errors: string[] = [];
     
-    if (!aadhaarFront.file && !aadhaarFront.previewUrl) errors.push("Aadhaar Front Image");
-    if (!aadhaarBack.file && !aadhaarBack.previewUrl) errors.push("Aadhaar Back Image");
-    if (!panFront.file && !panFront.previewUrl) errors.push("PAN Card Front Image");
+    if (enableDefaultIndianKyc) {
+      if (!aadhaarFront.file && !aadhaarFront.previewUrl) errors.push("Aadhaar Front Image");
+      if (!aadhaarBack.file && !aadhaarBack.previewUrl) errors.push("Aadhaar Back Image");
+      if (!panFront.file && !panFront.previewUrl) errors.push("PAN Card Front Image");
+    }
 
     activeAdditionalDocTypes.forEach(type => {
       const docData = additionalDocsData[type.id];
@@ -257,9 +275,15 @@ export default function Step3KycDocuments({
 
     try {
       const [frontAadhaar, backAadhaar, frontPan] = await Promise.all([
-        uploadFile(aadhaarFront, `provider_documents/${userUid}/aadhaar_front`, p => setAadhaarFront(prev => ({...prev, uploadProgress: p}))),
-        uploadFile(aadhaarBack, `provider_documents/${userUid}/aadhaar_back`, p => setAadhaarBack(prev => ({...prev, uploadProgress: p}))),
-        uploadFile(panFront, `provider_documents/${userUid}/pan_front`, p => setPanFront(prev => ({...prev, uploadProgress: p})))
+        (enableDefaultIndianKyc || aadhaarFront.file)
+          ? uploadFile(aadhaarFront, `provider_documents/${userUid}/aadhaar_front`, p => setAadhaarFront(prev => ({...prev, uploadProgress: p})))
+          : Promise.resolve({ url: aadhaarFront.existingUrl || null, fileName: aadhaarFront.originalFileName || null }),
+        (enableDefaultIndianKyc || aadhaarBack.file)
+          ? uploadFile(aadhaarBack, `provider_documents/${userUid}/aadhaar_back`, p => setAadhaarBack(prev => ({...prev, uploadProgress: p})))
+          : Promise.resolve({ url: aadhaarBack.existingUrl || null, fileName: aadhaarBack.originalFileName || null }),
+        (enableDefaultIndianKyc || panFront.file)
+          ? uploadFile(panFront, `provider_documents/${userUid}/pan_front`, p => setPanFront(prev => ({...prev, uploadProgress: p})))
+          : Promise.resolve({ url: panFront.existingUrl || null, fileName: panFront.originalFileName || null })
       ]);
 
       const additionalDocuments: KycDocument[] = [];
@@ -291,8 +315,8 @@ export default function Step3KycDocuments({
       }
 
       onNext({
-        aadhaar: { docType: 'aadhaar', docNumber: data.aadhaarNumber, frontImageUrl: frontAadhaar.url!, backImageUrl: backAadhaar.url!, verified: initialData.aadhaar?.verified || false, frontImageFileName: frontAadhaar.fileName || undefined, backImageFileName: backAadhaar.fileName || undefined },
-        pan: { docType: 'pan', docNumber: data.panNumber, frontImageUrl: frontPan.url!, verified: initialData.pan?.verified || false, frontImageFileName: frontPan.fileName || undefined },
+        aadhaar: (enableDefaultIndianKyc || frontAadhaar.url) ? { docType: 'aadhaar', docNumber: data.aadhaarNumber || "", frontImageUrl: frontAadhaar.url || "", backImageUrl: backAadhaar.url || "", verified: initialData.aadhaar?.verified || false, frontImageFileName: frontAadhaar.fileName || undefined, backImageFileName: backAadhaar.fileName || undefined } : undefined,
+        pan: (enableDefaultIndianKyc || frontPan.url) ? { docType: 'pan', docNumber: data.panNumber || "", frontImageUrl: frontPan.url || "", verified: initialData.pan?.verified || false, frontImageFileName: frontPan.fileName || undefined } : undefined,
         additionalDocuments
       });
 
@@ -397,52 +421,56 @@ export default function Step3KycDocuments({
         <Card className="border-none shadow-none">
           <CardHeader className="px-0"><CardTitle className="text-xl">KYC Documents</CardTitle></CardHeader>
           <CardContent className="px-0 space-y-8">
-            <div className="space-y-4 p-4 border rounded-lg bg-muted/10">
-              <h3 className="font-bold flex items-center gap-2"><ImageIcon className="h-5 w-5 text-primary"/> Aadhaar Details</h3>
-              <FormField control={form.control} name="aadhaarNumber" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Aadhaar Number *</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="XXXX XXXX XXXX" 
-                      {...field} 
-                      maxLength={12} 
-                      onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ''))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {renderUploadBox("Aadhaar Front", aadhaarFront, f => setAadhaarFront(prev => ({...prev, file: f, previewUrl: URL.createObjectURL(f), originalFileName: f.name})), () => handleRemoveFile(setAadhaarFront), true)}
-                {renderUploadBox("Aadhaar Back", aadhaarBack, f => setAadhaarBack(prev => ({...prev, file: f, previewUrl: URL.createObjectURL(f), originalFileName: f.name})), () => handleRemoveFile(setAadhaarBack), true)}
-              </div>
-            </div>
+            {enableDefaultIndianKyc && (
+              <>
+                <div className="space-y-4 p-4 border rounded-lg bg-muted/10">
+                  <h3 className="font-bold flex items-center gap-2"><ImageIcon className="h-5 w-5 text-primary"/> Aadhaar Details</h3>
+                  <FormField control={form.control} name="aadhaarNumber" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Aadhaar Number *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="XXXX XXXX XXXX" 
+                          {...field} 
+                          maxLength={12} 
+                          onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ''))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {renderUploadBox("Aadhaar Front", aadhaarFront, f => setAadhaarFront(prev => ({...prev, file: f, previewUrl: URL.createObjectURL(f), originalFileName: f.name})), () => handleRemoveFile(setAadhaarFront), true)}
+                    {renderUploadBox("Aadhaar Back", aadhaarBack, f => setAadhaarBack(prev => ({...prev, file: f, previewUrl: URL.createObjectURL(f), originalFileName: f.name})), () => handleRemoveFile(setAadhaarBack), true)}
+                  </div>
+                </div>
 
-            <div className="space-y-4 p-4 border rounded-lg bg-muted/10">
-              <h3 className="font-bold flex items-center gap-2"><ImageIcon className="h-5 w-5 text-primary"/> PAN Details</h3>
-              <FormField control={form.control} name="panNumber" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>PAN Number *</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="ABCDE1234F" 
-                      {...field} 
-                      style={{textTransform:'uppercase'}} 
-                      onChange={(e) => field.onChange(e.target.value.toUpperCase().replace(/\s/g, ''))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {renderUploadBox("PAN Card Front", panFront, f => setPanFront(prev => ({...prev, file: f, previewUrl: URL.createObjectURL(f), originalFileName: f.name})), () => handleRemoveFile(setPanFront), true)}
-              </div>
-            </div>
+                <div className="space-y-4 p-4 border rounded-lg bg-muted/10">
+                  <h3 className="font-bold flex items-center gap-2"><ImageIcon className="h-5 w-5 text-primary"/> PAN Details</h3>
+                  <FormField control={form.control} name="panNumber" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>PAN Number *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="ABCDE1234F" 
+                          {...field} 
+                          style={{textTransform:'uppercase'}} 
+                          onChange={(e) => field.onChange(e.target.value.toUpperCase().replace(/\s/g, ''))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {renderUploadBox("PAN Card Front", panFront, f => setPanFront(prev => ({...prev, file: f, previewUrl: URL.createObjectURL(f), originalFileName: f.name})), () => handleRemoveFile(setPanFront), true)}
+                  </div>
+                </div>
+              </>
+            )}
 
             {activeAdditionalDocTypes.length > 0 && (
               <div className="space-y-6">
-                <h3 className="font-bold text-lg flex items-center gap-2"><PlusCircle className="h-5 w-5 text-primary"/> Additional Documents</h3>
+                <h3 className="font-bold text-lg flex items-center gap-2"><PlusCircle className="h-5 w-5 text-primary"/> {enableDefaultIndianKyc ? "Additional Documents" : "Identity Verification Documents"}</h3>
                 {activeAdditionalDocTypes.map(type => {
                   const docState = additionalDocsData[type.id];
                   if (!docState) return null;

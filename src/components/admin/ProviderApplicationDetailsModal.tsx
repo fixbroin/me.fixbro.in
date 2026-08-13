@@ -413,18 +413,22 @@ export default function ProviderApplicationDetailsModal({
               </TabsContent>
 
               <TabsContent value="kyc" className="space-y-4 focus-visible:outline-none focus-visible:ring-0 mt-0 w-full">
-                <KycDocDisplay 
-                  doc={application.aadhaar} 
-                  docName="Aadhaar Card"
-                  onVerify={() => handleVerifyDocument('aadhaar')}
-                  isVerifying={verifyingDocType === 'aadhaar'}
-                />
-                <KycDocDisplay 
-                  doc={application.pan} 
-                  docName="PAN Card"
-                  onVerify={() => handleVerifyDocument('pan')}
-                  isVerifying={verifyingDocType === 'pan'}
-                />
+                {application.aadhaar && (application.aadhaar.docNumber || application.aadhaar.frontImageUrl) && (
+                  <KycDocDisplay 
+                    doc={application.aadhaar} 
+                    docName="Aadhaar Card"
+                    onVerify={() => handleVerifyDocument('aadhaar')}
+                    isVerifying={verifyingDocType === 'aadhaar'}
+                  />
+                )}
+                {application.pan && (application.pan.docNumber || application.pan.frontImageUrl) && (
+                  <KycDocDisplay 
+                    doc={application.pan} 
+                    docName="PAN Card"
+                    onVerify={() => handleVerifyDocument('pan')}
+                    isVerifying={verifyingDocType === 'pan'}
+                  />
+                )}
                 
                 {application.additionalDocuments && application.additionalDocuments.length > 0 && (
                   <div className="pt-2">

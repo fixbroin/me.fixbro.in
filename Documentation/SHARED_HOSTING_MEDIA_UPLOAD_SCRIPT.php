@@ -1,14 +1,14 @@
 <?php
 /**
- * Wecanfix Remote Media Upload Bridge for Shared Hosting
- * Upload this file as `upload.php` to your Shared Hosting subdomain (e.g. media.wecanfix.in)
+ * Remote Media Upload Bridge for Shared Hosting
+ * Upload this file as `upload.php` to your Shared Hosting subdomain (e.g. media.yourdomain.com)
  */
 
-// 1. SET YOUR SECRET KEY (Must match the Secret Key in /admin/web-settings -> Media Storage)
-define('SECRET_KEY', 'wecanfix_secure_key_123');
+// 1. SET YOUR SECRET KEY (Must match the Secret Key in Web Settings -> Media Storage tab)
+define('SECRET_KEY', 'your_secure_secret_key_here');
 
 // 2. SET YOUR SUBDOMAIN PUBLIC BASE URL (No trailing slash)
-define('MEDIA_BASE_URL', 'https://media.wecanfix.in');
+define('MEDIA_BASE_URL', 'https://media.yourdomain.com');
 
 // Enable CORS if needed
 header("Access-Control-Allow-Origin: *");

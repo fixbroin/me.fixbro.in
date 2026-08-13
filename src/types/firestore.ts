@@ -623,6 +623,7 @@ export interface AppSettings {
   isChatEnabled?: boolean; // Added for compatibility with appDefaults.ts
   isProviderRegistrationEnabled?: boolean; // For toggling registration
   isCancelledChequeCompulsory?: boolean; // For toggling cheque compulsory status
+  enableDefaultIndianKyc?: boolean; // For toggling Aadhaar and PAN defaults
   maxProviderRadiusKm?: number; // New for provider work area
   autoDispatchRadiusKm?: number; // New: Configurable radius for automatic assignment
   

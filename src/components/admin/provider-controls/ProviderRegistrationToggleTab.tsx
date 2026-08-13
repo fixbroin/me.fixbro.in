@@ -22,11 +22,13 @@ export default function ProviderRegistrationToggleTab() {
   const [isSaving, setIsSaving] = useState(false);
   const [isRegistrationEnabled, setIsRegistrationEnabled] = useState(true);
   const [isChequeCompulsory, setIsChequeCompulsory] = useState(false);
+  const [enableDefaultIndianKyc, setEnableDefaultIndianKyc] = useState(true);
 
   useEffect(() => {
     if (!isLoadingAppConfig && appConfig) {
       setIsRegistrationEnabled(appConfig.isProviderRegistrationEnabled === undefined ? true : appConfig.isProviderRegistrationEnabled);
       setIsChequeCompulsory(appConfig.isCancelledChequeCompulsory === undefined ? false : appConfig.isCancelledChequeCompulsory);
+      setEnableDefaultIndianKyc(appConfig.enableDefaultIndianKyc === undefined ? true : appConfig.enableDefaultIndianKyc);
     }
   }, [appConfig, isLoadingAppConfig]);
 
@@ -41,6 +43,7 @@ export default function ProviderRegistrationToggleTab() {
       const dataToSave: Partial<AppSettings> = {
         isProviderRegistrationEnabled: isRegistrationEnabled,
         isCancelledChequeCompulsory: isChequeCompulsory,
+        enableDefaultIndianKyc: enableDefaultIndianKyc,
         updatedAt: Timestamp.now(),
       };
       await setDoc(settingsDocRef, dataToSave, { merge: true });
@@ -107,6 +110,24 @@ export default function ProviderRegistrationToggleTab() {
               onCheckedChange={(checked) => setIsChequeCompulsory(checked)}
               disabled={isSaving}
               aria-label="Toggle cancelled cheque requirement"
+            />
+          </div>
+
+          <div className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+            <div className="space-y-0.5">
+              <label htmlFor="indian-kyc-toggle" className="text-base font-medium">
+                Default Indian KYC (Aadhaar & PAN)
+              </label>
+              <p className="text-sm text-muted-foreground">
+                {enableDefaultIndianKyc ? "Enabled: Aadhaar and PAN documents are required during provider registration." : "Disabled: Aadhaar and PAN are hidden. Registration will only require documents configured in the Document Types tab."}
+              </p>
+            </div>
+            <Switch
+              id="indian-kyc-toggle"
+              checked={enableDefaultIndianKyc}
+              onCheckedChange={(checked) => setEnableDefaultIndianKyc(checked)}
+              disabled={isSaving}
+              aria-label="Toggle default Indian KYC"
             />
           </div>
         </div>

@@ -383,7 +383,7 @@ export default function ProviderRegistrationPage() {
       case 0: return <Step0AuthPrompt redirectUrl="/provider-registration" />;
       case 1: return <Step1CategorySkills onNext={handleNextStep} initialData={applicationData} controlOptions={controlOptions} isSaving={isSavingStep} />;
       case 2: return <Step2PersonalInfo onNext={handleNextStep} onPrevious={handlePreviousStep} initialData={applicationData} controlOptions={controlOptions} isSaving={isSavingStep} userUid={editingApplicationIdForAdmin || user?.uid || ""} />;
-      case 3: return <Step3KycDocuments onNext={handleNextStep} onPrevious={handlePreviousStep} initialData={applicationData} controlOptions={controlOptions} isSaving={isSavingStep} userUid={editingApplicationIdForAdmin || user?.uid || ""} />;
+      case 3: return <Step3KycDocuments onNext={handleNextStep} onPrevious={handlePreviousStep} initialData={applicationData} controlOptions={controlOptions} isSaving={isSavingStep} userUid={editingApplicationIdForAdmin || user?.uid || ""} enableDefaultIndianKyc={appConfig?.enableDefaultIndianKyc === undefined ? true : appConfig.enableDefaultIndianKyc} />;
       case 4: return <Step4LocationBank onSubmit={handleFinalSubmitApplication} onPrevious={handlePreviousStep} initialData={applicationData} controlOptions={controlOptions} isSaving={isSavingStep} userUid={editingApplicationIdForAdmin || user?.uid || ""} />;
       case 5: return <RegistrationCompleted isAdminEdit={isEditModeByAdmin} />;
       default: return <Card><CardContent className="pt-6">Loading step...</CardContent></Card>;

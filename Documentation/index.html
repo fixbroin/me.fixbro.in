@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WeCanFix Documentation - Next.js on-Demand Home Services Booking Script</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #45A0A2;
+      --primary-hover: #378082;
+      --primary-light: #F0F8FA;
+      --bg: #F8FAFC;
+      --surface: #FFFFFF;
+      --text: #1E293B;
+      --text-muted: #64748B;
+      --border: #E2E8F0;
+      --code-bg: #1E1E2E;
+      --code-text: #F8F8F2;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --info: #3B82F6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 300px;
+      background-color: #0F172A;
+      color: #F8FAFC;
+      height: 100vh;
+      position: fixed;
+      left: 0;
+      top: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #1E293B;
+      z-index: 100;
+    }
+
+    .sidebar-header {
+      padding: 24px;
+      border-bottom: 1px solid #1E293B;
+    }
+
+    .sidebar-logo {
+      font-size: 22px;
+      font-weight: 700;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sidebar-logo span {
+      color: var(--primary);
+    }
+
+    .sidebar-logo-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .sidebar-search {
+      padding: 16px 24px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+      background-color: #1E293B;
+      color: #F8FAFC;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+    }
+
+    .sidebar-menu {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px 24px;
+    }
+
+    .menu-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin: 16px 8px 8px;
+    }
+
+    .menu-list {
+      list-style: none;
+    }
+
+    .menu-item a {
+      display: block;
+      padding: 8px 12px;
+      color: #94A3B8;
+      text-decoration: none;
+      font-size: 14px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .menu-item a:hover {
+      color: #FFFFFF;
+      background-color: #1E293B;
+    }
+
+    .menu-item.active a {
+      color: #FFFFFF;
+      background-color: var(--primary);
+      font-weight: 500;
+    }
+
+    /* Main Content */
+    .main-container {
+      margin-left: 300px;
+      flex: 1;
+      min-width: 0; /* Prevents flex items from overflowing */
+      padding: 48px 64px;
+      max-width: 1200px;
+    }
+
+    header.main-header {
+      margin-bottom: 48px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
+    }
+
+    .main-header h1 {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+      color: #0F172A;
+    }
+
+    .main-header p {
+      font-size: 16px;
+      color: var(--text-muted);
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-cols: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .meta-card {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      padding: 16px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    .meta-card strong {
+      display: block;
+      color: #0F172A;
+      margin-bottom: 4px;
+    }
+
+    /* Sections */
+    section {
+      margin-bottom: 56px;
+      scroll-margin-top: 24px; /* Gives space when linked */
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 20px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--primary-light);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1E293B;
+      margin: 24px 0 12px;
+    }
+
+    p {
+      margin-bottom: 16px;
+      color: #334155;
+    }
+
+    /* Lists */
+    ul, ol {
+      margin-bottom: 20px;
+      padding-left: 24px;
+      color: #334155;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    /* Code Blocks */
+    pre {
+      background-color: var(--code-bg);
+      color: var(--code-text);
+      padding: 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: 'Fira Code', monospace;
+      font-size: 13.5px;
+      margin-bottom: 20px;
+      border: 1px solid #2A2A3D;
+      position: relative;
+    }
+
+    code {
+      font-family: 'Fira Code', monospace;
+      background-color: #E2E8F0;
+      color: #0F172A;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    pre code {
+      background-color: transparent;
+      color: inherit;
+      padding: 0;
+      border-radius: 0;
+    }
+
+    /* Buttons */
+    .btn-copy {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      background-color: #2D2D3F;
+      border: 1px solid #44445A;
+      color: #A0A0B8;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+
+    .btn-copy:hover {
+      background-color: var(--primary);
+      color: #FFFFFF;
+      border-color: var(--primary);
+    }
+
+    /* Alerts */
+    .alert {
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      border-left: 4px solid;
+      font-size: 14.5px;
+    }
+
+    .alert-note {
+      background-color: #EFF6FF;
+      border-color: var(--info);
+      color: #1E3A8A;
+    }
+
+    .alert-tip {
+      background-color: #ECFDF5;
+      border-color: var(--success);
+      color: #065F46;
+    }
+
+    .alert-warning {
+      background-color: #FFFBEB;
+      border-color: var(--warning);
+      color: #92400E;
+    }
+
+    .alert-danger {
+      background-color: #FEF2F2;
+      border-color: var(--danger);
+      color: #991B1B;
+    }
+
+    .alert-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 12px 16px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #F1F5F9;
+      font-weight: 600;
+      color: #0F172A;
+    }
+
+    tr:nth-child(even) {
+      background-color: #F8FAFC;
+    }
+
+    /* Steps */
+    .step-list {
+      list-style: none;
+      counter-reset: steps;
+      padding-left: 0;
+      margin-bottom: 24px;
+    }
+
+    .step-item {
+      position: relative;
+      padding-left: 48px;
+      margin-bottom: 24px;
+    }
+
+    .step-item::before {
+      counter-increment: steps;
+      content: counter(steps);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 32px;
+      height: 32px;
+      background-color: var(--primary);
+      color: #FFFFFF;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    /* Responsive */
+    @media (max-width: 992px) {
+      .sidebar {
+        display: none;
+      }
+      .main-container {
+        margin-left: 0;
+        padding: 32px 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">WeCanFix<span>.</span></div>
+      <div class="sidebar-logo-sub">Documentation</div>
+    </div>
+    
+    <div class="sidebar-search">
+      <input type="text" class="search-input" id="searchMenu" placeholder="Search sections..." onkeyup="filterMenu()">
+    </div>
+
+    <nav class="sidebar-menu">
+      <div class="menu-section-title">Getting Started</div>
+      <ul class="menu-list" id="menuGroup1">
+        <li class="menu-item active"><a href="#intro">1. Introduction</a></li>
+        <li class="menu-item"><a href="#requirements">2. System Requirements</a></li>
+        <li class="menu-item"><a href="#local-setup">3. Local Installation</a></li>
+      </ul>
+
+      <div class="menu-section-title">Configuration</div>
+      <ul class="menu-list" id="menuGroup2">
+        <li class="menu-item"><a href="#env-vars">4. Environment Variables</a></li>
+        <li class="menu-item"><a href="#mysql-db">5. MySQL Database Setup</a></li>
+        <li class="menu-item"><a href="#firebase-setup">6. Firebase Credentials</a></li>
+      </ul>
+
+      <div class="menu-section-title">Deployment</div>
+      <ul class="menu-list" id="menuGroup3">
+        <li class="menu-item"><a href="#vps-setup">7. VPS & PM2 Setup</a></li>
+        <li class="menu-item"><a href="#local-build-setup">8. Local Standalone Build (Optional)</a></li>
+        <li class="menu-item"><a href="#shared-hosting">9. Remote Database Setup (Optional)</a></li>
+        <li class="menu-item"><a href="#cron-jobs">10. Cron Jobs Setup</a></li>
+      </ul>
+
+      <div class="menu-section-title">Integration & Terms</div>
+      <ul class="menu-list" id="menuGroup4">
+        <li class="menu-item"><a href="#admin-gateways">11. Payments & Settings</a></li>
+        <li class="menu-item"><a href="#remote-media">12. Remote Media Storage</a></li>
+        <li class="menu-item"><a href="#branding">13. Custom Branding Setup</a></li>
+        <li class="menu-item"><a href="#disclaimers">14. Cost Disclaimers</a></li>
+        <li class="menu-item"><a href="#support">15. FAQ & Support</a></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- Main Content Container -->
+  <main class="main-container">
+    <header class="main-header">
+      <h1>WeCanFix Documentation</h1>
+      <p>Next.js on-Demand Home Services Booking System with MySQL & Firebase Auth</p>
+      
+      <div class="meta-grid">
+        <div class="meta-card">
+          <strong>Latest Version</strong>
+          v1.0.0
+        </div>
+        <div class="meta-card">
+          <strong>Framework & Stack</strong>
+          Next.js (App Router), Tailwind CSS, MySQL, Firebase
+        </div>
+        <div class="meta-card">
+          <strong>Author</strong>
+          fixbro
+        </div>
+      </div>
+    </header>
+
+    <!-- SECTION 1: INTRODUCTION -->
+    <section id="intro">
+      <h2>1. Introduction</h2>
+      <p><strong>WeCanFix</strong> is a premium, mobile-first responsive script designed for service-based agencies, booking centers, or individual handyman businesses. Developed using Next.js App Router and optimized for Hostinger (MySQL Databases & VPS deployment), it provides a seamless booking experience for customers and a complete control panel for administrators.</p>
+      
+      <h3>Key Features:</h3>
+      <ul>
+        <li><strong>Interactive Landing Page:</strong> Slideshows, testimonials, and category grids.</li>
+        <li><strong>Dynamic Category & Services Page:</strong> Hierarchical classification of subcategories and listings.</li>
+        <li><strong>Seamless Cart Flow:</strong> Instant price calculations, platforms fees, and custom visiting fees.</li>
+        <li><strong>Autopicked Booking Slots:</strong> Custom calendar date & time selection.</li>
+        <li><strong>GPS Address Detection:</strong> Integrated map search or HTML5 geolocation auto-detect.</li>
+        <li><strong>Multi-Currency Settings:</strong> Select any country's currency in the admin settings; the application automatically updates symbols, codes, and correct mathematical decimal units.</li>
+        <li><strong>Razorpay Integration:</strong> Seamless client-side checkout and secure server-side signature verification.</li>
+        <li><strong>SEO Generator Module:</strong> Bulk landing page generator for dynamic area-based service pages.</li>
+        <li><strong>REST API Backend Architecture:</strong> Next.js Route Handlers function as standard REST API endpoints (located in <code>src/app/api/*</code>). This allows developers to easily extend the codebase, build and connect mobile apps (e.g. Flutter or React Native), or integrate with third-party software.</li>
+        <li><strong>Database & Images Management Tools:</strong> One-click download of database snapshots (.json) and uploaded media zip archives (.zip) directly through the admin interface, with full one-click restorations and Next.js fetch-cache cleaners.</li>
+      </ul>
+    </section>
+
+    <!-- SECTION 2: SYSTEM REQUIREMENTS -->
+    <section id="requirements">
+      <h2>2. System Requirements</h2>
+      <p>To run this application locally or in production, your system must meet the following prerequisites:</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Software Component</th>
+            <th>Required Version / Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Node.js</strong></td>
+            <td>v18.x or v20.x LTS (Recommended)</td>
+          </tr>
+          <tr>
+            <td><strong>NPM / Npx</strong></td>
+            <td>v9.x or higher</td>
+          </tr>
+          <tr>
+            <td><strong>MySQL Server</strong></td>
+            <td>v8.0 or higher (supports JSON columns)</td>
+          </tr>
+          <tr>
+            <td><strong>Hosting Platform</strong></td>
+            <td>VPS (Hostinger/AWS Ubuntu 20.04/22.04 LTS) OR Hostinger Premium Shared Hosting with MySQL Node access</td>
+          </tr>
+          <tr>
+            <td><strong>Firebase API Project</strong></td>
+            <td>Active Google Firebase Project (Free spark plan is enough to start)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- SECTION 3: LOCAL INSTALLATION -->
+    <section id="local-setup">
+      <h2>3. Local Installation & Development Flow</h2>
+      <p>Follow these structured steps to set up and run the application in your local development environment:</p>
+      
+      <ol class="step-list">
+        <li class="step-item">
+          <strong>Extract and Open:</strong>
+          <p>Unzip the downloaded CodeCanyon package and open the folder in your code editor (recommended: <strong>Visual Studio Code</strong>).</p>
+        </li>
+        <li class="step-item">
+          <strong>Ensure Local Database is Running (e.g., XAMPP):</strong>
+          <p>You must have a MySQL server running locally to test database integrations. If using <strong>XAMPP Control Panel</strong>, ensure the <strong>MySQL</strong> module is started and running on port 3306. Create a blank database schema (e.g. <code>wecanfix_db</code>) using phpMyAdmin or any MySQL tool.</p>
+        </li>
+        <li class="step-item">
+          <strong>Configure Environment File:</strong>
+          <p>Copy the file named <code>.env.example</code>, rename it to <code>.env</code> in the project root directory, and fill in your database and third-party configuration keys:</p>
+          <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>cp .env.example .env</code></pre>
+        </li>
+        <li class="step-item">
+          <strong>Configure Administrator Email:</strong>
+          <p>Open the file <a href="../src/contexts/AuthContext.tsx"><code>src/contexts/AuthContext.tsx</code></a> in your editor. Find line 36 where the admin email is defined:</p>
+          <pre><code>export const ADMIN_EMAIL = "admin@yourdomain.com";</code></pre>
+          <p>Change <code>"admin@yourdomain.com"</code> to your preferred administrator email. When you register/sign up on the website's frontend with this exact email address, the system will automatically authorize and create your profile with full Super Admin privileges.</p>
+        </li>
+        <li class="step-item">
+          <strong>Install Dependencies:</strong>
+          <p>Open the VS Code integrated terminal and run the install command to configure dependencies:</p>
+          <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>npm install</code></pre>
+        </li>
+        <li class="step-item">
+          <strong>Update Branding and Domains (Search-and-Replace):</strong>
+          <p>Use VS Code's global search (<code>Ctrl + Shift + F</code>) to customize hardcoded references:</p>
+          <ul>
+            <li>Search for <strong><code>wecanfix</code></strong> and replace it with your custom brand name (e.g. <code>yourbrand</code>).</li>
+            <li>Search for <strong><code>wecanfix.in</code></strong> and replace it with your own website domain name (e.g. <code>yourdomain.com</code>).</li>
+          </ul>
+        </li>
+        <li class="step-item">
+          <strong>Configure PWA Manifests & Brand Logo Images:</strong>
+          <p>The application runs as a Progressive Web App (PWA). You must customize the manifest files and brand logos inside the <code>public/</code> folder:</p>
+          <ol style="margin-top: 5px; margin-bottom: 5px;">
+            <li>Ensure the metadata parameters (name, short_name, and description) inside <code>public/manifest.json</code>, <code>public/manifest-admin.json</code>, and <code>public/manifest-provider.json</code> reflect your brand. (Performing Step 5 handles most updates, but verify the files).</li>
+            <li>Navigate to the online favicon utility: <a href="https://usebro.in/tools/favicon-generator" target="_blank"><strong>Favicon & PWA Icon Generator</strong></a>.</li>
+            <li>Upload your primary high-resolution business logo. The system automatically creates all favicons and PWA-required icon resolutions.</li>
+            <li>Download the generated icon zip archive, extract it, and copy/overwrite all files directly into the project's <strong><code>public/</code></strong> folder (replacing standard favicons, <code>apple-touch-icon.png</code>, and chrome images).</li>
+          </ol>
+        </li>
+        <li class="step-item">
+          <strong>Launch Development Server:</strong>
+          <p>Run the development server script. On first startup, the database compiler will automatically populate all system tables in your local database:</p>
+          <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>npm run dev</code></pre>
+          <p>The website will be accessible locally at <code>http://localhost:3006</code>. Open the website, log into the admin dashboard, and verify everything works.</p>
+        </li>
+        <li class="step-item">
+          <strong>Production Compilation:</strong>
+          <p>Once you verify that everything is working locally, build the production bundle before deploying to VPS or standalone hosting:</p>
+          <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>npm run build</code></pre>
+        </li>
+      </ol>
+    </section>
+
+    <!-- SECTION 4: ENVIRONMENT VARIABLES -->
+    <section id="env-vars">
+      <h2>4. Environment Variables Guide</h2>
+      <p>Configure these keys inside your <code>.env</code> file. These variables control database connectivity, external auth APIs, payment processing, and cron security tokens.</p>
+      
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code># GEMINI API Key
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# MySQL Database Configuration
+MYSQL_HOST=your_mysql_host_here
+MYSQL_USER=your_mysql_user_here
+MYSQL_PASSWORD=your_mysql_password_here
+MYSQL_DATABASE=your_mysql_database_name_here
+MYSQL_PORT=3306
+
+# Firebase Client configuration keys
+NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key_here
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project_id.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_firebase_app_id
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_firebase_measurement_id
+
+# Base URL for dynamic paths/sitemaps
+NEXT_PUBLIC_BASE_URL=https://yourdomain.com
+PORT=3006
+
+# Google Maps API Key (Optional)
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY="your_google_maps_api_key_here"
+
+# WhatsApp Webhook Verification Token (For dynamic messaging integrations)
+WHATSAPP_VERIFY_TOKEN=your_whatsapp_verify_token_here
+CRON_SECRET=your_cron_secret_here
+WHATSAPP_TOKEN=your_whatsapp_access_token_here
+WHATSAPP_PHONE_NUMBER_ID=your_whatsapp_phone_number_id_here
+
+# Firebase Service Account Credentials JSON (Single Line String)
+FIREBASE_ADMIN_SDK_CONFIG='{"type": "service_account", "project_id": "your_project_id", "private_key": "-----BEGIN PRIVATE KEY-----\nyour_private_key_lines_here\n-----END PRIVATE KEY-----\n", "client_email": "your_client_email", "client_id": "your_client_id", "auth_uri": "https://accounts.google.com/o/oauth2/auth", "token_uri": "https://oauth2.googleapis.com/token", "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs", "client_x509_cert_url": "your_client_x509_cert_url", "universe_domain": "googleapis.com"}'</code></pre>
+    </section>
+
+    <!-- SECTION 5: MYSQL DATABASE SETUP -->
+    <section id="mysql-db">
+      <h2>5. MySQL Database Setup</h2>
+      <p>WeCanFix utilizes a modern JSON-document hybrid schema over MySQL. This means you get the reliability of relational databases while preserving document-level query flexibility.</p>
+      
+      <div class="alert alert-tip">
+        <div class="alert-title">💡 DB Migration Autoloading</div>
+        You do <strong>not</strong> need to manually import any database tables or SQL scripts. When the project starts up via <code>npm run dev</code> or <code>npm run build</code>, a script called <code>scripts/db-init.js</code> automatically runs, queries your schema configurations, and constructs any missing tables.
+      </div>
+
+      <h3>Manual Database Setup Instructions:</h3>
+      <ol>
+        <li>Create a schema in your database client (like Hostinger phpMyAdmin or MySQL Workbench):
+          <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>CREATE DATABASE your_database_name CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;</code></pre>
+        </li>
+        <li>Update your <code>.env</code> file with the correct <code>MYSQL_HOST</code>, <code>MYSQL_USER</code>, <code>MYSQL_PASSWORD</code>, and <code>MYSQL_DATABASE</code>.</li>
+        <li>Start the server. The tables (like <code>bookings</code>, <code>webSettings</code>, <code>adminServices</code>, and others) are generated on-the-fly.</li>
+      </ol>
+    </section>
+
+    <!-- SECTION 6: FIREBASE CREDENTIALS -->
+    <section id="firebase-setup">
+      <h2>6. Firebase Integration Guide</h2>
+      <p>Firebase handles two key areas of the app: **Authentication** (including Phone/OTP sign-in, Email, and Google accounts) and **Media File Upload Storage**.</p>
+      
+      <h3>Step 1: Setup a new Firebase Project</h3>
+      <ol>
+        <li>Go to the <a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a> and click <strong>Create Project</strong>.</li>
+        <li>Add a web app to your project under Project Settings to generate the config keys (API key, Auth Domain, Project ID, App ID, etc.).</li>
+        <li>Copy these values into your client-side environment variables (e.g. <code>NEXT_PUBLIC_FIREBASE_API_KEY</code>).</li>
+      </ol>
+
+      <h3>Step 2: Enable Authentication Methods</h3>
+      <p>In the Firebase Console sidebar, go to <strong>Build -> Authentication</strong>, enable it, and configure the following sign-in providers:</p>
+      <ul>
+        <li><strong>Email/Password:</strong> Toggle enabled.</li>
+        <li><strong>Google Account:</strong> Toggle enabled.</li>
+        <li><strong>Phone Number (OTP Verification):</strong> Toggle enabled. Ensure you whitelist your testing numbers.</li>
+      </ul>
+
+      <h3>Step 3: Setup Google Cloud Storage Bucket</h3>
+      <p>Go to <strong>Build -> Storage</strong> and click Get Started. Set the rules to allow public read/write or edit access for your media files upload route.</p>
+
+      <h3>Step 4: Generate Firebase Service Account JSON (Admin SDK)</h3>
+      <p>To securely access user records and write authentication middleware on the server side, you need an Admin SDK credential:</p>
+      <ol>
+        <li>Go to <strong>Project Settings (gear icon) -> Service accounts</strong>.</li>
+        <li>Click <strong>Generate new private key</strong>. This will download a JSON file containing sensitive credentials.</li>
+        <li>Open the JSON file, copy the entire string, and assign it to <code>FIREBASE_ADMIN_SDK_CONFIG</code> inside your <code>.env</code> file:
+          <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>FIREBASE_ADMIN_SDK_CONFIG='{"type": "service_account", "project_id": "your_project_id", "private_key": "-----BEGIN PRIVATE KEY-----\nyour_private_key_lines_here\n-----END PRIVATE KEY-----\n", ...}'</code></pre>
+        </li>
+      </ol>
+
+      <h3>Step 5: Configure Firebase in Admin Panel (Required for Chats & Notifications)</h3>
+      <p>Real-time chat and Firebase web push notifications require the credentials to be configured inside the Admin Panel settings:</p>
+      <ol>
+        <li>Log into your Admin dashboard and navigate to <strong>Marketing IDs</strong> in the sidebar.</li>
+        <li>Select the <strong>Firebase</strong> tab.</li>
+        <li>Provide the following configurations:
+          <ul>
+            <li><strong>Firebase Public VAPID Key:</strong> Paste your Web Push Key (generate this in Firebase Console under <strong>Project Settings -> Cloud Messaging -> Web Push certificates</strong>).</li>
+            <li><strong>Full Client Config:</strong> Enter your Firebase client config parameters (API Key, Auth Domain, Project ID, Storage Bucket, Messaging Sender ID, App ID, Measurement ID).</li>
+            <li><strong>Admin SDK JSON:</strong> Paste the full stringified content of the service account private key JSON file generated in Step 4.</li>
+          </ul>
+        </li>
+        <li>Click <strong>Save All Marketing Settings</strong>. This ensures real-time updates and push messaging work seamlessly across user chat modules.</li>
+      </ol>
+    </section>
+
+    <!-- SECTION 7: VPS & PM2 DEPLOYMENT -->
+    <section id="vps-setup">
+      <h2>7. VPS & PM2 Setup & Production Deployment</h2>
+      <p>This section provides comprehensive, step-by-step instructions to configure **MySQL Server**, **Node.js**, **Nginx Reverse Proxy**, **SSL Certificates**, and **PM2 Process Manager** on an Ubuntu/Debian VPS (such as Hostinger VPS, AWS, or DigitalOcean) to host your application under your domain name.</p>
+      
+      <p>You can also reference the standalone markdown guide in this folder: <a href="./VPS_SETUP_GUIDE.md"><code>VPS_SETUP_GUIDE.md</code></a>.</p>
+
+      <h3>Step 1: Connect to VPS & Install Dependencies</h3>
+      <p>Connect to your server via SSH as <code>root</code> or a sudo user:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>ssh root@your_vps_ip_address</code></pre>
+      
+      <p>Update system packages and install Node.js 20 LTS, Nginx, Git, Unzip, and build compilers:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>sudo apt update && sudo apt upgrade -y
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs nginx git build-essential unzip</code></pre>
+      
+      <p>Install **PM2 globally** to manage your server background processes:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>sudo npm install -g pm2</code></pre>
+
+      <h3>Step 2: Install & Secure MySQL Server</h3>
+      <p>Install and enable the MySQL database service:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>sudo apt install -y mysql-server
+sudo systemctl start mysql
+sudo systemctl enable mysql</code></pre>
+      
+      <p>Run the security initialization utility (optional but recommended):</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>sudo mysql_secure_installation</code></pre>
+
+      <h3>Step 3: Create MySQL Database & User</h3>
+      <p>Log into the MySQL command line interface:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>sudo mysql</code></pre>
+      
+      <p>Run these SQL statements to configure your clean database schema and user credentials:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>CREATE DATABASE your_database_name CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'your_database_user'@'localhost' IDENTIFIED BY 'SuperStrongPassword123!';
+GRANT ALL PRIVILEGES ON your_database_name.* TO 'your_database_user'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;</code></pre>
+
+      <h3>Step 4: Upload and Build Next.js Application</h3>
+      <p>Deploy the application files to the <code>/var/www/</code> directory on your VPS using either Option A or Option B:</p>
+      <ul>
+        <li><strong>Option A (Git):</strong> Push your customized code to a private Git repository and clone it:
+          <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>cd /var/www
+git clone &lt;YOUR_GIT_REPOSITORY_URL&gt; your-app-directory
+cd your-app-directory</code></pre>
+        </li>
+        <li><strong>Option B (SFTP/Zip):</strong> Zip the project folder (excluding <code>node_modules</code> and <code>.next</code>), upload it via FileZilla/Cyberduck to <code>/var/www/</code>, and extract it:
+          <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>cd /var/www
+unzip your-package.zip -d your-app-directory
+cd your-app-directory</code></pre>
+        </li>
+      </ul>
+
+      <p>Create a production environment configuration file <code>.env</code>:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>nano .env</code></pre>
+      <p>Paste your environment keys (replicating your local configurations but specifying production values), save, and exit. Then install dependencies and compile the production build:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>npm install
+npm run build</code></pre>
+
+      <h3>Step 5: Start Application with PM2</h3>
+      <p>Start the production Next.js backend standalone server using PM2 to keep it running 24/7:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>pm2 start .next/standalone/server.js --name "your-app-name"
+pm2 save
+pm2 startup</code></pre>
+      <p><em>(Copy and run the system command printed by <code>pm2 startup</code> to enable auto-boot on VPS restarts).</em></p>
+
+      <h3>Step 6: Configure Nginx Reverse Proxy & SSL</h3>
+      <p>Create a new site configuration file under Nginx:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>sudo nano /etc/nginx/sites-available/your-app-name</code></pre>
+      
+      <p>Paste this initial HTTP block to forward domain requests to Next.js running on port 3006:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+    client_max_body_size 500M;
+
+    location / {
+        proxy_pass http://127.0.0.1:3006;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}</code></pre>
+
+      <p>Save and close the file. Then, enable the config and restart Nginx:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>sudo ln -s /etc/nginx/sites-available/your-app-name /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx</code></pre>
+
+      <p>Request and automatically configure a Let's Encrypt SSL certificate for HTTPS:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com</code></pre>
+      <p><em>(Follow the prompts and select option to redirect HTTP traffic to HTTPS).</em></p>
+
+      <h4>Hardening Caches & Anti-Cloning Security (Highly Recommended)</h4>
+      <p>Once Certbot configures SSL, open the Nginx config file again to append caching headers for static assets and framing protections to prevent cloning and clickjacking attacks:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>sudo nano /etc/nginx/sites-available/your-app-name</code></pre>
+      
+      <p>Replace the configuration with this secure production-grade Nginx structure:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code># Redirect HTTP → HTTPS (Automated by Certbot)
+server {
+    listen 80;
+    server_name yourdomain.com www.yourdomain.com;
+    return 301 https://yourdomain.com$request_uri;
+}
+
+# Main HTTPS server
+server {
+    listen 443 ssl http2;
+    server_name yourdomain.com www.yourdomain.com;
+
+    # Allow large database backups and image ZIP uploads up to 500MB
+    client_max_body_size 500M;
+
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Security headers (Prevents clickjacking and site framing/cloning)
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Content-Security-Policy "frame-ancestors 'self'" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Static files cache (Optimizes browser asset loading speed)
+    location ~* \.(jpg|jpeg|png|gif|webp|svg|ico|css|js|woff|woff2|ttf)$ {
+        expires 30d;
+        access_log off;
+        add_header Cache-Control "public, max-age=2592000, immutable";
+
+        proxy_pass http://127.0.0.1:3006;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Next.js static framework assets
+    location /_next/static/ {
+        expires 365d;
+        access_log off;
+        add_header Cache-Control "public, immutable";
+
+        proxy_pass http://127.0.0.1:3006;
+        proxy_set_header Host $host;
+    }
+
+    # Main Next.js App Reverse Proxy with WebSocket support
+    location / {
+        proxy_pass http://127.0.0.1:3006;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}</code></pre>
+      <p>Save and restart Nginx once more:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>sudo nginx -t && sudo systemctl restart nginx</code></pre>
+
+      <h3>Step 7: Post-Deployment Verification</h3>
+      <p>Verify that your Node app process and MySQL database are running without issues:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>pm2 status
+pm2 logs your-app-name
+sudo systemctl status mysql</code></pre>
+    </section>
+
+    <!-- SECTION 8: LOCAL STANDALONE BUILD DEPLOYMENT (OPTIONAL) -->
+    <section id="local-build-setup">
+      <h2>8. Local Standalone Build Deployment (Optional - For Low-RAM VPS)</h2>
+      <p>If your VPS has 1GB of RAM or less, running <code>npm run build</code> on the server may freeze or crash because compiling Next.js requires high memory. You can compile the project on your local machine and upload only the production build files.</p>
+      
+      <p>Your project includes a custom compiler script (<code>scripts/postbuild.js</code>) that automatically bundles all essential public assets and static files into the <code>.next/standalone/</code> folder during building.</p>
+
+      <h3>Step-by-step Local Build Setup:</h3>
+      <ol>
+        <li>On your local machine, open the project in VS Code.</li>
+        <li>Configure your production environment credentials inside your local <code>.env</code> file.</li>
+        <li>Run the build command locally:
+          <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>npm run build</code></pre>
+        </li>
+        <li>The postbuild script will automatically package and copy your <code>public/</code> and <code>.next/static/</code> folders inside the <code>.next/standalone/</code> folder.</li>
+        <li>Compress the <strong>contents</strong> of the <code>.next/standalone/</code> folder along with your production <code>.env</code> file into a ZIP archive (e.g. <code>standalone.zip</code>).</li>
+        <li>Upload <code>standalone.zip</code> using an SFTP client (like FileZilla or Cyberduck) directly to your VPS directory (e.g. <code>/var/www/your-app-directory</code>).</li>
+        <li>SSH into your VPS, navigate to the folder, and extract the archive:
+          <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>cd /var/www/your-app-directory
+unzip standalone.zip</code></pre>
+        </li>
+        <li>Start your application directly with PM2 (without running npm install or npm run build on the VPS):
+          <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>pm2 start server.js --name "your-app-name"
+pm2 save
+pm2 startup</code></pre>
+        </li>
+      </ol>
+    </section>
+
+    <!-- SECTION 9: REMOTE DATABASE SETUP (OPTIONAL) -->
+    <section id="shared-hosting">
+      <h2>9. Remote Database Setup (Optional Shared Hosting DB)</h2>
+      <p>If you prefer to host your Next.js application on a VPS but wish to keep your MySQL database on a separate Shared Hosting server (like Hostinger, cPanel, or hPanel) for extra safety, backups, or database management, you can configure a remote database connection.</p>
+      
+      <p>Please refer to the detailed guide file: <a href="./SHARED_HOSTING_DATABASE_SETUP_GUIDE.md"><code>SHARED_HOSTING_DATABASE_SETUP_GUIDE.md</code></a> inside this <code>Documentation</code> directory.</p>
+      
+      <h3>Summary of Remote Database Setup:</h3>
+      <ol>
+        <li>Create a MySQL database and user inside your Shared Hosting dashboard (hPanel/cPanel).</li>
+        <li>Enable <strong>Remote MySQL</strong> access for the newly created database, setting IP to <code>%</code> (Any Host) or your VPS IP.</li>
+        <li>Update your Next.js project <code>.env</code> file with the remote host address (e.g. <code>mysql.yourdomain.com</code>) instead of <code>localhost</code>:
+          <pre><code>MYSQL_HOST=mysql.yourdomain.com
+MYSQL_USER=your_database_user
+MYSQL_PASSWORD=your_database_password
+MYSQL_DATABASE=your_database_name
+MYSQL_PORT=3306</code></pre>
+        </li>
+        <li>Start the server. The tables will initialize automatically on first connect.</li>
+      </ol>
+    </section>
+
+    <!-- SECTION 10: CRON JOBS SETUP -->
+    <section id="cron-jobs">
+      <h2>10. Cron Jobs Setup</h2>
+      <p>WeCanFix uses automated backend triggers for SEO generation (Google Indexing API) and marketing tasks.</p>
+      
+      <h3>Active Cron Endpoints:</h3>
+      <ul>
+        <li><strong>Google Indexing Cron:</strong> Daily URL compiler. Runs at 1 AM.
+          <pre><code>https://yourdomain.com/api/indexing-cron?secret=your_cron_secret_here</code></pre>
+          <div class="alert alert-important" style="margin-top: 10px; padding: 10px 15px;">
+            <strong>⚠️ Google API Library Requirement:</strong><br>
+            You must enable the <strong>Web Search Indexing API</strong> in your Google Cloud Console for the indexing cron to function:
+            <ol style="margin-top: 5px; margin-bottom: 5px;">
+              <li>Go to the <a href="https://console.cloud.google.com/apis/library" target="_blank">Google Cloud API Library</a>.</li>
+              <li>Select your Firebase/Google Cloud project.</li>
+              <li>Search for <strong>"Indexing API"</strong> (or "Web Search Indexing API") and click <strong>Enable</strong>.</li>
+              <li>Ensure the service account email is authorized as an <strong>Owner</strong> inside your Google Search Console property settings.</li>
+            </ol>
+          </div>
+        </li>
+        <li><strong>Marketing Automation Cron:</strong> Handles abandoned carts and booking triggers. Runs every 2 hours.
+          <pre><code>https://yourdomain.com/api/marketing-cron?secret=your_cron_secret_here</code></pre>
+        </li>
+      </ul>
+
+      <h3>Adding Cron Jobs on VPS:</h3>
+      <p>Open crontab: <code>crontab -e</code>. Append these rules to the bottom:</p>
+      <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>0 1 * * * curl -s "https://yourdomain.com/api/indexing-cron?secret=your_cron_secret_here" >/dev/null 2>&1
+0 */2 * * * curl -s "https://yourdomain.com/api/marketing-cron?secret=your_cron_secret_here" >/dev/null 2>&1</code></pre>
+    </section>
+
+    <!-- SECTION 11: PAYMENTS & SETTINGS -->
+    <section id="admin-gateways">
+      <h2>11. Payments & Settings Integration</h2>
+      <p>You can configure currencies and payment options directly inside the **App Settings** section of the Admin Panel.</p>
+      
+      <h3>Setting up Currency & Timezone:</h3>
+      <ol>
+        <li>Log into your admin dashboard and navigate to <strong>App Settings</strong> in the sidebar menu.</li>
+        <li>On the <strong>General</strong> tab, select your <strong>Country Currency</strong>.</li>
+        <li>The system will automatically configure the correct <strong>Currency Symbol</strong> and standard <strong>Decimal Point</strong> precision. You can manually adjust them if needed.</li>
+        <li>Set your business's <strong>Application Timezone</strong> (e.g. <code>India (IST)</code>) on this same page.</li>
+        <li>Click <strong>Save General Settings</strong> at the bottom of the section.</li>
+      </ol>
+      
+      <h3>Setting up Razorpay:</h3>
+      <ol>
+        <li>Log into your admin dashboard and navigate to <strong>App Settings</strong> in the sidebar.</li>
+        <li>Click the <strong>Payment</strong> tab.</li>
+        <li>Toggle <strong>Enable Online Payments (Razorpay)</strong> to <code>ON</code>.</li>
+        <li>Enter your <strong>Razorpay Key ID</strong> and <strong>Razorpay Key Secret</strong> (test keys for testing, live keys for production).</li>
+        <li>Make sure to toggle <strong>Enable "Pay After Service"</strong> if you want to support Cash on Delivery (COD).</li>
+        <li>Click <strong>Save Payment Settings</strong>. The system automatically syncs these credentials dynamically.</li>
+      </ol>
+
+      <h3>Configuring Provider KYC Documents:</h3>
+      <p>The application has a built-in **Custom Document Maker** inside the Admin Panel. This allows you to request any type of identity verification document from providers during registration (e.g., Driver's License, Passport, National ID, SSN) based on your target country:</p>
+      <ol>
+        <li>Log into your admin dashboard and navigate to <strong>Provider Controls</strong> in the sidebar menu.</li>
+        <li>On the <strong>Document Types</strong> tab, click <strong>Add Document Type</strong> to create a new requirement.</li>
+        <li>Specify the label, description, whether it is mandatory, how many images are required (1 or 2), and any character validation rules for the document number.</li>
+      </ol>
+      
+      <div class="alert alert-tip" style="margin-top: 15px;">
+        <strong>💡 Enabling Indian KYC (Aadhaar & PAN):</strong><br>
+        If you want to require Aadhaar and PAN cards with built-in format validations (specifically for India):
+        <ol style="margin-top: 5px; margin-bottom: 5px;">
+          <li>Log into your admin dashboard and navigate to <strong>Provider Controls</strong> in the sidebar.</li>
+          <li>Select the <strong>Registration Settings</strong> tab.</li>
+          <li>Toggle the <strong>Default Indian KYC (Aadhaar & PAN)</strong> option to <code>ON</code> and click <strong>Save Settings</strong>.</li>
+        </ol>
+        If you are targeting international markets, you can turn this toggle <code>OFF</code>, and rely purely on the custom documents defined in the <strong>Document Types</strong> tab.
+      </div>
+
+      <h3>Setting up Marketing, Analytics & Microsoft Clarity:</h3>
+      <ol>
+        <li>Navigate to <strong>Marketing IDs</strong> in the sidebar menu under <strong>Homepage & Marketing</strong>.</li>
+        <li><strong>Google Integrations (Analytics & Tag Manager):</strong>
+          <ul>
+            <li>Select the <strong>Google</strong> tab.</li>
+            <li>Fill in your <strong>Google Tag Manager ID</strong> (e.g. <code>GTM-XXXXXXX</code>), <strong>Google Analytics 4 Measurement ID</strong> (e.g. <code>G-XXXXXXXXXX</code>), and <strong>Google Ads Conversion ID/Label</strong>.</li>
+          </ul>
+        </li>
+        <li><strong>Microsoft & Other Platforms:</strong>
+          <ul>
+            <li>Select the <strong>Other Platforms</strong> tab.</li>
+            <li>Fill in your <strong>Microsoft Clarity Project ID</strong> (e.g. <code>your_project_id_here</code>) to enable session recordings and heatmaps, or paste your Pinterest Tag ID / Bing Ads UET Tag ID.</li>
+          </ul>
+        </li>
+        <li>Click <strong>Save All Marketing Settings</strong> at the bottom of the page to apply.</li>
+      </ol>
+
+      <h3>Database & Images Backups (Highly Recommended):</h3>
+      <div class="alert alert-tip">
+        <div class="alert-title">💾 Backup Before Updates or Migrations</div>
+        <p>Before running updates, changing backend configurations, or migrating servers, it is highly recommended to download a full snapshot of your website data directly from the Admin Panel.</p>
+      </div>
+      <ol>
+        <li>Log into the admin dashboard and navigate to <strong>Database Tools</strong> in the sidebar.</li>
+        <li><strong>Database Snapshot:</strong> Under the <em>Database Export & Restore</em> tool, click <strong>Download Database Backup (.json)</strong>. This generates and downloads a structured JSON snapshot containing all system tables and configurations.</li>
+        <li><strong>Images Archive:</strong> Under the <em>Images Backup & Restore</em> tool, click <strong>Download Images Backup (.zip)</strong>. This compiles and downloads all files uploaded inside the <code>/public/uploads/</code> directory.</li>
+        <li><strong>Restore Data:</strong> To restore matching tables or files from a previous backup, select the downloaded <code>.json</code> or <code>.zip</code> file in the respective Restore slot and click <strong>Restore Database</strong> or <strong>Restore Images Archive</strong>.</li>
+        <li><strong>Cache Purging:</strong> Under the <em>Next.js Disk Cache Management</em> widget at the bottom of the page, click the red <strong>Clear Next.js Disk Cache</strong> button to remove expired pre-rendered pages and free up storage space on your VPS.</li>
+      </ol>
+    </section>
+
+    <!-- SECTION 12: REMOTE MEDIA STORAGE -->
+    <section id="remote-media">
+      <h2>12. Remote Media Storage Setup</h2>
+      <p>WeCanFix supports <strong>Dual Storage Drivers</strong>, allowing you to save VPS disk space and bandwidth by hosting images on a remote shared hosting server instead of your Next.js server.</p>
+      
+      <h3>Overview:</h3>
+      <ul>
+        <li><strong>Local VPS Storage (<code>local</code>):</strong> Stores images directly on your VPS SSD disk (<code>/public/uploads/</code>).</li>
+        <li><strong>Remote Shared Hosting Storage (<code>remote</code>):</strong> Uploads images to a Shared Hosting subdomain (e.g., <code>https://media.yourdomain.com</code>) using a secure PHP bridge.</li>
+      </ul>
+
+      <h3>Step 1: Set Up Shared Hosting Subdomain</h3>
+      <ol>
+        <li>Log into your <strong>Hostinger / Shared Hosting hPanel</strong>.</li>
+        <li>Go to <strong>Domains -> Subdomains</strong> and create a subdomain: e.g., <code>media</code>.</li>
+        <li>Ensure SSL (HTTPS) is active for the subdomain.</li>
+      </ol>
+
+      <h3>Step 2: Upload <code>upload.php</code> to Subdomain</h3>
+      <ol>
+        <li>Locate the file <a href="./SHARED_HOSTING_MEDIA_UPLOAD_SCRIPT.php"><code>SHARED_HOSTING_MEDIA_UPLOAD_SCRIPT.php</code></a> in the <code>Documentation</code> directory.</li>
+        <li>Rename it to <strong><code>upload.php</code></strong>.</li>
+        <li>Upload it to the root directory (<code>/public_html/</code>) of your new media subdomain.</li>
+        <li>Open it in a text editor and configure your custom API secret key:
+          <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>define('SECRET_KEY', 'your_custom_secret_key_here');
+define('MEDIA_BASE_URL', 'https://media.yourdomain.com');</code></pre>
+        </li>
+      </ol>
+
+      <h3>Step 3: Configure Admin Settings</h3>
+      <ol>
+        <li>Open your Admin Panel and click on <strong>Web Settings</strong> in the sidebar menu.</li>
+        <li>Click the <strong>Media Storage</strong> tab.</li>
+        <li>Select <strong>Remote Shared Hosting Server</strong> (it will show as Active when saved).</li>
+        <li>Fill out the configuration fields:
+          <ul>
+            <li><strong>Remote Upload Script URL:</strong> <code>https://media.yourdomain.com/upload.php</code></li>
+            <li><strong>Security Secret Key:</strong> <code>your_custom_secret_key_here</code> (must match the key configured inside <code>upload.php</code>)</li>
+          </ul>
+        </li>
+        <li>Click <strong>Save Storage Settings</strong> at the bottom of the section. The system will now route image upload operations to the subdomain.</li>
+      </ol>
+
+      <h3>Step 4: Whitelist Domains in <code>next.config.ts</code> (Required)</h3>
+      <div class="alert alert-important">
+        <div class="alert-title">⚠️ Required for Next.js Image Loading</div>
+        <p>Next.js requires all external image domains/subdomains to be whitelisted for safety and dynamic optimization. If your website domain or remote media subdomain is not listed in your config, images will fail to render with an <em>"Invalid src prop"</em> error.</p>
+        <p>Before building the app, open <strong><code>next.config.ts</code></strong> in the project root, locate the <strong><code>remotePatterns</code></strong> array, and add your domain rules:</p>
+        <pre><button class="btn-copy" onclick="copyCode(this)">Copy</button><code>remotePatterns: [
+  { protocol: 'https', hostname: 'yourdomain.com' },
+  { protocol: 'https', hostname: '*.yourdomain.com' }, // Whitelists your subdomains (e.g. media.yourdomain.com)
+  { protocol: 'https', hostname: 'firebasestorage.googleapis.com' },
+  // ... keep other default patterns ...
+]</code></pre>
+        <p>After saving, rebuild and restart the app: <code>npm run build</code> and <code>pm2 restart your-app-name</code>.</p>
+      </div>
+    </section>
+
+    <!-- SECTION 13: CUSTOM BRANDING & SEARCH-AND-REPLACE -->
+    <section id="branding">
+      <h2>13. Custom Branding & Global Search-and-Replace</h2>
+      <p>Although most user-facing titles and descriptions are configured dynamically in the Admin Panel settings, some metadata assets, PWA manifest configurations, and automated email/SEO template keywords are hardcoded with the default branding.</p>
+      
+      <p>To brand the application with your own brand name and website name, follow this simple global search-and-replace method using **VS Code**:</p>
+
+      <h3>Step 1: Open the Project in VS Code</h3>
+      <p>Unzip your purchased CodeCanyon package, open the project folder in VS Code, and ensure you have completed your <code>.env</code> file configuration.</p>
+
+      <h3>Step 2: Perform Global Search and Replace</h3>
+      <ol>
+        <li>Click the <strong>Search</strong> icon in the VS Code sidebar (or press <code>Ctrl + Shift + F</code> / <code>Cmd + Shift + F</code>).</li>
+        <li>In the **Search** field, enter:
+          <pre><code>wecanfix</code></pre>
+        </li>
+        <li>In the **Replace** field, enter your own desired website/brand name:
+          <pre><code>YourBrandName</code></pre>
+        </li>
+        <li>We recommend running this twice to match cases properly:
+          <ul>
+            <li>Search for capitalized <strong><code>Wecanfix</code></strong> ➔ Replace with capitalized <strong><code>YourBrandName</code></strong>.</li>
+            <li>Search for lowercase <strong><code>wecanfix</code></strong> ➔ Replace with lowercase/capitalized as needed.</li>
+          </ul>
+        </li>
+        <li>This will automatically update occurrences in files such as:
+          <ul>
+            <li><strong>PWA Manifests:</strong> <code>public/manifest.json</code>, <code>public/manifest-admin.json</code>, and <code>public/manifest-provider.json</code> (changing app names like <em>"Wecanfix Admin"</em> to <em>"YourBrandName Admin"</em>).</li>
+            <li><strong>Email Flows & Templates:</strong> <code>src/ai/flows/*.ts</code> (changing AI prompt and template references).</li>
+            <li><strong>SEO Metadata:</strong> <code>src/app/about-us/page.tsx</code>, <code>src/app/layout.tsx</code>, and other static pages.</li>
+          </ul>
+        </li>
+        <li>Click the **Replace All** button next to the replace field to apply changes globally.</li>
+      </ol>
+
+      <h3>Step 3: Replace Logos & Generate Favicons</h3>
+      <p>Progressive Web Apps (PWA) require specific icon sizes (such as 192x192, 512x512) and browser favicons. You can generate all of these files automatically:</p>
+      <ol>
+        <li>Go to the online generator: <a href="https://usebro.in/tools/favicon-generator" target="_blank"><strong>Favicon & PWA Icon Generator</strong></a>.</li>
+        <li>Upload your high-resolution square brand logo.</li>
+        <li>Download the generated zip archive containing your custom favicons and icons.</li>
+        <li>Extract the archive and paste the files directly into your project's <strong><code>public/</code></strong> folder, overwriting the default placeholders (like <code>favicon.ico</code>, <code>apple-touch-icon.png</code>, <code>android-chrome-192x192.png</code>, and <code>pwa-192x192.png</code>).</li>
+      </ol>
+
+      <div class="alert alert-tip">
+        <div class="alert-title">💡 Rebuild After Branding</div>
+        Because these configuration files are compiled at build time, you must rebuild the Next.js production build for your custom PWA manifest and static branding changes to take effect:
+        <pre><code>npm run build</code></pre>
+      </div>
+    </section>
+
+    <!-- SECTION 14: COST DISCLAIMERS -->
+    <section id="disclaimers">
+      <h2>14. Third-Party Cost Disclaimers</h2>
+      <p>This script integrates premium third-party services that may incur running costs depending on your usage volume. Please review the terms of service for these tools:</p>
+      
+      <div class="alert alert-warning">
+        <div class="alert-title">⚠️ Third-Party Accounts & Fees</div>
+        <ul>
+          <li><strong>Razorpay:</strong> You must create a verified business merchant account on Razorpay to process payments. Razorpay charges transactional processing fees (typically ~2% per transaction + taxes) for credit cards, UPI, and netbanking.</li>
+          <li><strong>Firebase Authentication (SMS/OTP Auth):</strong> The phone number authentication is powered by Google Firebase. Firebase provides a free tier of SMS verification codes, after which verification commands are usage-based and will bill your linked Google Cloud Billing account at scale.</li>
+          <li><strong>Gemini AI (Google AI API):</strong> AI-assisted features use the Gemini API key. Charges are based on token generation and token queries processed by the model.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- SECTION 15: FAQ & SUPPORT -->
+    <section id="support">
+      <h2>15. FAQ & Support</h2>
+      
+      <h3>Frequently Asked Questions:</h3>
+      <p><strong>Q: Why does the Razorpay checkout fail to load or throw an error?</strong><br>
+      A: Ensure you have whitelisted/enabled international payments on your Razorpay dashboard if you are charging in USD or any foreign currency other than INR. Also make sure the keys in your admin panel match the environment (Test Mode vs Live Mode).</p>
+      
+      <p><strong>Q: Do I need to manually setup database schema tables?</strong><br>
+      A: No. Start the app using <code>npm run dev</code> or compile using <code>npm run build</code>; the database tables will initialize automatically.</p>
+
+      <h3>Support Channels:</h3>
+      <p>If you encounter issues during installation or configuration, contact us through our Envato Author profile support inbox. Please provide your purchase code and error logs for quick resolution.</p>
+    </section>
+  </main>
+
+  <script>
+    // Search Menu filter
+    function filterMenu() {
+      const input = document.getElementById('searchMenu');
+      const filter = input.value.toLowerCase();
+      const items = document.querySelectorAll('.menu-item');
+      
+      items.forEach(item => {
+        const text = item.textContent || item.innerText;
+        if (text.toLowerCase().indexOf(filter) > -1) {
+          item.style.display = "";
+        } else {
+          item.style.display = "none";
+        }
+      });
+    }
+
+    // Copy to clipboard helper
+    function copyCode(btn) {
+      const pre = btn.nextElementSibling;
+      const text = pre.textContent || pre.innerText;
+      
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = btn.innerText;
+        btn.innerText = "Copied!";
+        btn.style.backgroundColor = "var(--success)";
+        btn.style.borderColor = "var(--success)";
+        btn.style.color = "#ffffff";
+        
+        setTimeout(() => {
+          btn.innerText = originalText;
+          btn.style.backgroundColor = "";
+          btn.style.borderColor = "";
+          btn.style.color = "";
+        }, 2000);
+      });
+    }
+
+    // Scroll spy for navigation
+    window.addEventListener('DOMContentLoaded', () => {
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          const id = entry.target.getAttribute('id');
+          if (entry.intersectionRatio > 0) {
+            document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+            const activeLink = document.querySelector(`.menu-item a[href="#${id}"]`);
+            if (activeLink) activeLink.parentElement.classList.add('active');
+          }
+        });
+      });
+
+      // Track all sections
+      document.querySelectorAll('section').forEach(section => {
+        observer.observe(section);
+      });
+    });
+  </script>
+</body>
+</html>
