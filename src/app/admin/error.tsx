@@ -13,6 +13,19 @@ export default function AdminError({
 }) {
   useEffect(() => {
     console.error('Admin Error Boundary caught an error:', error);
+
+    // Check if the error is due to a ChunkLoadError (common during redeployments)
+    const isChunkLoadError = 
+      error.name === 'ChunkLoadError' || 
+      error.message?.includes('ChunkLoadError') || 
+      error.message?.includes('Loading chunk') ||
+      error.message?.includes('Failed to load resource') ||
+      error.message?.includes('Cannot read properties of undefined (reading \'call\')');
+      
+    if (isChunkLoadError) {
+      console.log('Chunk load error detected in admin. Automatically reloading page to fetch latest version...');
+      window.location.reload();
+    }
   }, [error]);
 
   return (

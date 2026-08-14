@@ -369,23 +369,19 @@ Run the following commands in order inside your VPS terminal:
 # 1. Navigate to your project folder
 cd /var/www/your-app-directory
 
-# 2. STOP the PM2 process first (this unlocks all files in the build directory)
-pm2 stop your-app-name
-
-# 3. Pull the latest code updates from GitHub
+# 2. Pull the latest code updates from GitHub
 git pull origin main
 
-# 4. Install any new NPM packages (if dependencies changed)
+# 3. Install NPM packages
 npm install
 
-# 5. Delete the old build folder completely (wipes Next.js compiler cache and standalone folder)
-rm -rf .next
-
-# 6. Compile the new production build (runs postbuild asset copying automatically)
+# 4. Compile the new production build
 npm run build
 
-# 7. START the PM2 process back up
-pm2 start your-app-name
+# 5. Clean start PM2 process to clear active cache and reload completely
+pm2 delete your-app-name
+pm2 start npm --name "your-app-name" -- start
+pm2 save
 ```
 
 > [!IMPORTANT]
