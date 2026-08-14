@@ -6,6 +6,19 @@ import { headers } from 'next/headers';
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Check if visitor logging is disabled in settings
+    try {
+      const { executeDbGetDoc } = require('@/app/actions/dbActions');
+      const configDoc = await executeDbGetDoc('webSettings', 'applicationConfig');
+      if (configDoc && configDoc.exists && configDoc.data) {
+        if (configDoc.data.enableVisitorLogging === false) {
+          return NextResponse.json({ success: true, bypassed: true });
+        }
+      }
+    } catch (dbErr) {
+      console.warn("Could not check enableVisitorLogging in API:", dbErr);
+    }
+
     const body = await req.json();
     const { pathname, userAgent } = body;
 

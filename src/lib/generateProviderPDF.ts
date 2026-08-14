@@ -85,11 +85,19 @@ const addDetail = (doc: jsPDF, label: string, value: string | string[] | undefin
 };
 
 async function getImageDataUri(url: string): Promise<{ dataUri: string; format: string } | null> {
-  if (!url || !url.startsWith('http')) return null;
+  if (!url) return null;
+
+  let targetUrl = url;
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    if (typeof window !== 'undefined') {
+      targetUrl = window.location.origin + (url.startsWith('/') ? url : '/' + url);
+    }
+  }
+
   try {
-    const response = await fetch(url);
+    const response = await fetch(targetUrl);
     if (!response.ok) {
-      console.warn(`Failed to fetch image from ${url}: ${response.statusText}`);
+      console.warn(`Failed to fetch image from ${targetUrl}: ${response.statusText}`);
       return null;
     }
     const blob = await response.blob();
@@ -124,8 +132,8 @@ const addImageToPdf = async (
   imageUrl: string | undefined | null,
   label: string,
   currentY: number,
-  imageWidthMm = 50, 
-  imageMaxHeightMm = 35
+  imageWidthMm = 160, 
+  imageMaxHeightMm = 110
 ): Promise<number> => {
   let newY = currentY;
   if (imageUrl) {
@@ -230,7 +238,7 @@ export const generateProviderApplicationPdf = async (
   y = checkAndAddPage(doc, y, 40);
   y = addSectionTitle(doc, "1. Personal Information", y);
   if (application.profilePhotoUrl) {
-    y = await addImageToPdf(doc, application.profilePhotoUrl, "Profile Photo", y, 30, 30);
+    y = await addImageToPdf(doc, application.profilePhotoUrl, "Profile Photo", y, 100, 100);
   }
   y = addDetail(doc, "Full Name", application.fullName, y);
   y = addDetail(doc, "Email Address", application.email, y);
@@ -343,7 +351,7 @@ export const generateProviderApplicationPdf = async (
     y = addDetail(doc, "Agreed & Certified On", formatTimestampToReadable(application.termsConfirmedAt), y);
   }
 
-  y = await addImageToPdf(doc, application.signatureUrl, "Digital Signature Image", y, 60, 20);
+  y = await addImageToPdf(doc, application.signatureUrl, "Digital Signature Image", y, 100, 100);
   y += 7;
 
   // Section 6: Admin Notes

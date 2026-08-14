@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import type { ProviderApplication, ProviderControlOptions, BankDetails } from '@/types/firestore';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, MapPin, Banknote, Camera, Image as ImageIcon, Trash2, Check, Lock, ChevronRight, AlertCircle, FileText } from "lucide-react";
+import { Loader2, MapPin, Banknote, Camera, Image as ImageIcon, Trash2, Check, Lock, ChevronRight, AlertCircle, FileText, ChevronsDown } from "lucide-react";
 import NextImage from 'next/image';
 import { useToast } from "@/hooks/use-toast";
 import { storage, db } from '@/lib/firebase';
@@ -46,6 +46,8 @@ const createStep4Schema = (maxRadius: number) => z.object({
   workAreaCenter: z.object({
     lat: z.number({ required_error: "Please select a location on the map." }),
     lng: z.number({ required_error: "Please select a location on the map." }),
+  }).optional().refine(val => val !== undefined && val.lat !== undefined && val.lng !== undefined, {
+    message: "Please select a location on the map.",
   }),
   workAreaRadiusKm: z.coerce.number().min(1, "Radius must be at least 1 km.").max(maxRadius, `Radius cannot exceed the maximum of ${maxRadius} km.`),
   bankName: z.string().min(2, "Bank name is required.").max(100),
@@ -117,7 +119,7 @@ export default function Step4LocationBank({
   const form = useForm<Step4FormData>({
     resolver: zodResolver(step4Schema),
     defaultValues: {
-      workAreaCenter: initialData.workAreaCenter ? { lat: initialData.workAreaCenter.latitude, lng: initialData.workAreaCenter.longitude } : DEFAULT_MAP_CENTER,
+      workAreaCenter: initialData.workAreaCenter ? { lat: initialData.workAreaCenter.latitude, lng: initialData.workAreaCenter.longitude } : undefined,
       workAreaRadiusKm: initialData.workAreaRadiusKm || 5,
       bankName: initialData.bankDetails?.bankName || "",
       accountHolderName: initialData.bankDetails?.accountHolderName || "",
@@ -193,7 +195,7 @@ export default function Step4LocationBank({
     });
 
     form.reset({
-      workAreaCenter: initialData.workAreaCenter ? { lat: initialData.workAreaCenter.latitude, lng: initialData.workAreaCenter.longitude } : DEFAULT_MAP_CENTER,
+      workAreaCenter: initialData.workAreaCenter ? { lat: initialData.workAreaCenter.latitude, lng: initialData.workAreaCenter.longitude } : undefined,
       workAreaRadiusKm: initialData.workAreaRadiusKm || 5,
       bankName: initialData.bankDetails?.bankName || "",
       accountHolderName: initialData.bankDetails?.accountHolderName || "",
@@ -227,6 +229,17 @@ export default function Step4LocationBank({
     if (el) {
       const isAtBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 5;
       if (isAtBottom) setCanAgreeTerms(true);
+    }
+  };
+
+  const handleScrollToBottom = () => {
+    const el = termsScrollRef.current;
+    if (el) {
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: 'smooth'
+      });
+      setCanAgreeTerms(true);
     }
   };
 
@@ -408,8 +421,8 @@ export default function Step4LocationBank({
       
       const applicationStepData: Partial<ProviderApplication> = {
         workAreaCenter: {
-          latitude: data.workAreaCenter.lat,
-          longitude: data.workAreaCenter.lng,
+          latitude: data.workAreaCenter!.lat,
+          longitude: data.workAreaCenter!.lng,
         },
         workAreaRadiusKm: data.workAreaRadiusKm,
         bankDetails: bankDetailsData,
@@ -698,7 +711,7 @@ export default function Step4LocationBank({
                 apiKey={appConfig.googleMapsApiKey} 
                 onAddressSelect={handleMapAddressSelect} 
                 onClose={() => setIsMapModalOpen(false)} 
-                initialCenter={form.getValues('workAreaCenter')} 
+                initialCenter={form.getValues('workAreaCenter') || null} 
                 serviceZones={[]} 
               />
             ) : <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin"/></div>}
@@ -717,12 +730,41 @@ export default function Step4LocationBank({
             <DialogTitle className="text-xl">Provider Terms & Conditions</DialogTitle>
             <DialogDescription className="text-primary-foreground/80">Please read and accept our terms to join the network.</DialogDescription>
           </DialogHeader>
-          <div 
-            ref={termsScrollRef}
-            onScroll={handleScrollTerms}
-            className="flex-grow overflow-y-auto max-h-[60vh] p-3 text-sm leading-relaxed prose prose-sm dark:prose-invert"
-            dangerouslySetInnerHTML={{ __html: termsContent || "<p>Loading terms...</p>" }}
-          />
+          <div className="relative flex-grow flex flex-col">
+            <div 
+              ref={termsScrollRef}
+              onScroll={handleScrollTerms}
+              className="flex-grow overflow-y-auto max-h-[60vh] p-3 text-sm leading-relaxed prose prose-sm dark:prose-invert"
+              dangerouslySetInnerHTML={{ __html: termsContent || "<p>Loading terms...</p>" }}
+            />
+             {!canAgreeTerms && (
+              <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none z-20">
+                <style dangerouslySetInnerHTML={{ __html: `
+                  @keyframes slow-bounce {
+                    0%, 100% {
+                      transform: translateY(0);
+                      animation-timing-function: cubic-bezier(0.8,0,1,1);
+                    }
+                    50% {
+                      transform: translateY(-8px);
+                      animation-timing-function: cubic-bezier(0,0,0.2,1);
+                    }
+                  }
+                  .animate-slow-bounce {
+                    animation: slow-bounce 2.2s infinite;
+                  }
+                `}} />
+                <button
+                  type="button"
+                  onClick={handleScrollToBottom}
+                  className="pointer-events-auto bg-[#45A0A2] hover:bg-[#398486] text-white px-4 py-2 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all duration-300 animate-slow-bounce select-none whitespace-nowrap cursor-pointer border border-[#45A0A2]/20 hover:scale-105 active:scale-95 uppercase tracking-wider"
+                >
+                  <ChevronsDown className="h-4 w-4 animate-pulse" />
+                  Read & Scroll Down
+                </button>
+              </div>
+            )}
+          </div>
           <DialogFooter className="p-3 border-t bg-muted/50 flex flex-col gap-3">
             <div className="flex items-center space-x-2 text-xs text-muted-foreground italic">
               {!canAgreeTerms && <span>Please scroll to the bottom to enable the Agree button.</span>}

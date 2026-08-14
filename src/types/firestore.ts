@@ -594,6 +594,8 @@ export interface AppSettings {
   carouselAutoplayDelay: number;
   enableTaxOnVisitingCharge: boolean;
   visitingChargeTaxPercent: number;     
+  enableVisitorLogging: boolean;
+  enableUserPresence: boolean;
   // Payment
   enableOnlinePayment: boolean;
   razorpayKeyId: string;

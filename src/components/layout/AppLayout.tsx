@@ -15,7 +15,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, limit, doc, updateDoc, Timestamp, serverTimestamp } from '@/lib/mysqlDb';
 import BottomNavigationBar from './BottomNavigationBar';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { ApplicationConfigProvider } from '@/hooks/useApplicationConfig';
+import { ApplicationConfigProvider, useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { cn } from '@/lib/utils';
 import CookieConsentBanner from '@/components/shared/CookieConsentBanner';
 import CompleteProfileDialog from '@/components/auth/CompleteProfileDialog';
@@ -42,6 +42,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
   const [isReviewPopupOpen, setIsReviewPopupOpen] = useState(false);
 
   const isMobile = useIsMobile();
+  const { config: appConfig } = useApplicationConfig();
   
   // --- Inactivity Tracker Logic (UPDATED) ---
   const lastActivityTimeRef = useRef<number>(Date.now());
@@ -54,7 +55,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
   // Firestore update OR sendBeacon fallback
   const updateUserLastSeen = useCallback(
     async (useBeaconFallback = false) => {
-      if (!user) return;
+      if (!user || appConfig?.enableUserPresence === false) return;
 
       try {
         // 1) sendBeacon first if closing tab or hidden
@@ -79,7 +80,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
         console.error("Error updating last seen:", err);
       }
     },
-    [user]
+    [user, appConfig]
   );
 
   // Schedule 5-minute final inactivity timeout
@@ -110,7 +111,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
 
   // MAIN EFFECT – installs listeners + unload handlers
   useEffect(() => {
-    if (!user || typeof window === "undefined") return;
+    if (!user || typeof window === "undefined" || appConfig?.enableUserPresence === false) return;
 
     const activityEvents: (keyof WindowEventMap)[] = [
       "mousemove",
@@ -163,7 +164,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, initialWebSettings, ini
         clearTimeout(inactivityTimeoutRef.current);
       }
     };
-  }, [user, resetInactivity, updateUserLastSeen]);
+  }, [user, resetInactivity, updateUserLastSeen, appConfig]);
 
 
   // On route change, count as activity

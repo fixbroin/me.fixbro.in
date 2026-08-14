@@ -21,6 +21,8 @@ export const defaultAppSettings: AppSettings = {
   carouselAutoplayDelay: 5000, 
   enableTaxOnVisitingCharge: true, 
   visitingChargeTaxPercent: 5,     
+  enableVisitorLogging: true,
+  enableUserPresence: true,
   // Payment
   enableOnlinePayment: true,
   razorpayKeyId: "",

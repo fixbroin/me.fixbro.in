@@ -5,6 +5,19 @@ import { initFirebaseAdmin } from '@/lib/firebase-admin';
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Check if user presence tracking is disabled in settings
+    try {
+      const { executeDbGetDoc } = require('@/app/actions/dbActions');
+      const configDoc = await executeDbGetDoc('webSettings', 'applicationConfig');
+      if (configDoc && configDoc.exists && configDoc.data) {
+        if (configDoc.data.enableUserPresence === false) {
+          return new NextResponse(null, { status: 204 });
+        }
+      }
+    } catch (dbErr) {
+      console.warn("Could not check enableUserPresence in API:", dbErr);
+    }
+
     const body = await req.json();
     const { uid, ts } = body;
 

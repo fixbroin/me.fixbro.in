@@ -41,6 +41,8 @@ const processData = (firestoreData: Partial<AppSettings>): AppSettings => {
     enableOtpLogin: typeof firestoreData.enableOtpLogin === 'boolean' ? firestoreData.enableOtpLogin : defaultAppSettings.enableOtpLogin,
     enableGoogleLogin: typeof firestoreData.enableGoogleLogin === 'boolean' ? firestoreData.enableGoogleLogin : defaultAppSettings.enableGoogleLogin,
     isReferralSystemEnabled: typeof firestoreData.isReferralSystemEnabled === 'boolean' ? firestoreData.isReferralSystemEnabled : defaultAppSettings.isReferralSystemEnabled,
+    enableVisitorLogging: typeof firestoreData.enableVisitorLogging === 'boolean' ? firestoreData.enableVisitorLogging : defaultAppSettings.enableVisitorLogging,
+    enableUserPresence: typeof firestoreData.enableUserPresence === 'boolean' ? firestoreData.enableUserPresence : defaultAppSettings.enableUserPresence,
   };
 };
 
