@@ -29,6 +29,8 @@ interface Step1CategorySkillsProps {
   initialData: Partial<ProviderApplication>;
   controlOptions: ProviderControlOptions | null;
   isSaving: boolean;
+  userUid: string;
+  isEditModeByAdmin?: boolean;
 }
 
 const STORAGE_KEY = 'wecanfix_reg_step1';
@@ -38,6 +40,8 @@ export default function Step1CategorySkills({
   initialData,
   controlOptions,
   isSaving,
+  userUid,
+  isEditModeByAdmin = false,
 }: Step1CategorySkillsProps) {
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [isExperienceDialogOpen, setIsExperienceDialogOpen] = useState(false);
@@ -57,7 +61,9 @@ export default function Step1CategorySkills({
 
   // Restore from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    if (isEditModeByAdmin || !userUid) return;
+    const userStorageKey = `${STORAGE_KEY}_${userUid}`;
+    const saved = localStorage.getItem(userStorageKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -69,7 +75,18 @@ export default function Step1CategorySkills({
         console.error("Step1: Error parsing saved data", e);
       }
     }
-  }, [form]);
+  }, [form, userUid, isEditModeByAdmin]);
+
+  // Reset form when initialData changes (critical for admin switching providers)
+  useEffect(() => {
+    form.reset({
+      workCategoryId: initialData.workCategoryId || undefined,
+      experienceLevelId: initialData.experienceLevelId || undefined,
+      skillLevelId: initialData.skillLevelId || undefined,
+      bio: initialData.bio || "",
+    });
+    lastGeneratedBioRef.current = initialData.bio || "";
+  }, [initialData, form]);
 
   // Auto-generate bio when choices change
   const catId = form.watch('workCategoryId');
@@ -108,8 +125,10 @@ export default function Step1CategorySkills({
   // Auto-save to localStorage on change
   const watchedFields = form.watch();
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(watchedFields));
-  }, [watchedFields]);
+    if (isEditModeByAdmin || !userUid) return;
+    const userStorageKey = `${STORAGE_KEY}_${userUid}`;
+    localStorage.setItem(userStorageKey, JSON.stringify(watchedFields));
+  }, [watchedFields, userUid, isEditModeByAdmin]);
 
   const handleSubmit = (data: Step1FormData) => {
     const category = controlOptions?.categories.find(c => c.id === data.workCategoryId);

@@ -213,7 +213,7 @@ export default function AdminProviderApplicationsPage() {
         await Promise.all(
           urlsToDelete.map(async (url) => {
             try {
-              if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+              if (url && (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/uploads/") || url.includes("uploads/"))) {
                 const imageRef = storageRef(storage, url);
                 await deleteObject(imageRef);
               }

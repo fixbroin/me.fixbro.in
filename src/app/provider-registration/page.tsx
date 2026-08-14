@@ -190,11 +190,15 @@ export default function ProviderRegistrationPage() {
 
       const appDocRef = doc(db, PROVIDER_APPLICATION_COLLECTION, targetUserId);
       const docSnap = await getDoc(appDocRef);
+      const cachedStep = targetUserId ? sessionStorage.getItem(`provider_reg_current_step_${targetUserId}`) : null;
+      
       if (docSnap.exists()) {
         const data = docSnap.data() as ProviderApplication;
         setApplicationData(data);
         setApplicationStatus(data.status);
-        if (!isEditModeByAdmin) {
+        if (cachedStep) {
+          setCurrentStep(parseInt(cachedStep, 10));
+        } else if (!isEditModeByAdmin) {
           if (data.status === 'approved') {
             // No action needed
           } else if (data.status.startsWith('pending_step_')) {
@@ -211,7 +215,11 @@ export default function ProviderRegistrationPage() {
           router.push('/admin/provider-applications');
           return;
         }
-        setCurrentStep(1);
+        if (cachedStep) {
+          setCurrentStep(parseInt(cachedStep, 10));
+        } else {
+          setCurrentStep(1);
+        }
       }
     } catch (error) {
       console.error("Error fetching provider application:", error);
@@ -238,6 +246,22 @@ export default function ProviderRegistrationPage() {
       router.push('/provider');
     }
   }, [applicationStatus, isEditModeByAdmin, router]);
+
+  // Keep track of active step on page reload / refresh
+  useEffect(() => {
+    const targetUserId = editingApplicationIdForAdmin || user?.uid;
+    if (targetUserId && currentStep > 0 && currentStep < 5) {
+      sessionStorage.setItem(`provider_reg_current_step_${targetUserId}`, String(currentStep));
+    }
+  }, [currentStep, editingApplicationIdForAdmin, user]);
+
+  // Clean up cached step upon registration completion
+  useEffect(() => {
+    const targetUserId = editingApplicationIdForAdmin || user?.uid;
+    if (targetUserId && currentStep === 5) {
+      sessionStorage.removeItem(`provider_reg_current_step_${targetUserId}`);
+    }
+  }, [currentStep, editingApplicationIdForAdmin, user]);
 
   const handleSaveStep = async (stepData: Partial<ProviderApplication>, nextStepStatus: ProviderApplicationStatus) => {
     const targetUserIdForSave = editingApplicationIdForAdmin || user?.uid;
@@ -381,10 +405,10 @@ export default function ProviderRegistrationPage() {
 
     switch (currentStep) {
       case 0: return <Step0AuthPrompt redirectUrl="/provider-registration" />;
-      case 1: return <Step1CategorySkills onNext={handleNextStep} initialData={applicationData} controlOptions={controlOptions} isSaving={isSavingStep} />;
-      case 2: return <Step2PersonalInfo onNext={handleNextStep} onPrevious={handlePreviousStep} initialData={applicationData} controlOptions={controlOptions} isSaving={isSavingStep} userUid={editingApplicationIdForAdmin || user?.uid || ""} />;
-      case 3: return <Step3KycDocuments onNext={handleNextStep} onPrevious={handlePreviousStep} initialData={applicationData} controlOptions={controlOptions} isSaving={isSavingStep} userUid={editingApplicationIdForAdmin || user?.uid || ""} enableDefaultIndianKyc={appConfig?.enableDefaultIndianKyc === undefined ? true : appConfig.enableDefaultIndianKyc} />;
-      case 4: return <Step4LocationBank onSubmit={handleFinalSubmitApplication} onPrevious={handlePreviousStep} initialData={applicationData} controlOptions={controlOptions} isSaving={isSavingStep} userUid={editingApplicationIdForAdmin || user?.uid || ""} />;
+      case 1: return <Step1CategorySkills onNext={handleNextStep} initialData={applicationData} controlOptions={controlOptions} isSaving={isSavingStep} userUid={editingApplicationIdForAdmin || user?.uid || ""} isEditModeByAdmin={isEditModeByAdmin} />;
+      case 2: return <Step2PersonalInfo onNext={handleNextStep} onPrevious={handlePreviousStep} initialData={applicationData} controlOptions={controlOptions} isSaving={isSavingStep} userUid={editingApplicationIdForAdmin || user?.uid || ""} isEditModeByAdmin={isEditModeByAdmin} />;
+      case 3: return <Step3KycDocuments onNext={handleNextStep} onPrevious={handlePreviousStep} initialData={applicationData} controlOptions={controlOptions} isSaving={isSavingStep} userUid={editingApplicationIdForAdmin || user?.uid || ""} isEditModeByAdmin={isEditModeByAdmin} enableDefaultIndianKyc={appConfig?.enableDefaultIndianKyc === undefined ? true : appConfig.enableDefaultIndianKyc} />;
+      case 4: return <Step4LocationBank onSubmit={handleFinalSubmitApplication} onPrevious={handlePreviousStep} initialData={applicationData} controlOptions={controlOptions} isSaving={isSavingStep} userUid={editingApplicationIdForAdmin || user?.uid || ""} isEditModeByAdmin={isEditModeByAdmin} />;
       case 5: return <RegistrationCompleted isAdminEdit={isEditModeByAdmin} />;
       default: return <Card><CardContent className="pt-6">Loading step...</CardContent></Card>;
     }

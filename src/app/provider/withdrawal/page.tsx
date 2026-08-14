@@ -128,13 +128,18 @@ function WithdrawalPageContent() {
   
   useEffect(() => {
     if (firestoreUser && !editingRequest) {
+        const bankDetails = (firestoreUser as any).bankDetails || {};
         form.reset({
             amount: 0,
             method: undefined,
             details: {
                 email: firestoreUser.email || "",
-                accountHolderName: firestoreUser.displayName || "",
-                bankName: "", accountNumber: "", confirmAccountNumber: "", ifscCode: "", upiId: "",
+                accountHolderName: bankDetails.accountHolderName || firestoreUser.displayName || "",
+                bankName: bankDetails.bankName || "",
+                accountNumber: bankDetails.accountNumber || "",
+                confirmAccountNumber: bankDetails.accountNumber || "",
+                ifscCode: bankDetails.ifscCode || (bankDetails.customFields && Object.values(bankDetails.customFields)[0]) || "",
+                upiId: "",
             },
         });
     }
@@ -328,7 +333,33 @@ function WithdrawalPageContent() {
           <FormField control={form.control} name="details.bankName" render={({ field }) => (<FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
           <FormField control={form.control} name="details.accountNumber" render={({ field }) => (<FormItem><FormLabel>Account Number</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
           <FormField control={form.control} name="details.confirmAccountNumber" render={({ field }) => (<FormItem><FormLabel>Confirm Account Number</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
-          <FormField control={form.control} name="details.ifscCode" render={({ field }) => (<FormItem><FormLabel>IFSC Code</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />
+          <FormField control={form.control} name="details.ifscCode" render={({ field }) => {
+            const firstCustomField = appConfig?.customBankFields?.[0];
+            const bankCodeLabel = firstCustomField?.name || "IFSC Code";
+            const bankPlaceholder = firstCustomField?.placeholder || "e.g., SBIN0001234";
+            return (
+              <FormItem>
+                <FormLabel>{bankCodeLabel}</FormLabel>
+                <FormControl>
+                  <Input 
+                    placeholder={bankPlaceholder} 
+                    {...field} 
+                    value={field.value ?? ""} 
+                    onChange={(e) => {
+                      const type = firstCustomField?.type || 'alphanumeric';
+                      const rawVal = e.target.value;
+                      let formattedVal = rawVal;
+                      if (type === 'alphanumeric' || type === 'text') {
+                        formattedVal = rawVal.toUpperCase();
+                      }
+                      field.onChange(formattedVal);
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            );
+          }} />
         </>
       );
       case 'upi': return (<FormField control={form.control} name="details.upiId" render={({ field }) => (<FormItem><FormLabel>UPI ID</FormLabel><FormControl><Input placeholder="yourname@okhdfc" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>)} />);

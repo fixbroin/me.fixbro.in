@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { generateProviderApplicationPdf } from '@/lib/generateProviderPDF';
 import { triggerPdfDownload } from '@/lib/pdfUtils';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { Separator } from "@/components/ui/separator";
 import { cn, getTimestampMillis } from "@/lib/utils";
 import { db } from '@/lib/firebase';
@@ -105,16 +106,25 @@ const KycDocDisplay: React.FC<{
 
 const BankDetailsDisplay: React.FC<{ 
   details?: BankDetails | null,
+  customFieldsConfig?: any[],
   onVerify?: () => void,
   isVerifying?: boolean
-}> = ({ details, onVerify, isVerifying }) => {
+}> = ({ details, customFieldsConfig, onVerify, isVerifying }) => {
   if (!details || !details.bankName) return <p className="text-sm text-muted-foreground">Not Provided</p>;
   return (
     <div className="space-y-1">
       <DetailRow label="Bank Name" value={details.bankName} />
       <DetailRow label="Account Holder" value={details.accountHolderName} />
       <DetailRow label="Account Number" value={details.accountNumber} />
-      <DetailRow label="IFSC Code" value={details.ifscCode} />
+      {details.customFields && Object.keys(details.customFields).length > 0 ? (
+        Object.entries(details.customFields).map(([key, val]) => {
+          const fieldCfg = customFieldsConfig?.find(f => f.id === key);
+          const formattedLabel = fieldCfg?.name || (key === 'ifsc' ? 'IFSC Code' : key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()));
+          return <DetailRow key={key} label={formattedLabel} value={val} />;
+        })
+      ) : (
+        <DetailRow label="IFSC Code" value={details.ifscCode} />
+      )}
       
       <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/40 last:border-b-0 text-sm">
         <span className="font-semibold text-muted-foreground sm:w-1/3 shrink-0">Verification Status</span>
@@ -145,11 +155,9 @@ const BankDetailsDisplay: React.FC<{
                 View Full Size <ExternalLink className="h-3 w-3"/>
               </a>
             </div>
-            {details.cancelledChequeUrl.startsWith('http') && (
-              <div className="relative w-48 h-32 border rounded-lg overflow-hidden bg-white">
-                <NextImage src={details.cancelledChequeUrl} alt="Cancelled Cheque" fill className="object-contain p-1"/>
-              </div>
-            )}
+            <div className="relative w-48 h-32 border rounded-lg overflow-hidden bg-white">
+              <NextImage src={details.cancelledChequeUrl} alt="Cancelled Cheque" fill className="object-contain p-1"/>
+            </div>
         </div>
       )}
     </div>
@@ -167,6 +175,7 @@ export default function ProviderApplicationDetailsModal({
   const [adminNotes, setAdminNotes] = useState("");
   const { toast } = useToast();
   const { settings: globalCompanySettings } = useGlobalSettings();
+  const { config: appConfig } = useApplicationConfig();
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [verifyingDocType, setVerifyingDocType] = useState<string | null>(null);
   const router = useRouter();
@@ -240,7 +249,7 @@ export default function ProviderApplicationDetailsModal({
         contactMobile: globalCompanySettings?.contactMobile || '+91-XXXXXXXXXX',
         logoUrl: globalCompanySettings?.logoUrl || undefined,
       };
-      const pdfDataUri = await generateProviderApplicationPdf(application, companyInfo);
+      const pdfDataUri = await generateProviderApplicationPdf(application, companyInfo, appConfig?.customBankFields);
       triggerPdfDownload(pdfDataUri, `ProviderApp-${application.fullName?.replace(/\s+/g, '_') || application.id}.pdf`);
     } catch (error) {
       console.error("Error generating or downloading provider PDF:", error);
@@ -466,6 +475,7 @@ export default function ProviderApplicationDetailsModal({
                   <h4 className="font-bold text-sm text-primary uppercase tracking-wider mb-2">Bank Details</h4>
                   <BankDetailsDisplay 
                     details={application.bankDetails} 
+                    customFieldsConfig={appConfig?.customBankFields}
                     onVerify={() => handleVerifyDocument('bank')}
                     isVerifying={verifyingDocType === 'bank'}
                   />
@@ -484,27 +494,29 @@ export default function ProviderApplicationDetailsModal({
                     )} 
                   />
                 </div>
-                <Separator className="my-2" />
-                <div className="space-y-1">
-                  <h4 className="font-bold text-sm text-primary uppercase tracking-wider mb-2">Signature</h4>
-                  {application.signatureUrl ? (
-                    <div className="py-2.5">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">Signature Image</span>
-                        <a href={application.signatureUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                          View Full Size <ExternalLink className="h-3 w-3"/>
-                        </a>
-                      </div>
-                      {application.signatureUrl.startsWith('http') && (
-                        <div className="relative w-48 h-24 border rounded-lg overflow-hidden bg-white">
-                          <NextImage src={application.signatureUrl} alt="Provider Signature" fill className="object-contain p-1"/>
+                {(appConfig?.enableSignatureUpload !== false || application.signatureUrl) && (
+                  <>
+                    <Separator className="my-2" />
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-sm text-primary uppercase tracking-wider mb-2">Signature</h4>
+                      {application.signatureUrl ? (
+                        <div className="py-2.5">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">Signature Image</span>
+                            <a href={application.signatureUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                              View Full Size <ExternalLink className="h-3 w-3"/>
+                            </a>
+                          </div>
+                          <div className="relative w-48 h-24 border rounded-lg overflow-hidden bg-white">
+                            <NextImage src={application.signatureUrl} alt="Provider Signature" fill className="object-contain p-1"/>
+                          </div>
                         </div>
+                      ) : (
+                        <p className="text-muted-foreground text-sm">No signature provided.</p>
                       )}
                     </div>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">No signature provided.</p>
-                  )}
-                </div>
+                  </>
+                )}
               </TabsContent>
 
               {/* Admin Review Notes (Now scrolls with content) */}

@@ -28,7 +28,7 @@ import { useAuth } from "@/hooks/useAuth";
 const STORAGE_KEY = 'wecanfix_reg_step2';
 
 const generateRandomHexString = (length: number) => Array.from({ length }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-const isFirebaseStorageUrl = (url: string | null | undefined): boolean => !!url && typeof url === 'string' && url.includes("firebasestorage.googleapis.com");
+const isFirebaseStorageUrl = (url: string | null | undefined): boolean => !!url && typeof url === 'string' && (url.includes("firebasestorage.googleapis.com") || url.startsWith("/uploads/") || url.includes("uploads/"));
 const isValidImageSrc = (url: string | null | undefined): url is string => {
     if (!url || url.trim() === '') return false;
     return url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('http:') || url.startsWith('https:') || url.startsWith('/');
@@ -44,7 +44,7 @@ const step2PersonalInfoSchema = z.object({
   qualificationId: z.string({ required_error: "Please select your qualification." }),
   alternateMobile: z.string().max(15).regex(/^\+?[1-9]\d{1,14}$/, "Invalid alternate phone format.").optional().or(z.literal('')),
   languagesSpokenIds: z.array(z.string()).min(1, "Select at least one language spoken.").max(5, "Select up to 5 languages."),
-  profilePhotoUrl: z.string().url("Invalid photo URL.").optional().nullable(),
+  profilePhotoUrl: z.string().optional().nullable(),
 });
 
 type Step2FormData = z.infer<typeof step2PersonalInfoSchema>;
@@ -56,6 +56,7 @@ interface Step2PersonalInfoProps {
   controlOptions: ProviderControlOptions | null;
   isSaving: boolean;
   userUid: string;
+  isEditModeByAdmin?: boolean;
 }
 
 export default function Step2PersonalInfo({
@@ -65,6 +66,7 @@ export default function Step2PersonalInfo({
   controlOptions,
   isSaving,
   userUid,
+  isEditModeByAdmin = false,
 }: Step2PersonalInfoProps) {
   const { toast } = useToast();
   const { user, firestoreUser } = useAuth();
@@ -98,8 +100,9 @@ export default function Step2PersonalInfo({
 
   // Load from Local Storage on mount
   useEffect(() => {
-    if (!isMounted) return;
-    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!isMounted || isEditModeByAdmin || !userUid) return;
+    const userStorageKey = `${STORAGE_KEY}_${userUid}`;
+    const saved = localStorage.getItem(userStorageKey);
     if (saved) {
       try {
         const data = JSON.parse(saved);
@@ -111,15 +114,17 @@ export default function Step2PersonalInfo({
         console.error("Error restoring Step 2 from storage:", e);
       }
     }
-  }, [isMounted, form]);
+  }, [isMounted, form, userUid, isEditModeByAdmin]);
 
   // Auto-save to Local Storage on change
   useEffect(() => {
+    if (isEditModeByAdmin || !userUid) return;
     const subscription = form.watch((value) => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+      const userStorageKey = `${STORAGE_KEY}_${userUid}`;
+      localStorage.setItem(userStorageKey, JSON.stringify(value));
     });
     return () => subscription.unsubscribe();
-  }, [form]);
+  }, [form, userUid, isEditModeByAdmin]);
   
   // Sync with initialData and firestoreUser for auto-fill
   useEffect(() => {
@@ -129,7 +134,7 @@ export default function Step2PersonalInfo({
     // Only auto-fill if fields are currently empty (prevents overwriting user's active typing)
     const shouldFill = !currentValues.fullName && !currentValues.mobileNumber;
 
-    if (shouldFill || initialData?.fullName) {
+    if (isEditModeByAdmin || shouldFill || initialData?.fullName) {
         form.reset({
             fullName: initialData.fullName || firestoreUser?.displayName || user?.displayName || "",
             email: initialData.email || firestoreUser?.email || user?.email || "",
@@ -143,7 +148,7 @@ export default function Step2PersonalInfo({
         });
         setCurrentImagePreview(initialData.profilePhotoUrl || null);
     }
-  }, [initialData, firestoreUser, user, form, isMounted]);
+  }, [initialData, firestoreUser, user, form, isMounted, isEditModeByAdmin]);
 
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -178,13 +183,14 @@ export default function Step2PersonalInfo({
   };
 
   const handleSubmit = async (data: Step2FormData) => {
-    if (!selectedFile && !data.profilePhotoUrl && !initialData.profilePhotoUrl) {
+    // If we have no new file, and preview was cleared, and there was no initial photo
+    if (!selectedFile && !currentImagePreview) {
         setShowPhotoError(true);
         toast({ title: "Profile Photo Required", description: "Please upload your passport size profile photo to continue.", variant: "destructive" });
         return;
     }
 
-    let finalPhotoUrl = data.profilePhotoUrl || null;
+    let finalPhotoUrl = initialData.profilePhotoUrl || null;
 
     if (selectedFile) {
       setStatusMessage("Uploading profile photo..."); setUploadProgress(0);
@@ -213,9 +219,12 @@ export default function Step2PersonalInfo({
         toast({ title: "Photo Upload Failed", description: (uploadError as Error).message || "Could not upload photo.", variant: "destructive" });
         setStatusMessage(""); setUploadProgress(null); return; 
       }
-    } else if (!finalPhotoUrl && initialData.profilePhotoUrl && isFirebaseStorageUrl(initialData.profilePhotoUrl)) {
+    } else if (!currentImagePreview && initialData.profilePhotoUrl && isFirebaseStorageUrl(initialData.profilePhotoUrl)) {
         setStatusMessage("Removing profile photo...");
-        try { await deleteObject(storageRefStandard(storage, initialData.profilePhotoUrl)); finalPhotoUrl = null; }
+        try { 
+          await deleteObject(storageRefStandard(storage, initialData.profilePhotoUrl)); 
+          finalPhotoUrl = null; 
+        }
         catch (e) { console.warn("Old profile photo not deleted:", e); }
         setStatusMessage("Photo removed.");
     }
@@ -230,7 +239,7 @@ export default function Step2PersonalInfo({
       qualificationLabel: qualification?.label,
       languagesSpokenLabels: languages?.map(l => l.label),
     };
-    onNext(applicationStepData, finalPhotoUrl === undefined ? initialData.profilePhotoUrl : finalPhotoUrl);
+    onNext(applicationStepData, finalPhotoUrl);
   };
 
   const displayPreviewUrl = isValidImageSrc(currentImagePreview) ? currentImagePreview : null;

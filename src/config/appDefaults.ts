@@ -59,6 +59,11 @@ export const defaultAppSettings: AppSettings = {
   
   isProviderRegistrationEnabled: true, // Added default
   isCancelledChequeCompulsory: false, // Added default (optional)
+  enableCancelledChequeUpload: true,
+  enableSignatureUpload: true,
+  customBankFields: [
+    { id: 'ifsc', name: 'IFSC Code', type: 'alphanumeric', required: true, placeholder: 'Enter IFSC code' }
+  ],
   maxProviderRadiusKm: 50, // Added default max provider radius
   autoDispatchRadiusKm: 5, // Default auto-dispatch radius (km)
   

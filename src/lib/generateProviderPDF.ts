@@ -179,7 +179,8 @@ const addImageToPdf = async (
 
 export const generateProviderApplicationPdf = async (
   application: ProviderApplication,
-  companyDetails?: CompanyDetailsForPdf
+  companyDetails?: CompanyDetailsForPdf,
+  customFieldsConfig?: any[]
 ): Promise<string> => {
   const doc = new jsPDF();
   let y = 22;
@@ -308,7 +309,17 @@ export const generateProviderApplicationPdf = async (
     y = addDetail(doc, "Bank Name", bank.bankName, y);
     y = addDetail(doc, "Account Holder Name", bank.accountHolderName, y);
     y = addDetail(doc, "Account Number", bank.accountNumber, y);
-    y = addDetail(doc, "IFSC Code", bank.ifscCode, y);
+    
+    if (bank.customFields && Object.keys(bank.customFields).length > 0) {
+      for (const [key, val] of Object.entries(bank.customFields)) {
+        const fieldCfg = customFieldsConfig?.find(f => f.id === key);
+        const formattedLabel = fieldCfg?.name || (key === 'ifsc' ? 'IFSC Code' : key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()));
+        y = addDetail(doc, formattedLabel, val, y);
+      }
+    } else {
+      y = addDetail(doc, "IFSC Code", bank.ifscCode, y);
+    }
+    
     y = await addImageToPdf(doc, bank.cancelledChequeUrl, "Cancelled Cheque / Passbook Image", y);
     y = addDetail(doc, "Bank Account Status", bank.verified ? "Verified" : "Pending Verification", y);
   } else {

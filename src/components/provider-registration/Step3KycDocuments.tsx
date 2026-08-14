@@ -27,7 +27,7 @@ const STORAGE_KEY = 'wecanfix_reg_step3';
 
 
 const generateRandomHexString = (length: number) => Array.from({ length }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-const isFirebaseStorageUrl = (url: string | null | undefined): boolean => !!url && typeof url === 'string' && url.includes("firebasestorage.googleapis.com");
+const isFirebaseStorageUrl = (url: string | null | undefined): boolean => !!url && typeof url === 'string' && (url.includes("firebasestorage.googleapis.com") || url.startsWith("/uploads/") || url.includes("uploads/"));
 const isValidImageSrc = (url: string | null | undefined): url is string => {
     if (!url || url.trim() === '') return false;
     return url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('http:') || url.startsWith('https:') || url.startsWith('/');
@@ -55,6 +55,7 @@ interface Step3KycDocumentsProps {
   controlOptions: ProviderControlOptions | null;
   isSaving: boolean;
   userUid: string;
+  isEditModeByAdmin?: boolean;
   enableDefaultIndianKyc?: boolean;
 }
 
@@ -65,6 +66,7 @@ export default function Step3KycDocuments({
   controlOptions,
   isSaving, 
   userUid,
+  isEditModeByAdmin = false,
   enableDefaultIndianKyc = true,
 }: Step3KycDocumentsProps) {
   const { toast } = useToast();
@@ -103,7 +105,9 @@ export default function Step3KycDocuments({
 
   // Load from Local Storage on mount
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    if (isEditModeByAdmin || !userUid) return;
+    const userStorageKey = `${STORAGE_KEY}_${userUid}`;
+    const saved = localStorage.getItem(userStorageKey);
     if (saved) {
       try {
         const data = JSON.parse(saved);
@@ -112,15 +116,28 @@ export default function Step3KycDocuments({
         console.error("Error restoring Step 3 from storage:", e);
       }
     }
+  }, [initialData, form, userUid, isEditModeByAdmin]);
+
+  // Reset form and states when initialData changes (critical for admin switching providers)
+  useEffect(() => {
+    form.reset({
+      aadhaarNumber: initialData.aadhaar?.docNumber || "",
+      panNumber: initialData.pan?.docNumber || "",
+    });
+    setAadhaarFront({ file: null, previewUrl: initialData.aadhaar?.frontImageUrl || null, uploadProgress: null, existingUrl: initialData.aadhaar?.frontImageUrl, originalFileName: initialData.aadhaar?.frontImageFileName });
+    setAadhaarBack({ file: null, previewUrl: initialData.aadhaar?.backImageUrl || null, uploadProgress: null, existingUrl: initialData.aadhaar?.backImageUrl, originalFileName: initialData.aadhaar?.backImageFileName });
+    setPanFront({ file: null, previewUrl: initialData.pan?.frontImageUrl || null, uploadProgress: null, existingUrl: initialData.pan?.frontImageUrl, originalFileName: initialData.pan?.frontImageFileName });
   }, [initialData, form]);
 
   // Auto-save to Local Storage on change
   useEffect(() => {
+    if (isEditModeByAdmin || !userUid) return;
     const subscription = form.watch((value) => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+      const userStorageKey = `${STORAGE_KEY}_${userUid}`;
+      localStorage.setItem(userStorageKey, JSON.stringify(value));
     });
     return () => subscription.unsubscribe();
-  }, [form]);
+  }, [form, userUid, isEditModeByAdmin]);
 
   useEffect(() => {
     const initialAddDocs: typeof additionalDocsData = {};
