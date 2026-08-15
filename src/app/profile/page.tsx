@@ -17,7 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { updateProfile, sendPasswordResetEmail, deleteUser, updateEmail, sendEmailVerification, RecaptchaVerifier, type ConfirmationResult, type User, linkWithPhoneNumber } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, setDoc, deleteDoc, Timestamp } from '@/lib/mysqlDb';
+import { doc, getDoc, setDoc, deleteDoc, Timestamp, collection, query, where, getDocs, limit } from '@/lib/mysqlDb';
 import { useToast } from '@/hooks/use-toast';
 import type { FirestoreUser } from '@/types/firestore';
 import Link from 'next/link';
@@ -180,6 +180,13 @@ export default function ProfilePage() {
     if (!user || !auth.currentUser) return;
     setIsSubmittingEmail(true);
     try {
+      // Verify email uniqueness
+      const emailQuery = query(collection(db, "users"), where("email", "==", values.email.toLowerCase()), limit(1));
+      const emailSnap = await getDocs(emailQuery);
+      if (!emailSnap.empty && emailSnap.docs[0].id !== user.uid) {
+        throw new Error("This email address is already linked to another account.");
+      }
+
       await updateEmail(auth.currentUser, values.email); 
       await setDoc(doc(db, "users", user.uid), { email: values.email }, { merge: true });
       toast({ title: "Email Updated", description: "A verification link has been sent to your new email address." });
@@ -201,10 +208,17 @@ export default function ProfilePage() {
     const countryCode = appConfig?.defaultOtpCountryCode || '+91';
     const fullPhoneNumber = `${countryCode}${values.mobileNumber}`;
     try {
+      // Verify mobile number uniqueness
+      const phoneQuery = query(collection(db, "users"), where("mobileNumber", "==", fullPhoneNumber), limit(1));
+      const phoneSnap = await getDocs(phoneQuery);
+      if (!phoneSnap.empty && phoneSnap.docs[0].id !== user.uid) {
+        throw new Error("This mobile number is already linked to another account.");
+      }
+
       await setDoc(doc(db, "users", user.uid), {
-  mobileNumber: fullPhoneNumber,
-  mobileNumberVerified: false,
-}, { merge: true });
+        mobileNumber: fullPhoneNumber,
+        mobileNumberVerified: false,
+      }, { merge: true });
       toast({ title: "Success", description: "Your mobile number has been updated. Please verify it." });
       setIsMobileDialogOpen(false);
     } catch (error: any) {

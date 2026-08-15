@@ -112,10 +112,9 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
     const q = query(
       notificationsRef,
       where("userId", "==", providerUser.uid),
-      where("type", "==", "booking_update"), 
       where("read", "==", false), 
       orderBy("createdAt", "desc"),
-      limit(5) 
+      limit(10) 
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -127,14 +126,18 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
       }
       
       // Check if ANY of the top unread notifications is a new job assignment
-      const anyNewJob = snapshot.docs.some(docSnap => (docSnap.data().title || "").toLowerCase().includes("new job"));
+      const anyNewJob = snapshot.docs.some(docSnap => {
+        const title = (docSnap.data().title || "").toLowerCase();
+        return title.includes("new job") || title.includes("assigned") || title.includes("new booking");
+      });
       setHasNewJobInUnread(anyNewJob);
 
       // Look for the most recent unread "new job" notification not dismissed in this session
       const relevantDoc = snapshot.docs.find(docSnap => {
         const data = docSnap.data();
         const title = (data.title || "").toLowerCase();
-        return title.includes("new job") && !processedJobNotificationIdsRef.current.includes(docSnap.id);
+        const isJob = title.includes("new job") || title.includes("assigned") || title.includes("new booking");
+        return isJob && !processedJobNotificationIdsRef.current.includes(docSnap.id);
       });
 
       if (relevantDoc) {
@@ -145,21 +148,24 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
           const parts = href.split('/');
           bookingDocId = parts[parts.length - 1];
         }
-        let bookingHumanId = "N/A";
-        const messageMatch = notification.message?.match(/ID: (\S+)/);
+        let bookingHumanId = "";
+        const messageMatch = notification.message?.match(/(?:ID:|booking)\s*([A-Z0-9-]+)/i);
         if (messageMatch && messageMatch[1]) {
-          bookingHumanId = messageMatch[1];
+          bookingHumanId = messageMatch[1].replace(/[.,!]/g, '');
         } else {
-          const titleMatch = notification.title?.match(/ID: (\S+)/); 
-           if (titleMatch && titleMatch[1]) bookingHumanId = titleMatch[1];
+          const titleMatch = notification.title?.match(/(?:ID:|booking)\s*([A-Z0-9-]+)/i); 
+          if (titleMatch && titleMatch[1]) {
+            bookingHumanId = titleMatch[1].replace(/[.,!]/g, '');
+          } else {
+            bookingHumanId = bookingDocId || "New";
+          }
         }
 
-        if (bookingDocId && bookingHumanId !== "N/A") {
+        if (bookingDocId) {
           setNewJobPopupDetails({ bookingDocId, bookingHumanId, notificationId: notification.id! });
           setShowNewJobPopup(true);
         }
       } else {
-        // Hide if the relevant notification is no longer present or was read elsewhere
         setShowNewJobPopup(false);
         setNewJobPopupDetails(null);
       }
@@ -173,8 +179,7 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
     setShowNewJobPopup(false);
 
     if (notificationIdToMark) {
-        // Track as dismissed in this instance so it doesn't pop up again until refresh
-        processedJobNotificationIdsRef.current.push(notificationIdToMark);
+      processedJobNotificationIdsRef.current.push(notificationIdToMark);
     }
 
     if (markNotificationAsRead && notificationIdToMark && providerUser?.uid) {
@@ -269,6 +274,21 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
     }
   }, [globalSettings?.chatNotificationSoundUrl, globalSettings?.bookingNotificationSoundUrl]);
 
+  // Play booking notification sound once when the popup first opens
+  useEffect(() => {
+    const playSound = () => {
+      if (showNewJobPopup && providerOrderAudioRef.current) {
+        providerOrderAudioRef.current.play().catch(e => console.warn("ProviderLayout: Order audio play blocked/failed:", e));
+      }
+    };
+    if (showNewJobPopup) {
+      playSound();
+      // Listen for click on document in case autoplay was blocked by the browser
+      document.addEventListener('click', playSound, { once: true });
+    }
+    return () => document.removeEventListener('click', playSound);
+  }, [showNewJobPopup]);
+
   useEffect(() => {
     if (!providerUser?.uid || authIsLoading || !isProviderApproved) return;
 
@@ -299,14 +319,14 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
         seenNotificationIdsRef.current = [...seenNotificationIdsRef.current, ...newDocs.map(d => d.id)];
 
         const normalAudio = providerNotificationAudioRef.current;
-        const orderAudio = providerOrderAudioRef.current;
 
-        // Check if any of the new notifications is a new job
-        const hasNewBooking = newDocs.some(d => (d.data().title || "").toLowerCase().includes("new job"));
+        // Exclude booking/job notifications from triggering normal notification sound
+        const newDocsFiltered = newDocs.filter(d => {
+          const title = (d.data().title || "").toLowerCase();
+          return !(title.includes("new job") || title.includes("assigned") || title.includes("new booking"));
+        });
 
-        if (hasNewBooking && orderAudio) {
-          orderAudio.play().catch(e => console.warn("ProviderLayout: New order notification audio play failed:", e));
-        } else if (normalAudio) {
+        if (newDocsFiltered.length > 0 && normalAudio) {
           normalAudio.play().catch(e => console.warn("ProviderLayout: New normal notification audio play failed:", e));
         }
       }

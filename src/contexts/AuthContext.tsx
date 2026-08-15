@@ -353,8 +353,43 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
     if (!userCredentialForProfileCompletion) return;
     setIsLoading(true);
     const { user } = userCredentialForProfileCompletion;
+    const providerId = user.providerData[0]?.providerId;
+    const isCustomAuth = providerId === 'password' || providerId === 'phone';
   
     try {
+      // 1. Email Uniqueness Verification
+      const targetEmail = (details.email || user.email)?.toLowerCase();
+      if (targetEmail) {
+        const emailQuery = query(collection(db, "users"), where("email", "==", targetEmail), limit(1));
+        const emailSnap = await getDocs(emailQuery);
+        if (!emailSnap.empty && emailSnap.docs[0].id !== user.uid) {
+          throw new Error("This email address is already linked to another account.");
+        }
+      }
+
+      // 2. Mobile Number Uniqueness Verification
+      const targetMobile = details.mobileNumber || user.phoneNumber;
+      if (targetMobile) {
+        const phoneQuery = query(collection(db, "users"), where("mobileNumber", "==", targetMobile), limit(1));
+        const phoneSnap = await getDocs(phoneQuery);
+        if (!phoneSnap.empty && phoneSnap.docs[0].id !== user.uid) {
+          throw new Error("This mobile number is already linked to another account.");
+        }
+      }
+
+      // 3. Device account limit check (max 2 accounts per device for email signup)
+      let deviceId: string | null = null;
+      if (typeof window !== 'undefined') {
+        deviceId = getSimpleDeviceId();
+      }
+      if (providerId === 'password' && deviceId) {
+        const deviceQuery = query(collection(db, "users"), where("deviceId", "==", deviceId));
+        const deviceSnap = await getDocs(deviceQuery);
+        if (deviceSnap.size >= 2) {
+          throw new Error("Device account limit exceeded. You cannot create more than 2 accounts on this device using email sign-up.");
+        }
+      }
+
       await updateProfile(user, { displayName: details.fullName });
   
       if (details.email && user.providerData[0]?.providerId === 'phone') {
@@ -490,6 +525,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
           lastLoginAt: Timestamp.now(),
           walletBalance: initialWalletBalance,
           referralCode: generateReferralCode(referralSettings?.referralCodeLength || 6),
+          deviceId: deviceId || null,
           ...(referrerId && { referredBy: referrerId }),
         };
         transaction.set(newUserDocRef, newUserFirestoreData);
@@ -606,11 +642,23 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       router.push(finalRedirectPath);
       if (authActionRedirectPath) setAuthActionRedirectPath(null);
   
-    } catch (error) {
-      const authError = error as AuthError;
-      console.error("Error completing profile setup:", authError);
-      toast({ title: "Error", description: authError.message || "Could not save profile details.", variant: "destructive" });
-      throw authError;
+    } catch (error: any) {
+      console.error("Error completing profile setup:", error);
+      
+      // Clean up incomplete custom auth user to prevent orphaned auth records
+      if (isCustomAuth) {
+        try {
+          await user.delete();
+          setUserCredentialForProfileCompletion(null);
+          setIsCompletingProfile(false);
+          setUser(null);
+        } catch (delErr) {
+          console.warn("Could not delete orphaned auth user:", delErr);
+        }
+      }
+
+      toast({ title: "Registration Blocked", description: error.message || "Could not save profile details.", variant: "destructive" });
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -623,11 +671,31 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
     }
     setIsLoading(true);
     try {
+      // 1. Verify email uniqueness
+      const emailQuery = query(collection(db, "users"), where("email", "==", data.email.toLowerCase()), limit(1));
+      const emailSnap = await getDocs(emailQuery);
+      if (!emailSnap.empty) {
+        throw new Error("This email address is already linked to another account.");
+      }
+
+      // 2. Check device registration limit (max 2 accounts per device for email signup)
+      let deviceId: string | null = null;
+      if (typeof window !== 'undefined') {
+        deviceId = getSimpleDeviceId();
+      }
+      if (deviceId) {
+        const deviceQuery = query(collection(db, "users"), where("deviceId", "==", deviceId));
+        const deviceSnap = await getDocs(deviceQuery);
+        if (deviceSnap.size >= 2) {
+          throw new Error("Device account limit exceeded. You cannot create more than 2 accounts on this device using email sign-up.");
+        }
+      }
+
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       setUserCredentialForProfileCompletion(userCredential);
       setIsCompletingProfile(true);
       setIsLoading(false);
-    } catch (error) {
+    } catch (error: any) {
       const authError = error as AuthError;
       console.error("Signup error:", authError);
       toast({ title: "Signup Failed", description: authError.message, variant: "destructive" });

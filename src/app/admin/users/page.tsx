@@ -295,6 +295,22 @@ export default function AdminUsersPage() {
   const handleUpdateUserFromModal = async (updatedUserData: Partial<FirestoreUser>) => {
     if (!selectedUserForModal?.id) return false;
     try {
+        if (updatedUserData.email) {
+          const emailQuery = query(collection(db, "users"), where("email", "==", updatedUserData.email.toLowerCase()), limit(1));
+          const emailSnap = await getDocs(emailQuery);
+          if (!emailSnap.empty && emailSnap.docs[0].id !== selectedUserForModal.id) {
+            toast({ title: "Update Failed", description: "This email address is already linked to another account.", variant: "destructive" });
+            return false;
+          }
+        }
+        if (updatedUserData.mobileNumber) {
+          const phoneQuery = query(collection(db, "users"), where("mobileNumber", "==", updatedUserData.mobileNumber), limit(1));
+          const phoneSnap = await getDocs(phoneQuery);
+          if (!phoneSnap.empty && phoneSnap.docs[0].id !== selectedUserForModal.id) {
+            toast({ title: "Update Failed", description: "This mobile number is already linked to another account.", variant: "destructive" });
+            return false;
+          }
+        }
         await updateDoc(doc(db, "users", selectedUserForModal.id), updatedUserData);
         await triggerRefresh('users'); // SmartSync
         toast({ title: "Updated", description: "User details synchronized." });

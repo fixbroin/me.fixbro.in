@@ -287,6 +287,7 @@ export interface FirestoreUser {
   walletBalance?: number; // Current available balance
   totalReferralPaidOut?: number; // Lifetime referral payouts
   pendingWalletBalance?: number; // Balance from referrals on "Booked" status
+  deviceId?: string | null; // Unique browser fingerprint ID
   
   // New/updated for provider settlement
   withdrawableBalance?: number; // Total net earnings ready for withdrawal

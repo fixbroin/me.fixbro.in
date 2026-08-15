@@ -100,10 +100,9 @@ export default function AdminLayout({ children }: PropsWithChildren) {
     const q = query(
       notificationsRef,
       where("userId", "==", adminUser.uid),
-      where("type", "==", "admin_alert"), 
       where("read", "==", false), 
       orderBy("createdAt", "desc"),
-      limit(5) 
+      limit(10) 
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -117,32 +116,39 @@ export default function AdminLayout({ children }: PropsWithChildren) {
       const relevantDoc = snapshot.docs.find(docSnap => {
         const data = docSnap.data();
         const title = (data.title || "").toLowerCase();
-        return title.includes("new booking") && !processedBookingNotificationIdsRef.current.includes(docSnap.id);
+        const isBooking = title.includes("new booking") || title.includes("booking received");
+        return isBooking && !processedBookingNotificationIdsRef.current.includes(docSnap.id);
       });
 
       if (relevantDoc) {
         const notification = { id: relevantDoc.id, ...relevantDoc.data() } as FirestoreNotification;
         const href = notification.href;
         let bookingDocId = "";
-        if (href && href.startsWith('/admin/bookings/edit/')) {
-          const parts = href.split('/');
-          bookingDocId = parts[parts.length - 1];
+        if (href) {
+          if (href.startsWith('/admin/bookings/edit/')) {
+            const parts = href.split('/');
+            bookingDocId = parts[parts.length - 1];
+          } else if (href.startsWith('/admin/bookings')) {
+            bookingDocId = "list";
+          }
         }
-        let bookingHumanId = "N/A";
-        const messageMatch = notification.message?.match(/ID: (\S+)/);
+        let bookingHumanId = "";
+        const messageMatch = notification.message?.match(/(?:ID:|booking)\s*([A-Z0-9-]+)/i);
         if (messageMatch && messageMatch[1]) {
-          bookingHumanId = messageMatch[1];
+          bookingHumanId = messageMatch[1].replace(/[.,!]/g, '');
         } else {
-          const titleMatch = notification.title?.match(/ID: (\S+)/); 
-           if (titleMatch && titleMatch[1]) bookingHumanId = titleMatch[1];
+          const titleMatch = notification.title?.match(/(?:ID:|booking)\s*([A-Z0-9-]+)/i); 
+          if (titleMatch && titleMatch[1]) {
+            bookingHumanId = titleMatch[1].replace(/[.,!]/g, '');
+          } else {
+            bookingHumanId = (bookingDocId && bookingDocId !== "list") ? bookingDocId : "New";
+          }
         }
 
-        if (bookingDocId && bookingHumanId !== "N/A") {
-          setNewBookingPopupDetails({ bookingDocId, bookingHumanId, notificationId: notification.id! });
-          setShowNewBookingPopup(true);
-        }
+        // Show popup if a booking notification was found, regardless of specific doc ID availability
+        setNewBookingPopupDetails({ bookingDocId, bookingHumanId, notificationId: notification.id! });
+        setShowNewBookingPopup(true);
       } else {
-        // Hide if the relevant notification is no longer present or was read elsewhere
         setShowNewBookingPopup(false);
         setNewBookingPopupDetails(null);
       }
@@ -156,8 +162,7 @@ export default function AdminLayout({ children }: PropsWithChildren) {
     setShowNewBookingPopup(false);
     
     if (notificationIdToMark) {
-        // Track as dismissed in this instance so it doesn't pop up again until refresh
-        processedBookingNotificationIdsRef.current.push(notificationIdToMark);
+      processedBookingNotificationIdsRef.current.push(notificationIdToMark);
     }
 
     if (markNotificationAsRead && notificationIdToMark && adminUser?.uid) {
@@ -197,6 +202,21 @@ export default function AdminLayout({ children }: PropsWithChildren) {
     }
   }, [globalSettings?.chatNotificationSoundUrl, globalSettings?.bookingNotificationSoundUrl]);
 
+  // Play booking notification sound once when the popup first opens
+  useEffect(() => {
+    const playSound = () => {
+      if (showNewBookingPopup && adminOrderAudioRef.current) {
+        adminOrderAudioRef.current.play().catch(e => console.warn("AdminLayout: Order audio play blocked/failed:", e));
+      }
+    };
+    if (showNewBookingPopup) {
+      playSound();
+      // Listen for click on document in case autoplay was blocked by the browser
+      document.addEventListener('click', playSound, { once: true });
+    }
+    return () => document.removeEventListener('click', playSound);
+  }, [showNewBookingPopup]);
+
   useEffect(() => {
     if (!adminUser?.uid || authIsLoading || !isAdmin) return;
 
@@ -227,14 +247,14 @@ export default function AdminLayout({ children }: PropsWithChildren) {
         seenAdminNotificationIdsRef.current = [...seenAdminNotificationIdsRef.current, ...newDocs.map(d => d.id)];
 
         const normalAudio = adminChatAudioRef.current;
-        const orderAudio = adminOrderAudioRef.current;
 
-        // Check if any of the new notifications is a new booking (for admin)
-        const hasNewBooking = newDocs.some(d => (d.data().title || "").toLowerCase().includes("new booking"));
+        // Exclude booking notifications from triggering normal notification sound
+        const newDocsFiltered = newDocs.filter(d => {
+          const title = (d.data().title || "").toLowerCase();
+          return !(title.includes("new booking") || title.includes("booking received"));
+        });
 
-        if (hasNewBooking && orderAudio) {
-          orderAudio.play().catch(e => console.warn("AdminLayout: New order notification audio play failed:", e));
-        } else if (normalAudio) {
+        if (newDocsFiltered.length > 0 && normalAudio) {
           normalAudio.play().catch(e => console.warn("AdminLayout: New normal notification audio play failed:", e));
         }
       }
