@@ -72,7 +72,9 @@ export default function AdminLayout({ children }: PropsWithChildren) {
   const { isLoading: isLoadingTotalUnread } = useTotalAdminUnreadChatCount(adminUser?.uid);
   const { settings: globalSettings, isLoading: isLoadingGlobalSettings } = useGlobalSettings();
   const adminChatAudioRef = useRef<HTMLAudioElement | null>(null);
-  const previousTotalUnreadCountRef = useRef<number>(0);
+  const adminOrderAudioRef = useRef<HTMLAudioElement | null>(null); // Added for order sound
+  const seenAdminNotificationIdsRef = useRef<string[]>([]);
+  const isFirstLoadAdminNotificationsRef = useRef(true);
 
   const [showNewBookingPopup, setShowNewBookingPopup] = useState(false);
   const [newBookingPopupDetails, setNewBookingPopupDetails] = useState<{ bookingDocId: string; bookingHumanId: string; notificationId: string; } | null>(null);
@@ -183,27 +185,65 @@ export default function AdminLayout({ children }: PropsWithChildren) {
     } else {
       adminChatAudioRef.current = null;
     }
-  }, [globalSettings?.chatNotificationSoundUrl]);
 
-  const hasPlayedInitialSoundRef = useRef(false);
+    // 2. Setup order specific sound
+    const bookingSoundUrl = globalSettings?.bookingNotificationSoundUrl || '/sounds/order_sound.wav';
+    if (!adminOrderAudioRef.current) {
+      adminOrderAudioRef.current = new Audio(bookingSoundUrl);
+      adminOrderAudioRef.current.load();
+    } else if (adminOrderAudioRef.current.src !== bookingSoundUrl) {
+      adminOrderAudioRef.current.src = bookingSoundUrl;
+      adminOrderAudioRef.current.load();
+    }
+  }, [globalSettings?.chatNotificationSoundUrl, globalSettings?.bookingNotificationSoundUrl]);
 
   useEffect(() => {
-    if (!isLoadingAdminNotifications && !isLoadingGlobalSettings && globalSettings.chatNotificationSoundUrl && adminChatAudioRef.current && adminUser && isAdmin) {
-      // Play sound on initial load if there are unread notifications
-      if (!hasPlayedInitialSoundRef.current && unreadAdminNotificationsCount > 0) {
-        adminChatAudioRef.current.play().catch(e => console.warn("AdminLayout: Initial audio play failed:", e));
-        hasPlayedInitialSoundRef.current = true;
-      }
+    if (!adminUser?.uid || authIsLoading || !isAdmin) return;
+
+    const notificationsRef = collection(db, "userNotifications");
+    const q = query(
+      notificationsRef,
+      where("userId", "==", adminUser.uid),
+      where("read", "==", false),
+      orderBy("createdAt", "desc"),
+      limit(20)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const currentIds = snapshot.docs.map(d => d.id);
       
-      // Play sound when count increases (new notification)
-      if (unreadAdminNotificationsCount > previousTotalUnreadCountRef.current) {
-        adminChatAudioRef.current.play().catch(e => console.warn("AdminLayout: New notification audio play failed:", e));
+      if (isFirstLoadAdminNotificationsRef.current) {
+        // On first snapshot, just remember all currently unread notifications
+        seenAdminNotificationIdsRef.current = currentIds;
+        isFirstLoadAdminNotificationsRef.current = false;
+        return;
       }
-    }
-    if (!isLoadingAdminNotifications) {
-        previousTotalUnreadCountRef.current = unreadAdminNotificationsCount; 
-    }
-  }, [unreadAdminNotificationsCount, isLoadingAdminNotifications, globalSettings, isLoadingGlobalSettings, adminUser, isAdmin]);
+
+      // Find new notifications that we haven't seen in this session
+      const newDocs = snapshot.docs.filter(d => !seenAdminNotificationIdsRef.current.includes(d.id));
+
+      if (newDocs.length > 0) {
+        // Update seen IDs
+        seenAdminNotificationIdsRef.current = [...seenAdminNotificationIdsRef.current, ...newDocs.map(d => d.id)];
+
+        const normalAudio = adminChatAudioRef.current;
+        const orderAudio = adminOrderAudioRef.current;
+
+        // Check if any of the new notifications is a new booking (for admin)
+        const hasNewBooking = newDocs.some(d => (d.data().title || "").toLowerCase().includes("new booking"));
+
+        if (hasNewBooking && orderAudio) {
+          orderAudio.play().catch(e => console.warn("AdminLayout: New order notification audio play failed:", e));
+        } else if (normalAudio) {
+          normalAudio.play().catch(e => console.warn("AdminLayout: New normal notification audio play failed:", e));
+        }
+      }
+    }, (error) => {
+      console.error("AdminLayout: Error in audio notification listener:", error);
+    });
+
+    return () => unsubscribe();
+  }, [adminUser, authIsLoading, isAdmin]);
 
 
   const handleChangePassword = async () => {

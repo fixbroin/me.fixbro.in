@@ -71,7 +71,8 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
   const { settings: globalSettings, isLoading: isLoadingGlobalSettings } = useGlobalSettings();
   const providerNotificationAudioRef = useRef<HTMLAudioElement | null>(null);
   const providerOrderAudioRef = useRef<HTMLAudioElement | null>(null); // Added for order sound
-  const previousProviderUnreadCountRef = useRef<number>(0);
+  const seenNotificationIdsRef = useRef<string[]>([]);
+  const isFirstLoadNotificationsRef = useRef(true);
   const isMobile = useIsMobile(); 
 
   const [showNewJobPopup, setShowNewJobPopup] = useState(false);
@@ -258,46 +259,63 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
     }
 
     // 2. Setup order specific sound
+    const bookingSoundUrl = globalSettings?.bookingNotificationSoundUrl || '/sounds/order_sound.wav';
     if (!providerOrderAudioRef.current) {
-      providerOrderAudioRef.current = new Audio('/sounds/order_sound.wav');
+      providerOrderAudioRef.current = new Audio(bookingSoundUrl);
+      providerOrderAudioRef.current.load();
+    } else if (providerOrderAudioRef.current.src !== bookingSoundUrl) {
+      providerOrderAudioRef.current.src = bookingSoundUrl;
       providerOrderAudioRef.current.load();
     }
-  }, [globalSettings?.chatNotificationSoundUrl]);
+  }, [globalSettings?.chatNotificationSoundUrl, globalSettings?.bookingNotificationSoundUrl]);
 
   useEffect(() => {
-    if (
-      !isLoadingProviderNotifications &&
-      !isLoadingGlobalSettings &&
-      providerUser
-    ) {
-      const normalAudio = providerNotificationAudioRef.current;
-      const orderAudio = providerOrderAudioRef.current;
+    if (!providerUser?.uid || authIsLoading || !isProviderApproved) return;
 
-      // Play sound on initial load if there are unread notifications
-      if (!hasPlayedInitialSoundRef.current && unreadProviderNotificationsCount > 0) {
-        if (hasNewJobInUnread && orderAudio) {
-          orderAudio.play().catch(e => console.warn("ProviderLayout: Initial order audio play failed:", e));
-        } else if (normalAudio) {
-          normalAudio.play().catch(e => console.warn("ProviderLayout: Initial normal audio play failed:", e));
-        }
-        hasPlayedInitialSoundRef.current = true;
+    const notificationsRef = collection(db, "userNotifications");
+    const q = query(
+      notificationsRef,
+      where("userId", "==", providerUser.uid),
+      where("read", "==", false),
+      orderBy("createdAt", "desc"),
+      limit(20)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const currentIds = snapshot.docs.map(d => d.id);
+      
+      if (isFirstLoadNotificationsRef.current) {
+        // On first snapshot, just remember all currently unread notifications
+        seenNotificationIdsRef.current = currentIds;
+        isFirstLoadNotificationsRef.current = false;
+        return;
       }
 
-      // Play sound when count increases (new notification)
-      if (unreadProviderNotificationsCount > previousProviderUnreadCountRef.current) {
-        if (hasNewJobInUnread && orderAudio) {
+      // Find new notifications that we haven't seen in this session
+      const newDocs = snapshot.docs.filter(d => !seenNotificationIdsRef.current.includes(d.id));
+
+      if (newDocs.length > 0) {
+        // Update seen IDs
+        seenNotificationIdsRef.current = [...seenNotificationIdsRef.current, ...newDocs.map(d => d.id)];
+
+        const normalAudio = providerNotificationAudioRef.current;
+        const orderAudio = providerOrderAudioRef.current;
+
+        // Check if any of the new notifications is a new job
+        const hasNewBooking = newDocs.some(d => (d.data().title || "").toLowerCase().includes("new job"));
+
+        if (hasNewBooking && orderAudio) {
           orderAudio.play().catch(e => console.warn("ProviderLayout: New order notification audio play failed:", e));
         } else if (normalAudio) {
           normalAudio.play().catch(e => console.warn("ProviderLayout: New normal notification audio play failed:", e));
         }
       }
-    }
-    // Update the ref *after* the check, regardless of whether the sound played or not,
-    // as long as we are not in a loading state for notifications.
-    if (!isLoadingProviderNotifications) {
-        previousProviderUnreadCountRef.current = unreadProviderNotificationsCount;
-    }
-  }, [unreadProviderNotificationsCount, isLoadingProviderNotifications, globalSettings, isLoadingGlobalSettings, providerUser, hasNewJobInUnread]);
+    }, (error) => {
+      console.error("ProviderLayout: Error in audio notification listener:", error);
+    });
+
+    return () => unsubscribe();
+  }, [providerUser, authIsLoading, isProviderApproved]);
 
 
   const handleChangePassword = async () => {

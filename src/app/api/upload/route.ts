@@ -75,7 +75,10 @@ export async function POST(req: NextRequest) {
     if (baseDir.includes(path.join('.next', 'standalone')) || baseDir.endsWith('standalone')) {
       baseDir = path.join(baseDir, '..', '..');
     }
-    const targetDir = path.join(baseDir, 'public', 'uploads', cleanSubfolder);
+    const isSoundsFolder = cleanSubfolder === 'sounds';
+    const targetDir = isSoundsFolder
+      ? path.join(baseDir, 'public', 'sounds')
+      : path.join(baseDir, 'public', 'uploads', cleanSubfolder);
 
     await fs.mkdir(targetDir, { recursive: true });
 
@@ -123,7 +126,9 @@ export async function POST(req: NextRequest) {
     await fs.writeFile(fullPath, buffer);
 
     // Build public URL
-    const publicUrl = `/uploads/${cleanSubfolder ? cleanSubfolder + '/' : ''}${filename}`;
+    const publicUrl = isSoundsFolder 
+      ? `/sounds/${filename}` 
+      : `/uploads/${cleanSubfolder ? cleanSubfolder + '/' : ''}${filename}`;
 
     return NextResponse.json({
       success: true,
@@ -153,6 +158,18 @@ export async function DELETE(req: NextRequest) {
         baseDir = path.join(baseDir, '..', '..');
       }
       const filePath = path.join(baseDir, 'public', 'uploads', cleanPath);
+      try {
+        await fs.unlink(filePath);
+      } catch (err) {
+        console.warn("Local file unlink note:", filePath, err);
+      }
+    } else if (fileUrl.startsWith('/sounds/') || fileUrl.startsWith('sounds/')) {
+      const cleanPath = fileUrl.replace(/^\/?sounds\//, '');
+      let baseDir = process.cwd();
+      if (baseDir.includes(path.join('.next', 'standalone')) || baseDir.endsWith('standalone')) {
+        baseDir = path.join(baseDir, '..', '..');
+      }
+      const filePath = path.join(baseDir, 'public', 'sounds', cleanPath);
       try {
         await fs.unlink(filePath);
       } catch (err) {

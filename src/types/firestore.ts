@@ -438,6 +438,7 @@ export interface GlobalWebSettings {
   isChatEnabled?: boolean; 
   isAiChatBotEnabled?: boolean; // New: Master switch for the AI bot
   chatNotificationSoundUrl?: string;
+  bookingNotificationSoundUrl?: string;
   globalAdminPopup?: GlobalAdminPopup;
   adminUserUidForChat?: string; 
   isCookieConsentEnabled?: boolean; 

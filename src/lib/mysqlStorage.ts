@@ -27,6 +27,9 @@ function getUploadPath(refPath: string): string {
   if (refPath.includes('pdf') || refPath.endsWith('.pdf')) {
     return 'pdf';
   }
+  if (refPath.includes('sounds') || refPath.startsWith('sounds/')) {
+    return 'sounds';
+  }
   const match = refPath.match(/uploads\/([^/]+)/);
   return match ? match[1] : 'general';
 }
