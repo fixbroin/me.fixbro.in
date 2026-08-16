@@ -4,6 +4,7 @@ import { adminDb } from '@/lib/firebaseAdmin';
 import { AppSettings, FirestoreService, FirestoreSubCategory, TimeSlotCategoryLimit, FirestoreBooking, LeaveRequest } from '@/types/firestore';
 import { defaultAppSettings } from '@/config/appDefaults';
 import { getZonedDate, formatZonedDateToISO, convertWallClockToUTC } from '@/lib/utils';
+import { getHaversineDistance } from '@/lib/locationUtils';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -20,7 +21,7 @@ const DEFAULT_HOURS_WHEN_LIMIT_ENABLED = defaultAppSettings.limitLateBookingHour
 // --- Performance Cache ---
 // Module-level cache for schedule simulation results
 // Keyed by date range, bookings hash, and limits hash
-const BUSY_MAP_CACHE = new Map<string, Map<string, Record<string, number>>>();
+const BUSY_MAP_CACHE = new Map<string, any>();
 const MAX_CACHE_SIZE = 100;
 
 // Config caching to prevent fetching settings on every click (2s TTL for instant admin reflection)
@@ -380,7 +381,7 @@ function* simulateProgression(
 
 export async function POST(req: NextRequest) {
     try {
-        const { selectedDate, cartEntries } = await req.json();
+        const { selectedDate, cartEntries, latitude, longitude } = await req.json();
 
         if (!selectedDate || !cartEntries) {
             return NextResponse.json({ error: "Missing required parameters." }, { status: 400 });
@@ -523,14 +524,20 @@ export async function POST(req: NextRequest) {
             .sort()
             .join('|');
             
-        const cacheKey = `${lookBackISO}_${dateISO}_${bookingsHash}_${limitsHash}_${appConfig.updatedAt?.toMillis() || 0}_${breakTimeMinutes}`;
+        const cacheKey = `${lookBackISO}_${dateISO}_${bookingsHash}_${limitsHash}_${appConfig.updatedAt?.toMillis() || 0}_${breakTimeMinutes}_${latitude || 0}_${longitude || 0}`;
         
-        let globalBusyMap: Map<string, Record<string, number>>;
+        let cacheData: {
+            globalBusyMap: Map<string, Record<string, number>>;
+            providerBusyMap: Map<string, Set<string>>;
+            adminBusyMap: Map<string, Record<string, number>>;
+        };
 
         if (BUSY_MAP_CACHE.has(cacheKey)) {
-            globalBusyMap = BUSY_MAP_CACHE.get(cacheKey)!;
+            cacheData = BUSY_MAP_CACHE.get(cacheKey)!;
         } else {
-            globalBusyMap = new Map<string, Record<string, number>>();
+            const globalBusyMap = new Map<string, Record<string, number>>();
+            const providerBusyMap = new Map<string, Set<string>>();
+            const adminBusyMap = new Map<string, Record<string, number>>();
 
             existingBookings.forEach(booking => {
                 let bookingWorkDuration = 0;
@@ -557,13 +564,29 @@ export async function POST(req: NextRequest) {
 
                 for (const step of progression) {
                     const key = getSlotKey(step.dateISO, step.minutes);
-                    const counts = globalBusyMap.get(key) || {};
                     
+                    // 1. Update Global Busy Map
+                    const counts = globalBusyMap.get(key) || {};
                     bookingCategoryIds.forEach(catId => {
                         counts[catId] = (counts[catId] || 0) + 1;
                     });
-                    
                     globalBusyMap.set(key, counts);
+
+                    // 2. Update Provider Busy Map
+                    if (booking.providerId) {
+                        const busySet = providerBusyMap.get(key) || new Set<string>();
+                        busySet.add(booking.providerId);
+                        providerBusyMap.set(key, busySet);
+                    }
+
+                    // 3. Update Admin Busy Map
+                    if (!booking.providerId) {
+                        const adminCounts = adminBusyMap.get(key) || {};
+                        bookingCategoryIds.forEach(catId => {
+                            adminCounts[catId] = (adminCounts[catId] || 0) + 1;
+                        });
+                        adminBusyMap.set(key, adminCounts);
+                    }
                 }
             });
 
@@ -573,8 +596,11 @@ export async function POST(req: NextRequest) {
                     BUSY_MAP_CACHE.delete(firstKey);
                 }
             }
-            BUSY_MAP_CACHE.set(cacheKey, globalBusyMap);
+            cacheData = { globalBusyMap, providerBusyMap, adminBusyMap };
+            BUSY_MAP_CACHE.set(cacheKey, cacheData);
         }
+        
+        const { globalBusyMap, providerBusyMap, adminBusyMap } = cacheData;
         // --- Cache Logic End ---
 
         // Check if selected date is fully blocked by a leave
@@ -589,9 +615,39 @@ export async function POST(req: NextRequest) {
         if (activeIntervals.length === 0) {
             return NextResponse.json({ availableTimeSlots: [], totalCartDuration });
         }
-
         const now = getZonedDate(new Date(), timezone);
         const earliestBookableTime = new Date(now.getTime() + (limitLateBookingHours * 60 * 60 * 1000));
+
+        // Fetch local approved providers for the required category IDs that cover the customer's coordinates
+        const localProvidersMap = new Map<string, any[]>();
+        for (const catId of cartCategoryIds) {
+            let providersList: any[] = [];
+            if (latitude !== undefined && longitude !== undefined) {
+                try {
+                    const providersSnapshot = await adminDb.collection('providerApplications')
+                        .where('status', '==', 'approved')
+                        .where('workCategoryId', '==', catId)
+                        .get();
+                    
+                    providersList = providersSnapshot.docs.map(doc => {
+                        const pData = doc.data() as any;
+                        let distance = Infinity;
+                        if (pData.workAreaCenter && pData.workAreaRadiusKm) {
+                            distance = getHaversineDistance(
+                                Number(latitude),
+                                Number(longitude),
+                                Number(pData.workAreaCenter.latitude),
+                                Number(pData.workAreaCenter.longitude)
+                            );
+                        }
+                        return { id: doc.id, ...pData, distance };
+                    }).filter(p => p.distance <= (p.workAreaRadiusKm || 0));
+                } catch (err) {
+                    console.error(`Error loading providers for category ${catId}:`, err);
+                }
+            }
+            localProvidersMap.set(catId, providersList);
+        }
 
         const availableSlots: { slot: string; remainingCapacity: number, endDateTime: string }[] = [];
 
@@ -644,14 +700,33 @@ export async function POST(req: NextRequest) {
                     isPathClear = false;
                 }
                 
+                // Track busy providers across the entire path steps
+                const busyProviderIds = new Set<string>();
                 for (const step of pathSteps) {
                     const key = getSlotKey(step.dateISO, step.minutes);
-                    const counts = globalBusyMap.get(key) || {};
-
+                    const busySet = providerBusyMap.get(key);
+                    if (busySet) {
+                        busySet.forEach(id => busyProviderIds.add(id));
+                    }
+                }
+                
+                for (const step of pathSteps) {
                     for (const catId of cartCategoryIds) {
-                        const limit = limitsData[catId]?.maxConcurrentBookings || 1;
-                        const currentBookings = counts[catId] || 0;
-                        const remaining = limit - currentBookings;
+                        const adminLimit = limitsData[catId]?.maxConcurrentBookings || 1;
+                        
+                        // Count unassigned admin bookings at this step key
+                        const key = getSlotKey(step.dateISO, step.minutes);
+                        const adminCounts = adminBusyMap.get(key) || {};
+                        const adminBookings = adminCounts[catId] || 0;
+
+                        const remainingAdminCapacity = Math.max(0, adminLimit - adminBookings);
+                        
+                        // Count available local providers
+                        const localProviders = localProvidersMap.get(catId) || [];
+                        const availableProviders = localProviders.filter(p => !busyProviderIds.has(p.id)).length;
+
+                        // Dynamic Remaining Capacity
+                        const remaining = remainingAdminCapacity + availableProviders;
                         
                         minRemainingCapacity = Math.min(minRemainingCapacity, remaining);
                         if (remaining <= 0) {

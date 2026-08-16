@@ -355,6 +355,8 @@ export default function CheckoutPage() {
             onSelect={handleScheduleSelect}
             initialDate={scheduledDate || undefined}
             initialSlot={scheduledSlot || undefined}
+            latitude={selectedAddress?.latitude ?? undefined}
+            longitude={selectedAddress?.longitude ?? undefined}
           />
         </DialogContent>
       </Dialog>

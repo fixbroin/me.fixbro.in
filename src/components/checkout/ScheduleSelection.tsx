@@ -41,9 +41,11 @@ interface ScheduleSelectionProps {
   onSelect: (date: Date, slot: string, endTime: string, interveningBreaks: any[], dailyTimeline?: any[]) => void;
   initialDate?: Date;
   initialSlot?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
-export default function ScheduleSelection({ onSelect, initialDate, initialSlot }: ScheduleSelectionProps) {
+export default function ScheduleSelection({ onSelect, initialDate, initialSlot, latitude, longitude }: ScheduleSelectionProps) {
   const slotsSectionRef = useRef<HTMLDivElement>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(initialDate);
   const [displayMonth, setDisplayMonth] = useState<Date>(initialDate || new Date());
@@ -258,7 +260,9 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot }
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 selectedDate: formatZonedDateToISO(date, appConfig?.timezone),
-                cartEntries: cartEntries
+                cartEntries: cartEntries,
+                latitude,
+                longitude
             })
         });
 
@@ -281,7 +285,7 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot }
         console.error("Error fetching available slots from API:", error);
         throw error;
     }
-  }, [appConfig?.timezone]);
+  }, [appConfig?.timezone, latitude, longitude]);
 
   useEffect(() => {
     if (!selectedDate || isLoadingAppSettings) return;

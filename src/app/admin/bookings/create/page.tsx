@@ -220,14 +220,19 @@ export default function AdminCreateBookingPage() {
 
         const response = await fetch('/api/checkout/available-slots', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ selectedDate: selectedDate.toISOString(), cartEntries })
+          body: JSON.stringify({ 
+            selectedDate: selectedDate.toISOString(), 
+            cartEntries,
+            latitude: customerDetails.latitude ? Number(customerDetails.latitude) : undefined,
+            longitude: customerDetails.longitude ? Number(customerDetails.longitude) : undefined
+          })
         });
         const data = await response.json();
         setAvailableSlots(data.availableTimeSlots || []);
       } catch (error) { console.error(error); } finally { setIsLoadingSlots(false); }
     };
     fetchSlots();
-  }, [selectedDate, bookingServices]);
+  }, [selectedDate, bookingServices, customerDetails.latitude, customerDetails.longitude]);
 
   // Synchronize slot details when available slots or selected slot changes
   useEffect(() => {

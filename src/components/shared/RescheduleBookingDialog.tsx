@@ -44,7 +44,9 @@ export default function RescheduleBookingDialog({ isOpen, onClose, booking, onRe
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     selectedDate: date.toISOString(),
-                    cartEntries: cartEntries
+                    cartEntries: cartEntries,
+                    latitude: booking.latitude,
+                    longitude: booking.longitude
                 })
             });
 
@@ -58,7 +60,7 @@ export default function RescheduleBookingDialog({ isOpen, onClose, booking, onRe
         } finally {
             setIsFetchingSlots(false);
         }
-    }, [booking.services, toast]);
+    }, [booking.services, booking.latitude, booking.longitude, toast]);
 
     useEffect(() => {
         if (isOpen && selectedDate) {
