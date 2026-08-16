@@ -66,6 +66,8 @@ const BookingConfirmationEmailInputSchema = z.object({
   siteName: z.string().optional(),
   logoUrl: z.string().optional(),
   currencySymbol: z.string().optional().describe("Currency symbol to use in email templates."),
+  providerName: z.string().optional(),
+  providerPhone: z.string().optional(),
 });
 
 export type BookingConfirmationEmailInput = z.infer<typeof BookingConfirmationEmailInputSchema>;
@@ -176,6 +178,8 @@ const bookingEmailFlow = ai.defineFlow(
         cancellationReason,
         logoUrl,
         currencySymbol = "Rs.",
+        providerName,
+        
       } = bookingDetails;
 
       const paymentSummaryHtml = `
@@ -290,16 +294,39 @@ const bookingEmailFlow = ai.defineFlow(
         adminEmailSubject = `Booking Cancelled by Admin (ID: ${bookingDetails.bookingId})`;
         adminEmailBody = createHtmlTemplate('Admin Alert: Booking Cancelled', `<p>Booking ID <strong>${bookingDetails.bookingId}</strong> for <strong>${bookingDetails.customerName}</strong> was cancelled by an admin.</p>`, siteName, logoUrl);
       } else if (emailType === 'booking_status_update') {
-        customerEmailSubject = `Update on your ${siteName} booking (ID: ${bookingDetails.bookingId})`;
-        customerEmailBody = createHtmlTemplate('Booking Status Updated', `
-            <p>Hi ${bookingDetails.customerName},</p>
-            <p>The status of your service booking (ID: <strong>${bookingDetails.bookingId}</strong>) has been updated to: <strong>${bookingDetails.status}</strong>.</p>
-            <p style="text-align: center; margin-top: 30px;">
-              <a href="${getBaseUrl()}/my-bookings" class="button">View Booking Status</a>
-            </p>
-        `, siteName, logoUrl);
-        adminEmailSubject = `Booking Status Updated (ID: ${bookingDetails.bookingId})`;
-        adminEmailBody = createHtmlTemplate('Admin Alert: Status Updated', `<p>Booking ID <strong>${bookingDetails.bookingId}</strong> status changed to <strong>${bookingDetails.status}</strong>.</p>`, siteName, logoUrl);
+        if (bookingDetails.status === 'AssignedToProvider') {
+          customerEmailSubject = `Technician Assigned to your Booking (ID: ${bookingDetails.bookingId})`;
+          customerEmailBody = createHtmlTemplate('Technician Assigned', `
+              <p>Hi ${bookingDetails.customerName},</p>
+              <p>We have successfully assigned a service professional to your booking (ID: <strong>${bookingDetails.bookingId}</strong>).</p>
+              <div class="summary-box">
+                <div class="section-title">Technician Details</div>
+                <p style="margin: 5px 0;"><strong>Name:</strong> ${providerName || 'N/A'}</p>
+                <p style="margin: 5px 0; margin-top: 15px;"><strong>Scheduled Time:</strong> ${formatScheduledDate(bookingDetails.scheduledDate)} at ${bookingDetails.scheduledTimeSlot}</p>
+              </div>
+              <p style="text-align: center; margin-top: 30px;">
+                <a href="${getBaseUrl()}/my-bookings" class="button">View Booking Details</a>
+              </p>
+          `, siteName, logoUrl);
+          adminEmailSubject = `Provider Assigned to Booking (ID: ${bookingDetails.bookingId})`;
+          adminEmailBody = createHtmlTemplate('Admin Alert: Provider Assigned', `
+              <p>Booking ID <strong>${bookingDetails.bookingId}</strong> has been successfully assigned to provider <strong>${providerName || 'N/A'}</strong>.</p>
+              <p style="margin-top: 20px;">
+                <a href="${getBaseUrl()}/admin/bookings" class="button">Open Admin Panel</a>
+              </p>
+          `, siteName, logoUrl);
+        } else {
+          customerEmailSubject = `Update on your ${siteName} booking (ID: ${bookingDetails.bookingId})`;
+          customerEmailBody = createHtmlTemplate('Booking Status Updated', `
+              <p>Hi ${bookingDetails.customerName},</p>
+              <p>The status of your service booking (ID: <strong>${bookingDetails.bookingId}</strong>) has been updated to: <strong>${bookingDetails.status}</strong>.</p>
+              <p style="text-align: center; margin-top: 30px;">
+                <a href="${getBaseUrl()}/my-bookings" class="button">View Booking Status</a>
+              </p>
+          `, siteName, logoUrl);
+          adminEmailSubject = `Booking Status Updated (ID: ${bookingDetails.bookingId})`;
+          adminEmailBody = createHtmlTemplate('Admin Alert: Status Updated', `<p>Booking ID <strong>${bookingDetails.bookingId}</strong> status changed to <strong>${bookingDetails.status}</strong>.</p>`, siteName, logoUrl);
+        }
       } else { // booking_confirmation (default)
         customerEmailSubject = `Your ${siteName} Booking Confirmed! (ID: ${bookingDetails.bookingId})`;
         customerEmailBody = createHtmlTemplate('Booking Confirmed!', `

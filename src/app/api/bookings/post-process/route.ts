@@ -125,6 +125,22 @@ export async function POST(request: Request) {
     }
     // --- END SMART TAGGING & AUTO-DISPATCH ---
 
+    // Fetch provider details if providerId exists (either auto-assigned or manually assigned)
+    let providerName = "";
+    let providerPhone = "";
+    if (booking.providerId) {
+        try {
+            const pAppDoc = await adminDb.collection('providerApplications').doc(booking.providerId).get();
+            if (pAppDoc.exists) {
+                const pData = pAppDoc.data() as any;
+                providerName = pData.fullName || "";
+                providerPhone = pData.phone || pData.mobileNumber || "";
+            }
+        } catch (err) {
+            console.error("Error fetching provider details in post-process:", err);
+        }
+    }
+
     const tasks: Promise<any>[] = [];
 
     // --- Determine Email Type ---
@@ -139,7 +155,13 @@ export async function POST(request: Request) {
     } else if (!booking.isConfirmationEmailSent) {
         // First time booking is processed, send confirmation
         emailType = 'booking_confirmation';
-        tasks.push(adminDb.collection('bookings').doc(bookingDocId).update({ isConfirmationEmailSent: true }));
+        // Synchronous update to prevent duplicate email triggers from aborted checkouts/concurrent requests
+        try {
+            await adminDb.collection('bookings').doc(bookingDocId).update({ isConfirmationEmailSent: true });
+            booking.isConfirmationEmailSent = true;
+        } catch (e) {
+            console.error("Error setting isConfirmationEmailSent:", e);
+        }
     } else {
         // Subsequent status updates
         emailType = 'booking_status_update';
@@ -407,6 +429,9 @@ export async function POST(request: Request) {
               } else if (isRescheduled) {
                   adminTitle = "Booking Rescheduled";
                   adminMessage = `Booking ${booking.bookingId} has been rescheduled to ${formatScheduledDate(booking.scheduledDate)} at ${booking.scheduledTimeSlot}.`;
+              } else if (currentStatus === 'AssignedToProvider') {
+                  adminTitle = "Provider Assigned";
+                  adminMessage = `Booking ${booking.bookingId} has been assigned to provider ${providerName || 'N/A'}.`;
               } else if (emailType === 'booking_confirmation') {
                   adminTitle = "New Booking Received!";
                   adminMessage = `A new booking ${booking.bookingId} has been placed by ${booking.customerName}.`;
@@ -440,12 +465,27 @@ export async function POST(request: Request) {
     }
 
     if (userId) {
+        let customerTitle = "Booking Confirmed!";
+        let customerMessage = `Your booking ${booking.bookingId} is confirmed.`;
+
+        if (isCompleted) {
+            customerTitle = "Service Completed!";
+            customerMessage = `Your service ${booking.bookingId} is now complete.`;
+        } else if (isCancelled) {
+            customerTitle = "Booking Cancelled";
+            customerMessage = `Your booking ${booking.bookingId} has been cancelled.`;
+        } else if (isRescheduled) {
+            customerTitle = "Booking Rescheduled!";
+            customerMessage = `Your booking ${booking.bookingId} has been rescheduled to ${formatScheduledDate(booking.scheduledDate)} at ${booking.scheduledTimeSlot}.`;
+        } else if (currentStatus === 'AssignedToProvider') {
+            customerTitle = "Technician Assigned!";
+            customerMessage = `Technician ${providerName || 'Professional'} has been assigned to your booking ${booking.bookingId}.`;
+        }
+
         tasks.push(triggerPush(
             userId, 
-            isCompleted ? "Service Completed!" : "Booking Confirmed!", 
-            isCompleted 
-                ? `Your service ${booking.bookingId} is now complete.`
-                : `Your booking ${booking.bookingId} is confirmed.`, 
+            customerTitle, 
+            customerMessage, 
             "/my-bookings"
         ));
     }
@@ -524,6 +564,8 @@ export async function POST(request: Request) {
             name: fee.name, 
             amount: fee.calculatedFeeAmount + fee.taxAmountOnFee 
         })),
+        providerName: providerName || undefined,
+        providerPhone: providerPhone || undefined,
     };
 
     // Only send if it's NOT a generic status update, OR if the toggle is enabled
