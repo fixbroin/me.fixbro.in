@@ -331,10 +331,11 @@ export default function AdminSettingsPage() {
 
       if (['carouselAutoplayDelay', 'visitingChargeTaxPercent', 'minimumBookingAmount', 'visitingChargeAmount', 'limitLateBookingHours', 'freeCancellationDays', 'freeCancellationHours', 'freeCancellationMinutes', 'cancellationFeeValue', 'maxProviderRadiusKm', 'autoDispatchRadiusKm', 'timeSlotSettings.slotIntervalMinutes', 'timeSlotSettings.breakTimeMinutes', 'currencyDecimalPoints'].includes(name)) {
         const keys = name.split('.');
+        const parsedValue = value === '' ? '' : (isNaN(parseFloat(value)) ? 0 : parseFloat(value));
         if (keys.length > 1) {
-          (newSettings as any)[keys[0]][keys[1]] = parseFloat(value) || 0;
+          (newSettings as any)[keys[0]][keys[1]] = parsedValue;
         } else {
-           newSettings[name as keyof AppSettings] = parseFloat(value) || 0;
+           newSettings[name as keyof AppSettings] = parsedValue as any;
         }
       }
       else {
@@ -472,6 +473,28 @@ export default function AdminSettingsPage() {
       },
       updatedAt: Timestamp.now(),
     };
+
+    // Sanitize any empty string values from numeric fields back to 0 before saving to database
+    const numericKeys = [
+      'carouselAutoplayDelay', 'visitingChargeTaxPercent', 'minimumBookingAmount', 
+      'visitingChargeAmount', 'limitLateBookingHours', 'freeCancellationDays', 
+      'freeCancellationHours', 'freeCancellationMinutes', 'cancellationFeeValue', 
+      'maxProviderRadiusKm', 'autoDispatchRadiusKm', 'currencyDecimalPoints'
+    ];
+    numericKeys.forEach(key => {
+      if ((settingsToSave as any)[key] === '') {
+        (settingsToSave as any)[key] = 0;
+      }
+    });
+
+    if (settingsToSave.timeSlotSettings) {
+      if ((settingsToSave.timeSlotSettings as any).slotIntervalMinutes === '') {
+        settingsToSave.timeSlotSettings.slotIntervalMinutes = 0;
+      }
+      if ((settingsToSave.timeSlotSettings as any).breakTimeMinutes === '') {
+        settingsToSave.timeSlotSettings.breakTimeMinutes = 0;
+      }
+    }
 
     // Ensure isVisitingChargeTaxInclusive is false if conditions aren't met
     if (!settingsToSave.enableTaxOnVisitingCharge || (settingsToSave.visitingChargeTaxPercent || 0) <= 0) {
