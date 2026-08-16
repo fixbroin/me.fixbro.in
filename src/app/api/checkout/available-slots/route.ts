@@ -712,7 +712,9 @@ export async function POST(req: NextRequest) {
                 
                 for (const step of pathSteps) {
                     for (const catId of cartCategoryIds) {
-                        const adminLimit = limitsData[catId]?.maxConcurrentBookings || 1;
+                         const adminLimit = (limitsData[catId] && typeof limitsData[catId].maxConcurrentBookings === 'number')
+                             ? limitsData[catId].maxConcurrentBookings
+                             : 1;
                         
                         // Count unassigned admin bookings at this step key
                         const key = getSlotKey(step.dateISO, step.minutes);

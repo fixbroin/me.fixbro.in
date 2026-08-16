@@ -21,7 +21,7 @@ const timeSlotLimitFormSchema = z.object({
   categoryId: z.string({ required_error: "Please select a category." }),
   maxConcurrentBookings: z.coerce
     .number()
-    .min(1, { message: "Limit must be at least 1." })
+    .min(0, { message: "Limit must be at least 0." })
     .max(100, { message: "Limit cannot exceed 100." }), // Sensible upper bound
 });
 
@@ -215,7 +215,7 @@ export default function TimeSlotCategoryLimitForm({
                 <Input type="number" placeholder="e.g., 2" {...field} disabled={effectiveIsSubmitting} />
               </FormControl>
               <FormDescription>
-                How many bookings for this category can exist in the same time slot.
+                How many bookings for this category can exist in the same time slot. Set to 0 to only allow bookings based on active providers' locations/capacity.
               </FormDescription>
               <FormMessage />
             </FormItem>
