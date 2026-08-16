@@ -238,6 +238,7 @@ export interface FirestoreBooking {
   autoAssigned?: boolean;
   isProviderNotified?: boolean;
   workCategoryId?: string;
+  autoDispatchBypassed?: boolean;
 }
 
 export interface Address {

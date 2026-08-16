@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tag, Eye, Loader2, PackageSearch, XCircle, Edit, Trash2, CalendarDays, Clock, UserCheck2, MoreHorizontal, Users, ListOrdered, ChevronDown, Search, MapPin, Phone, Mail, IndianRupee, History, PlusCircle, ShieldCheck, AlertTriangle, Check, ChevronsUpDown } from "lucide-react"; 
+import { Tag, Eye, Loader2, PackageSearch, XCircle, Edit, Trash2, CalendarDays, Clock, UserCheck2, MoreHorizontal, Users, UserX, ListOrdered, ChevronDown, Search, MapPin, Phone, Mail, IndianRupee, History, PlusCircle, ShieldCheck, AlertTriangle, Check, ChevronsUpDown } from "lucide-react"; 
 import type { FirestoreBooking, BookingStatus, BookingServiceItem, AppSettings, ProviderApplication, FirestoreNotification, MarketingAutomationSettings, ReferralSettings, FirestoreUser, Referral, DayAvailability } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { triggerPushNotification } from '@/lib/fcmUtils';
@@ -506,6 +506,60 @@ export default function AdminBookingsPage() {
     } catch (err) { toast({ title: "Failed", variant: "destructive" }); } finally { setIsUpdatingStatus(null); }
   };
 
+  const handleUnassignProvider = async (booking: FirestoreBooking) => {
+    if (!booking.id) return;
+    setIsUpdatingStatus(booking.id);
+    try {
+      const updateData = { 
+        providerId: deleteField(), 
+        status: "Confirmed" as BookingStatus, 
+        isProviderNotified: false,
+        autoDispatchBypassed: true,
+        updatedAt: Timestamp.now() 
+      };
+      await updateDoc(doc(db, "bookings", booking.id), updateData);
+      
+      // Notify the provider they have been unassigned
+      if (booking.providerId) {
+        try {
+          const providerNotificationData: Omit<FirestoreNotification, 'id'> = {
+            userId: booking.providerId,
+            title: "Job Unassigned",
+            message: `You have been unassigned from booking ${booking.bookingId}.`,
+            type: 'info',
+            href: '/provider',
+            read: false,
+            createdAt: Timestamp.now(),
+          };
+          await addDoc(collection(db, "userNotifications"), providerNotificationData);
+
+          triggerPushNotification({
+            userId: booking.providerId,
+            title: "Job Unassigned",
+            body: `You have been unassigned from booking ${booking.bookingId}.`,
+            href: '/provider'
+          });
+        } catch (notifErr) {
+          console.error("Error creating unassign notification for provider:", notifErr);
+        }
+      }
+
+      // Update local state to reflect changes immediately
+      setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, providerId: undefined, status: "Confirmed", isProviderNotified: false, autoDispatchBypassed: true } : b));
+      if (selectedBooking?.id === booking.id) {
+        setSelectedBooking(prev => prev ? { ...prev, providerId: undefined, status: "Confirmed", isProviderNotified: false, autoDispatchBypassed: true } : null);
+      }
+
+      await triggerRefresh('bookings');
+      fetch('/api/bookings/post-process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bookingDocId: booking.id }) });
+      toast({ title: "Unassigned", description: "Provider has been unassigned successfully." });
+    } catch (err) { 
+      toast({ title: "Failed to unassign", variant: "destructive" }); 
+    } finally { 
+      setIsUpdatingStatus(null); 
+    }
+  };
+
   const handleRescheduleConfirm = async (newDate: string, newSlot: string, newEndTime: string) => {
     if (!bookingToReschedule?.id) return;
     
@@ -630,8 +684,23 @@ export default function AdminBookingsPage() {
           <Button variant="outline" size="sm" className="flex-1 font-bold h-9" onClick={() => { setBookingToEditId(booking.id || null); setIsEditModalOpen(true); }}>Edit</Button>
         </PermissionGuard>
         <PermissionGuard moduleId="bookings" action="write">
-          <Button variant="default" size="sm" className="flex-1 font-bold h-9" onClick={() => { setBookingToAssign(booking); setIsAssignModalOpen(true); }} disabled={["Completed", "Cancelled"].includes(booking.status)}>Assign</Button>
+          <Button variant="default" size="sm" className="flex-1 font-bold h-9" onClick={() => { setBookingToAssign(booking); setIsAssignModalOpen(true); }} disabled={["Completed", "Cancelled"].includes(booking.status)}>
+            {booking.providerId ? "Reassign" : "Assign"}
+          </Button>
         </PermissionGuard>
+        {booking.providerId && (
+          <PermissionGuard moduleId="bookings" action="write">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1 font-bold h-9 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 shadow-sm" 
+              onClick={() => handleUnassignProvider(booking)}
+              disabled={isUpdatingStatus === booking.id || ["Completed", "Cancelled"].includes(booking.status)}
+            >
+              Unassign
+            </Button>
+          </PermissionGuard>
+        )}
         <PermissionGuard moduleId="bookings" action="delete">
           <AlertDialog>
             <AlertDialogTrigger asChild><Button variant="destructive" size="sm" className="h-9 px-3 bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors" disabled={isDeleting === booking.id}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
@@ -815,6 +884,19 @@ export default function AdminBookingsPage() {
                                   <Users className="mr-1.5 h-4 w-4" /> {b.providerId ? "Reassign" : "Assign Provider"}
                                 </Button>
                               </PermissionGuard>
+                              {b.providerId && (
+                                <PermissionGuard moduleId="bookings" action="write">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-9 px-4 font-bold text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 shadow-sm" 
+                                    onClick={() => handleUnassignProvider(b)}
+                                    disabled={isUpdatingStatus === b.id || ["Completed", "Cancelled"].includes(b.status)}
+                                  >
+                                    <UserX className="mr-1.5 h-4 w-4" /> Unassign
+                                  </Button>
+                                </PermissionGuard>
+                              )}
                               <Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => { setSelectedBooking(b); setIsDetailsModalOpen(true); }}>Details</Button>
                               <PermissionGuard moduleId="bookings" action="write">
                                 <Button variant="outline" size="sm" className="h-9 px-4 font-bold" onClick={() => { setBookingToEditId(b.id || null); setIsEditModalOpen(true); }}>Edit</Button>

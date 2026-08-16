@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     const seoSettings = seoSettingsDoc.data() as any;
 
     // --- SERVER-SIDE SMART TAGGING & AUTO-DISPATCH ---
-    if (!booking.providerId && booking.workCategoryId && booking.latitude && booking.longitude && currentStatus !== 'Cancelled') {
+    if (!booking.providerId && booking.workCategoryId && booking.latitude && booking.longitude && currentStatus !== 'Cancelled' && !booking.autoDispatchBypassed) {
         try {
             const providersSnapshot = await adminDb.collection('providerApplications')
                 .where('status', '==', 'approved')
