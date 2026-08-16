@@ -429,13 +429,17 @@ export async function POST(request: Request) {
               } else if (isRescheduled) {
                   adminTitle = "Booking Rescheduled";
                   adminMessage = `Booking ${booking.bookingId} has been rescheduled to ${formatScheduledDate(booking.scheduledDate)} at ${booking.scheduledTimeSlot}.`;
+              } else if (emailType === 'booking_confirmation') {
+                  adminTitle = "New Booking Received!";
+                  if (booking.providerId) {
+                      adminMessage = `A new booking ${booking.bookingId} by ${booking.customerName} has been placed and auto-assigned to ${providerName || 'a provider'}.`;
+                  } else {
+                      adminMessage = `A new booking ${booking.bookingId} has been placed by ${booking.customerName}.`;
+                  }
+                  notificationType = 'admin_alert';
               } else if (currentStatus === 'AssignedToProvider') {
                   adminTitle = "Provider Assigned";
                   adminMessage = `Booking ${booking.bookingId} has been assigned to provider ${providerName || 'N/A'}.`;
-              } else if (emailType === 'booking_confirmation') {
-                  adminTitle = "New Booking Received!";
-                  adminMessage = `A new booking ${booking.bookingId} has been placed by ${booking.customerName}.`;
-                  notificationType = 'admin_alert';
               }
 
               adminsSnapshot.forEach(adminDoc => {

@@ -370,6 +370,7 @@ const bookingEmailFlow = ai.defineFlow(
               ${addressBlock}
               <li style="margin-bottom: 5px; margin-top: 10px;"><strong>Payment:</strong> ${bookingDetails.paymentMethod}</li>
               <li style="margin-bottom: 5px;"><strong>Status:</strong> ${bookingDetails.status}</li>
+              ${providerName ? `<li style="margin-bottom: 5px; margin-top: 10px; color: #0B5ED7;"><strong>Auto-Assigned Provider:</strong> ${providerName}</li>` : ''}
             </ul>
             
             <div class="section-title" style="margin-top: 25px;">Services Requested</div>
