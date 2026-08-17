@@ -982,7 +982,16 @@ export default function AdminCreateBookingPage() {
       </Dialog>
 
       <Dialog open={isMapModalOpen} onOpenChange={setIsMapModalOpen}>
-        <DialogContent className="max-w-3xl w-[95vw] sm:w-[90vw] h-[80vh] p-0 flex flex-col" aria-describedby={undefined}>
+        <DialogContent 
+          className="max-w-3xl w-[95vw] sm:w-[90vw] h-[80vh] p-0 flex flex-col" 
+          aria-describedby={undefined}
+          onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('.pac-container')) {
+              e.preventDefault();
+            }
+          }}
+        >
           <DialogHeader className="p-4 border-b">
             <DialogTitle>Select Service Location</DialogTitle>
             <DialogDescription>Select location on map.</DialogDescription>
