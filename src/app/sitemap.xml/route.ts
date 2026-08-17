@@ -13,21 +13,41 @@ export async function GET(request: Request) {
     const baseUrl = `${proto}://${host}`;
 
     const entries = await getCachedSitemapEntries();
+    const prodBaseUrl = getBaseUrl();
     
     const CHUNK_SIZE = 45000;
-    const numSitemaps = Math.ceil(entries.length / CHUNK_SIZE);
     
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-    xml += `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
     
-    for (let i = 0; i < Math.max(1, numSitemaps); i++) {
-      xml += `  <sitemap>\n`;
-      xml += `    <loc>${baseUrl}/sitemaps/chunk-${i}.xml</loc>\n`;
-      xml += `    <lastmod>${new Date().toISOString()}</lastmod>\n`;
-      xml += `  </sitemap>\n`;
+    if (entries.length <= CHUNK_SIZE) {
+      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+      entries.forEach(entry => {
+        const url = entry.url.replace(prodBaseUrl, baseUrl);
+        xml += `  <url>\n`;
+        xml += `    <loc>${url}</loc>\n`;
+        if (entry.lastModified) {
+          xml += `    <lastmod>${entry.lastModified}</lastmod>\n`;
+        }
+        if (entry.changeFrequency) {
+          xml += `    <changefreq>${entry.changeFrequency}</changefreq>\n`;
+        }
+        if (entry.priority !== undefined) {
+          xml += `    <priority>${entry.priority.toFixed(1)}</priority>\n`;
+        }
+        xml += `  </url>\n`;
+      });
+      xml += `</urlset>\n`;
+    } else {
+      const numSitemaps = Math.ceil(entries.length / CHUNK_SIZE);
+      xml += `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+      for (let i = 0; i < numSitemaps; i++) {
+        xml += `  <sitemap>\n`;
+        xml += `    <loc>${baseUrl}/sitemaps/chunk-${i}.xml</loc>\n`;
+        xml += `    <lastmod>${new Date().toISOString()}</lastmod>\n`;
+        xml += `  </sitemap>\n`;
+      }
+      xml += `</sitemapindex>\n`;
     }
-    
-    xml += `</sitemapindex>\n`;
     
     return new NextResponse(xml, {
       status: 200,

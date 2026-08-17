@@ -1364,7 +1364,7 @@ export default function AdminSettingsPage() {
                             id="timeSlotSettings.breakTimeMinutes"
                             name="timeSlotSettings.breakTimeMinutes"
                             type="number"
-                            value={settings.timeSlotSettings.breakTimeMinutes || 0}
+                            value={settings.timeSlotSettings.breakTimeMinutes !== undefined ? settings.timeSlotSettings.breakTimeMinutes : 0}
                             onChange={handleInputChange}
                             placeholder="e.g., 15"
                             disabled={isSaving}
