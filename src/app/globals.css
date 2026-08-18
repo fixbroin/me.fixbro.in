@@ -141,3 +141,9 @@ html, body {
 .keyboard-active footer.fixed.bottom-0 {
     display: none !important;
 }
+
+/* Change sticky bottom elements to static/relative position when keyboard is active to prevent floating/covering input fields */
+.keyboard-active .sticky.bottom-0,
+.keyboard-active [class*="sticky"][class*="bottom-0"] {
+    position: static !important;
+}
