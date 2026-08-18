@@ -134,3 +134,10 @@ html, body {
 [data-sidebar="content"]::-webkit-scrollbar-thumb:hover {
   background-color: hsl(var(--muted-foreground) / 0.5);
 }
+
+/* Hide fixed bottom navigation and action bars when keyboard is active to prevent floating */
+.keyboard-active nav.fixed.bottom-0,
+.keyboard-active div.fixed.bottom-0,
+.keyboard-active footer.fixed.bottom-0 {
+    display: none !important;
+}

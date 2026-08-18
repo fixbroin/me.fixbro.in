@@ -16,6 +16,7 @@ import PageViewTracker from '@/components/layout/PageViewTracker';
 import ThemeInjector from '@/components/layout/ThemeInjector';
 import DynamicManifest from '@/components/layout/DynamicManifest';
 import ScrollMemory from '@/components/layout/ScrollMemory';
+import KeyboardBehaviorManager from '@/components/layout/KeyboardBehaviorManager';
 import { DEFAULT_LIGHT_THEME_COLORS_HSL, DEFAULT_DARK_THEME_COLORS_HSL, hslStringToHex, generatePaletteCssVariables } from '@/lib/colorUtils';
 import { getGlobalWebSettings, getGlobalAppSettings } from '@/lib/webServerUtils';
 
@@ -164,6 +165,7 @@ export default async function RootLayout({
         <AuthProvider>
           <LoadingProvider>
             <DynamicManifest />
+            <KeyboardBehaviorManager />
             <Suspense fallback={null}>
               <ScrollMemory />
             </Suspense>
