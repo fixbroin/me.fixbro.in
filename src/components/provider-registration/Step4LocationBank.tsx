@@ -700,7 +700,7 @@ export default function Step4LocationBank({
 
       {/* Popups Flow */}
       <Dialog open={isMapModalOpen} onOpenChange={(open) => { if (!open) setIsMapModalOpen(false); }}>
-        <DialogContent className="max-w-3xl w-[95vw] h-[80vh] p-0 flex flex-col" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()} hideCloseButton={true}>
+        <DialogContent className="max-w-3xl w-[95vw] h-[90vh] p-0 flex flex-col" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()} hideCloseButton={true}>
           <DialogHeader className="p-4 border-b">
             <DialogTitle>Set Your Service Location</DialogTitle>
             <DialogDescription>Select the center point from where you will provide services.</DialogDescription>

@@ -852,7 +852,7 @@ export default function CustomServiceRequestForm({
 
       <Dialog open={isMapModalOpen} onOpenChange={setIsMapModalOpen}>
         <DialogContent 
-          className="max-w-3xl w-[95vw] h-[80vh] p-0 flex flex-col"
+          className="max-w-3xl w-[95vw] h-[90vh] p-0 flex flex-col"
           onPointerDownOutside={(e) => {
             const target = e.target as HTMLElement;
             if (target.closest('.pac-container')) {
@@ -879,7 +879,7 @@ export default function CustomServiceRequestForm({
 
       {/* Address Form Dialog */}
       <Dialog open={isAddressFormOpen} onOpenChange={setIsAddressFormOpen}>
-        <DialogContent className="max-w-lg w-[95vw] max-h-[85vh] overflow-y-auto p-6">
+        <DialogContent className="max-w-lg w-[95vw] max-h-[90vh] overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle>Complete Address Details</DialogTitle>
           </DialogHeader>

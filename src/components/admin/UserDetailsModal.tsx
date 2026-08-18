@@ -85,7 +85,7 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col max-h-[80vh] relative">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col max-h-[90vh] relative">
         <DialogHeader className="p-3 pb-4 border-b flex-shrink-0">
           <div className="flex items-center space-x-4">
             <Avatar className="h-16 w-16">

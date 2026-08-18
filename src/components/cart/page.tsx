@@ -530,7 +530,7 @@ function CartPageContent() {
                                     <Info className="h-3.5 w-3.5 text-muted-foreground hover:text-primary"/>
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent className="w-[90vw] sm:max-w-2xl md:max-w-3xl max-h-[85vh] overflow-y-auto">
+                            <DialogContent className="w-[90vw] sm:max-w-2xl md:max-w-3xl max-h-[90vh] overflow-y-auto">
                                 <DialogHeader>
                                     <DialogTitle>Tax Breakdown</DialogTitle>
                                 </DialogHeader>

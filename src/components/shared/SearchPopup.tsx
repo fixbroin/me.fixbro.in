@@ -127,7 +127,7 @@ export default function SearchPopup({ isOpen, onClose }: SearchPopupProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="w-[90%] sm:max-w-lg md:max-w-xl lg:max-w-2xl h-[80vh] max-h-[700px] flex flex-col p-0">
+      <DialogContent className="w-[90%] sm:max-w-lg md:max-w-xl lg:max-w-2xl h-[90vh] max-h-[700px] flex flex-col p-0">
         <DialogHeader className="p-4 sm:p-3 pb-2 border-b">
           <DialogTitle className="font-headline flex items-center">
             <Search className="mr-2 h-5 w-5 text-primary" /> Search Services

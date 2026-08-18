@@ -482,7 +482,7 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       </CardFooter>
 
       <Dialog open={isTaxBreakdownOpen} onOpenChange={setIsTaxBreakdownOpen}>
-        <DialogContent className="w-[90vw] sm:max-w-2xl md:max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[90vw] sm:max-w-2xl md:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Tax Breakdown</DialogTitle>
             <DialogDescription>

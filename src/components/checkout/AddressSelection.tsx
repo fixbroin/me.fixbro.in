@@ -395,7 +395,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
 
       <Dialog open={isMapModalOpen} onOpenChange={setIsMapModalOpen}>
         <DialogContent 
-          className="max-w-3xl w-[95vw] sm:w-[90vw] h-[80vh] p-0 flex flex-col" 
+          className="max-w-3xl w-[95vw] sm:w-[90vw] h-[90vh] p-0 flex flex-col" 
           aria-describedby={undefined}
           onPointerDownOutside={(e) => {
             const target = e.target as HTMLElement;
