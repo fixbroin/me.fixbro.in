@@ -710,7 +710,7 @@ export default function AdminCitiesPage() {
       </Card>
 
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) { setIsFormOpen(open); if (!open) setEditingCity(null); } }}>
-        <DialogContent className="w-[calc(100%-6px)] sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[85vh] overflow-y-auto p-0">
+        <DialogContent className="w-[calc(100%-6px)] sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[90vh] overflow-y-auto p-0">
           <DialogHeader className="p-3 pb-4 border-b sticky top-0 bg-background z-10">
             <DialogTitle>{editingCity ? 'Edit City' : 'Add New City'}</DialogTitle>
             <DialogDescription>
@@ -775,7 +775,7 @@ export default function AdminCitiesPage() {
       </Dialog>
 
       <Dialog open={isCountryImportOpen} onOpenChange={(open) => { if (!isImportingCities && !isSearchingCountry) { setIsCountryImportOpen(open); } }}>
-        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto p-0">
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-0">
           <DialogHeader className="p-4 pb-2 border-b">
             <DialogTitle className="flex items-center"><Globe className="mr-2 h-5 w-5 text-emerald-500" /> Import Cities from Country / State</DialogTitle>
             <DialogDescription>

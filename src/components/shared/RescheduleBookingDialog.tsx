@@ -95,7 +95,7 @@ export default function RescheduleBookingDialog({ isOpen, onClose, booking, onRe
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-3xl sm:max-w-[700px] max-h-[85vh] flex flex-col p-0 overflow-hidden">
+            <DialogContent className="max-w-3xl sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
                 <DialogHeader className="p-3 border-b bg-muted/20">
                     <DialogTitle className="text-2xl flex items-center gap-2">
                         <CalendarDays className="h-6 w-6 text-primary" />

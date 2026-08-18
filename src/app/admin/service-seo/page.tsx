@@ -612,7 +612,7 @@ export default function ServiceSeoPage() {
 
       {/* Add / Edit Form Overlay Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingSetting ? `Edit local SEO Config: ${editingSetting.serviceName}` : "Create Localized Service SEO Page"}</DialogTitle>
             <DialogDescription>

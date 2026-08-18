@@ -344,7 +344,7 @@ export default function CheckoutPage() {
 
       {/* Schedule Modal */}
       <Dialog open={isScheduleModalOpen} onOpenChange={setIsScheduleModalOpen}>
-        <DialogContent className="max-w-4xl w-[95vw] overflow-y-auto max-h-[85vh]">
+        <DialogContent className="max-w-4xl w-[95vw] overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Select Date & Time</DialogTitle>
             <DialogDescription>
@@ -363,7 +363,7 @@ export default function CheckoutPage() {
 
       {/* Address Modal */}
       <Dialog open={isAddressModalOpen} onOpenChange={setIsAddressModalOpen}>
-        <DialogContent className="max-w-2xl w-[95vw] overflow-y-auto max-h-[85vh]">
+        <DialogContent className="max-w-2xl w-[95vw] overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Select Service Address</DialogTitle>
             <DialogDescription>

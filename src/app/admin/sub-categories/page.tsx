@@ -301,7 +301,7 @@ export default function AdminSubCategoriesPage() {
       )}
 
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) { setIsFormOpen(open); if (!open) setEditingSubCategory(null); } }}>
-        <DialogContent className="w-[calc(100%-6px)] sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[85vh] overflow-y-auto p-3">
+        <DialogContent className="w-[calc(100%-6px)] sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[90vh] overflow-y-auto p-3">
           <DialogHeader><DialogTitle>{editingSubCategory ? 'Edit Sub-Category' : 'Add New Sub-Category'}</DialogTitle><DialogDescription>{editingSubCategory ? 'Update details.' : 'Fill in details.'}</DialogDescription></DialogHeader>
           {parentCategories.length === 0 && !isLoadingData ? (
              <div className="py-8 text-center"><p className="text-destructive">Cannot add sub-categories: no parent categories exist.</p><p className="text-muted-foreground text-sm mt-2">Add at least one category first.</p></div>

@@ -660,7 +660,7 @@ export default function AdminUsersPage() {
 
       {selectedUserForModal && (
         <Dialog open={isUserDetailsModalOpen} onOpenChange={setIsUserDetailsModalOpen}>
-          <DialogContent aria-describedby={undefined} className="max-w-2xl w-[95vw] max-h-[85vh] flex flex-col p-0 border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
+          <DialogContent aria-describedby={undefined} className="max-w-2xl w-[95vw] max-h-[90vh] flex flex-col p-0 border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
             <UserDetailsModal user={selectedUserForModal} onClose={() => setIsUserDetailsModalOpen(false)} onUpdateUser={handleUpdateUserFromModal} />
           </DialogContent>
         </Dialog>

@@ -381,7 +381,7 @@ export default function AdminReviewsPage() {
       </Card>
 
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) { setIsFormOpen(open); if (!open) setEditingReview(null); } }}>
-        <DialogContent className="w-[90vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[85vh] p-0 flex flex-col">
+        <DialogContent className="w-[90vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[90vh] p-0 flex flex-col">
            <DialogHeader className="p-3 pb-4 border-b bg-background z-10"> {/* Removed sticky, header will scroll */}
             <DialogTitle>{editingReview ? 'Edit Review' : 'Add New Review'}</DialogTitle>
             <DialogDescription>
