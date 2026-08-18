@@ -3,15 +3,51 @@
 import { useEffect } from 'react';
 
 /**
+ * Helper to find the scrollable parent container of a focused node.
+ * Falls back to main container elements or forms if no scrollable parent is found.
+ */
+function getScrollParent(node: HTMLElement | null): HTMLElement | null {
+  if (node == null) {
+    return null;
+  }
+
+  // Check if the element itself is scrollable
+  if (node.scrollHeight > node.clientHeight) {
+    const overflowY = window.getComputedStyle(node).overflowY;
+    const isScrollable = overflowY !== 'visible' && overflowY !== 'hidden';
+    if (isScrollable) {
+      return node;
+    }
+  }
+  
+  // Detect common layout containers that need padding
+  if (
+    node.classList.contains('overflow-y-auto') || 
+    node.tagName === 'FORM' || 
+    node.getAttribute('role') === 'dialog' ||
+    node.classList.contains('dialog-content') ||
+    node.tagName === 'MAIN'
+  ) {
+    return node;
+  }
+
+  return getScrollParent(node.parentElement);
+}
+
+/**
  * Global Keyboard Behavior Manager
  * Handles:
  * 1. Scrolling focused input fields smoothly into view so they are not covered by virtual keyboards.
- * 2. Dynamically disabling autocorrect, spellcheck, and autocomplete to hide prediction/suggestion bars.
- * 3. Detecting virtual keyboard status and hiding fixed bottom elements to prevent floating.
+ * 2. Temporarily expanding the bottom padding of scrollable parent forms to allow bottom-most inputs (like pincode, city, state) to scroll up fully.
+ * 3. Dynamically disabling autocorrect, spellcheck, and autocomplete to hide prediction/suggestion bars.
+ * 4. Detecting virtual keyboard status and hiding fixed bottom elements to prevent floating.
  */
 export default function KeyboardBehaviorManager() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    let paddedElement: HTMLElement | null = null;
+    let originalPaddingBottom = '';
 
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
@@ -38,7 +74,21 @@ export default function KeyboardBehaviorManager() {
           }
         }
 
-        // 2. Smoothly scroll the focused element into view
+        // 2. Find scrollable parent and append padding to create scroll space
+        const scrollParent = getScrollParent(target) || document.body;
+        
+        if (paddedElement && paddedElement !== scrollParent) {
+          paddedElement.style.paddingBottom = originalPaddingBottom;
+        }
+
+        if (paddedElement !== scrollParent) {
+          paddedElement = scrollParent;
+          originalPaddingBottom = scrollParent.style.paddingBottom || '';
+          // Add extra scroll space at the bottom so bottom elements can scroll high enough
+          scrollParent.style.setProperty('padding-bottom', '300px', 'important');
+        }
+
+        // 3. Smoothly scroll the focused element into view
         // Small delay ensures the virtual keyboard has started/finished sliding up
         setTimeout(() => {
           target.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -46,9 +96,28 @@ export default function KeyboardBehaviorManager() {
       }
     };
 
-    document.addEventListener('focusin', handleFocusIn, true);
+    const handleFocusOut = () => {
+      // Small delay to verify if focus moved to another input
+      setTimeout(() => {
+        const active = document.activeElement;
+        const isStillInput = active && (
+          active.tagName === 'INPUT' || 
+          active.tagName === 'TEXTAREA' || 
+          (active as HTMLElement).contentEditable === 'true'
+        );
 
-    // 3. Monitor virtual viewport resizing to detect virtual keyboard opening
+        if (!isStillInput && paddedElement) {
+          paddedElement.style.paddingBottom = originalPaddingBottom;
+          paddedElement = null;
+          originalPaddingBottom = '';
+        }
+      }, 100);
+    };
+
+    document.addEventListener('focusin', handleFocusIn, true);
+    document.addEventListener('focusout', handleFocusOut, true);
+
+    // 4. Monitor virtual viewport resizing to detect virtual keyboard opening
     const handleResize = () => {
       if (!window.visualViewport) return;
 
@@ -69,9 +138,13 @@ export default function KeyboardBehaviorManager() {
 
     return () => {
       document.removeEventListener('focusin', handleFocusIn, true);
+      document.removeEventListener('focusout', handleFocusOut, true);
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleResize);
         window.visualViewport.removeEventListener('scroll', handleResize);
+      }
+      if (paddedElement) {
+        paddedElement.style.paddingBottom = originalPaddingBottom;
       }
     };
   }, []);
