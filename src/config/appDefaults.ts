@@ -23,6 +23,7 @@ export const defaultAppSettings: AppSettings = {
   visitingChargeTaxPercent: 5,     
   enableVisitorLogging: true,
   enableUserPresence: true,
+  enableKeyboardSuggestions: true,
   // Payment
   enableOnlinePayment: true,
   razorpayKeyId: "",

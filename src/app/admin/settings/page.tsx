@@ -1155,6 +1155,21 @@ export default function AdminSettingsPage() {
                     disabled={isSaving}
                   />
                 </div>
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="enableKeyboardSuggestions" className="text-base">Enable Keyboard Suggestions</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Allow mobile virtual keyboards to show text recommendations and autocompletes. Disable to keep suggestions bar hidden.
+                    </p>
+                  </div>
+                  <Switch
+                    id="enableKeyboardSuggestions"
+                    name="enableKeyboardSuggestions" 
+                    checked={settings.enableKeyboardSuggestions ?? true}
+                    onCheckedChange={(checked) => handleSwitchChange('enableKeyboardSuggestions', checked)}
+                    disabled={isSaving}
+                  />
+                </div>
               </div>
 
               <div className="space-y-4 p-4 border rounded-md shadow-sm">

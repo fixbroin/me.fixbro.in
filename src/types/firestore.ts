@@ -599,6 +599,7 @@ export interface AppSettings {
   visitingChargeTaxPercent: number;     
   enableVisitorLogging: boolean;
   enableUserPresence: boolean;
+  enableKeyboardSuggestions?: boolean;
   // Payment
   enableOnlinePayment: boolean;
   razorpayKeyId: string;
