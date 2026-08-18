@@ -498,7 +498,7 @@ export default function AdminPromoCodesPage() {
                e.preventDefault();
              }
           }}
-          className="w-[90vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[90vh] p-0 flex flex-col"
+          className="w-[90vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[85vh] p-0 flex flex-col"
         >
           <DialogHeader className="p-3 pb-4 border-b sticky top-0 bg-background z-10">
             <DialogTitle>{editingPromoCode ? 'Edit Promo Code' : 'Add New Promo Code'}</DialogTitle>

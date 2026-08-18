@@ -433,7 +433,7 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col p-0 rounded-2xl overflow-hidden">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] flex flex-col p-0 rounded-2xl overflow-hidden">
         <DialogHeader className="p-3 pb-4 border-b shrink-0">
           <DialogTitle className="text-xl flex items-center gap-2">
             <Edit className="h-5 w-5 text-primary" /> Edit Booking: {booking?.bookingId || "Loading..."}
@@ -601,7 +601,7 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
                         >
                           <PlusCircle className="mr-1.5 h-3.5 w-3.5" /> Add Service
                         </Button>
-                        <DialogContent className="w-[90vw] sm:max-w-lg rounded-2xl max-h-[90vh] flex flex-col p-0">
+                        <DialogContent className="w-[90vw] sm:max-w-lg rounded-2xl max-h-[85vh] flex flex-col p-0">
                           <DialogHeader className="p-3 pb-4 border-b">
                             <DialogTitle>Add Service</DialogTitle>
                             <DialogDescription>Search and select a service to add to this booking.</DialogDescription>

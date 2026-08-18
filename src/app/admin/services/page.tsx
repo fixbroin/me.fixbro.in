@@ -492,7 +492,7 @@ export default function AdminServicesPage() {
       )}
 
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) { setIsFormOpen(open); if (!open) { setEditingService(null); setIsCloning(false); } } }}>
-        <DialogContent className="w-[calc(100%-6px)] sm:max-w-md md:max-w-lg lg:max-w-2xl max-h-[90vh] p-0 flex flex-col">
+        <DialogContent className="w-[calc(100%-6px)] sm:max-w-md md:max-w-lg lg:max-w-2xl max-h-[85vh] p-0 flex flex-col">
           <DialogHeader className="p-3 pb-4 border-b">
             <DialogTitle>{editingService ? (isCloning ? 'Clone Service' : 'Edit Service') : 'Add New Service'}</DialogTitle>
             <DialogDescription>
