@@ -154,11 +154,11 @@ html, body {
         position: static !important;
     }
 
-    /* Provide a permanent bottom scrollable area in mobile forms so inputs can easily scroll above the keyboard */
-    form.overflow-y-auto,
-    .overflow-y-auto form,
-    [role="dialog"] .overflow-y-auto,
-    .dialog-content .overflow-y-auto {
-        padding-bottom: 160px !important;
+    /* Provide a bottom scrollable area in mobile forms ONLY when keyboard is active so inputs can easily scroll above it */
+    .keyboard-active form.overflow-y-auto,
+    .keyboard-active .overflow-y-auto form,
+    .keyboard-active [role="dialog"] .overflow-y-auto,
+    .keyboard-active .dialog-content .overflow-y-auto {
+        padding-bottom: 260px !important;
     }
 }
