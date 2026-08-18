@@ -4,8 +4,10 @@ import { useEffect } from 'react';
 
 /**
  * Global Keyboard Behavior Manager
- * Handles disabling autocorrect, spellcheck, and autocomplete globally on text inputs
- * to prevent predictive text suggestion bars from showing on top of virtual keyboards.
+ * Handles:
+ * 1. Automatically scrolling focused input fields smoothly to the center of the viewport.
+ * 2. Disabling autocorrect, spellcheck, and autocomplete globally on text inputs
+ *    to prevent predictive text suggestion bars from showing on top of virtual keyboards.
  */
 export default function KeyboardBehaviorManager() {
   useEffect(() => {
@@ -20,7 +22,7 @@ export default function KeyboardBehaviorManager() {
                       target.contentEditable === 'true';
 
       if (isInput) {
-        // Disable suggestions and predictive autocorrect to hide virtual keyboard suggestion bars
+        // 1. Disable suggestions and predictive autocorrect to hide virtual keyboard suggestion bars
         if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
           const type = target.getAttribute('type');
           if (!type || ['text', 'search', 'tel', 'email', 'url', 'number', 'password'].includes(type)) {
@@ -35,6 +37,12 @@ export default function KeyboardBehaviorManager() {
             }
           }
         }
+
+        // 2. Smoothly scroll the focused input field to the center of the viewport
+        // Small delay ensures the keyboard has started sliding up
+        setTimeout(() => {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
       }
     };
 
