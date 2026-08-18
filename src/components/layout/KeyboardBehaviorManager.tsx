@@ -48,6 +48,7 @@ export default function KeyboardBehaviorManager() {
 
     let paddedElement: HTMLElement | null = null;
     let originalPaddingBottom = '';
+    let normalHeight = window.innerHeight;
 
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
@@ -88,6 +89,11 @@ export default function KeyboardBehaviorManager() {
           scrollParent.style.setProperty('padding-bottom', '300px', 'important');
         }
 
+        // Record normal height right before keyboard opens
+        if (window.visualViewport) {
+          normalHeight = window.visualViewport.height;
+        }
+
         // 3. Smoothly scroll the focused element into view
         // Small delay ensures the virtual keyboard has started/finished sliding up
         setTimeout(() => {
@@ -121,20 +127,37 @@ export default function KeyboardBehaviorManager() {
     const handleResize = () => {
       if (!window.visualViewport) return;
 
-      // When the virtual keyboard opens, the visual viewport height shrinks significantly
-      const isKeyboardActive = window.screen.height - window.visualViewport.height > 150;
+      const currentHeight = window.visualViewport.height;
+      const active = document.activeElement;
+      const isInputFocused = active && (
+        active.tagName === 'INPUT' || 
+        active.tagName === 'TEXTAREA' || 
+        (active as HTMLElement).contentEditable === 'true'
+      );
+
+      // If no input is focused, current height is the normal height
+      if (!isInputFocused) {
+        normalHeight = currentHeight;
+      }
+
+      // Check if visual viewport shrunk by more than 150px compared to normal height
+      const isKeyboardActive = isInputFocused && (normalHeight - currentHeight > 150);
 
       if (isKeyboardActive) {
         document.documentElement.classList.add('keyboard-active');
       } else {
         document.documentElement.classList.remove('keyboard-active');
         
-        // Android device Back Button / dismiss keyboard clears the keyboard
-        // Collapses the padding back even if the input technically retains active focus state
+        // Keyboard closed: clean up bottom padding and active focus
         if (paddedElement) {
           paddedElement.style.paddingBottom = originalPaddingBottom;
           paddedElement = null;
           originalPaddingBottom = '';
+        }
+
+        // Force blur if keyboard closed but input kept focus (device back button behavior)
+        if (isInputFocused && active instanceof HTMLElement) {
+          active.blur();
         }
       }
     };
