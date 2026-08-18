@@ -140,7 +140,6 @@ export default function KeyboardBehaviorManager() {
         normalHeight = currentHeight;
       }
 
-      // Check if visual viewport shrunk by more than 150px compared to normal height
       const isKeyboardActive = isInputFocused && (normalHeight - currentHeight > 150);
 
       if (isKeyboardActive) {
@@ -148,16 +147,11 @@ export default function KeyboardBehaviorManager() {
       } else {
         document.documentElement.classList.remove('keyboard-active');
         
-        // Keyboard closed: clean up bottom padding and active focus
+        // Keyboard closed: clean up bottom padding
         if (paddedElement) {
           paddedElement.style.paddingBottom = originalPaddingBottom;
           paddedElement = null;
           originalPaddingBottom = '';
-        }
-
-        // Force blur if keyboard closed but input kept focus (device back button behavior)
-        if (isInputFocused && active instanceof HTMLElement) {
-          active.blur();
         }
       }
     };
