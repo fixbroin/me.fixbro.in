@@ -329,7 +329,7 @@ export default function AdminServiceZonesPage() {
 
         <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) { setIsFormOpen(open); if (!open) setEditingZone(null); } }}>
           <DialogContent 
-            className="w-full max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[90vh] p-0 flex flex-col"
+            className="w-full max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[85vh] p-0 flex flex-col"
             onPointerDownOutside={(e) => {
               const target = e.target as HTMLElement;
               if (target?.closest('.pac-container')) {

@@ -282,7 +282,7 @@ export default function MyAddressPage() {
       </div>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-3xl w-[95vw] sm:w-[90vw] max-h-[90vh] p-0 flex flex-col">
+        <DialogContent className="max-w-3xl w-[95vw] sm:w-[90vw] max-h-[85vh] p-0 flex flex-col">
           <DialogHeader className="p-3 border-b"><DialogTitle>{editingAddress?.id ? 'Edit Address' : 'Add New Address'}</DialogTitle></DialogHeader>
           <div className="flex-grow overflow-y-auto p-3">
             <AddressForm
@@ -299,7 +299,7 @@ export default function MyAddressPage() {
 
       <Dialog open={isMapModalOpen} onOpenChange={setIsMapModalOpen}>
         <DialogContent
-          className="max-w-3xl w-[95vw] sm:w-[90vw] h-[90vh] p-0 flex flex-col"
+          className="max-w-3xl w-[95vw] sm:w-[90vw] h-[85vh] p-0 flex flex-col"
           onPointerDownOutside={(e) => { const target = e.target as HTMLElement; if (target.closest('.pac-container')) e.preventDefault(); }}
         >
           <DialogHeader className="p-4 border-b">

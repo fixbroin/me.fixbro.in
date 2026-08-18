@@ -61,7 +61,7 @@ const CustomRequestDetailsModal = ({ isOpen, onClose, request }: { isOpen: boole
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl w-[90vw] max-h-[90vh] flex flex-col p-0">
+      <DialogContent className="max-w-2xl w-[90vw] max-h-[85vh] flex flex-col p-0">
         <DialogHeader className="p-4 sm:p-3 border-b flex-shrink-0">
           <DialogTitle className="text-xl sm:text-2xl">{request.serviceTitle}</DialogTitle>
           <DialogDescription>Submitted by {request.userName || "Guest"} on {formatDate(request.submittedAt)}</DialogDescription>

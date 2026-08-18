@@ -233,7 +233,7 @@ export default function AdsManagementTab({ allCategories, allServices, isLoading
       </CardContent>
        {/* Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSaving) { setIsFormOpen(open); if (!open) setEditingAd(null); } }}>
-        <DialogContent className="w-[90vw] max-w-lg md:max-w-2xl lg:max-w-3xl max-h-[90vh] p-0 flex flex-col">
+        <DialogContent className="w-[90vw] max-w-lg md:max-w-2xl lg:max-w-3xl max-h-[85vh] p-0 flex flex-col">
           <DialogHeader className="p-3 pb-4 border-b">
             <DialogTitle>{editingAd ? 'Edit Ad Banner' : 'Add New Ad Banner'}</DialogTitle>
           </DialogHeader>

@@ -149,7 +149,7 @@ export default function CustomServicePage() {
       </div>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-2xl w-[95vw] sm:w-[90vw] max-h-[90vh] p-0 flex flex-col">
+        <DialogContent className="max-w-2xl w-[95vw] sm:w-[90vw] max-h-[85vh] p-0 flex flex-col">
           <DialogHeader className="p-3 border-b">
             <DialogTitle>New Custom Service Request</DialogTitle>
             <DialogDescription>Describe your needs, and we’ll do our best to accommodate.</DialogDescription>

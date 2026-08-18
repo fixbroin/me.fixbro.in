@@ -378,7 +378,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
       </div>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-3xl w-[95vw] sm:w-[90vw] max-h-[90vh] p-0 flex flex-col" aria-describedby={undefined}>
+        <DialogContent className="max-w-3xl w-[95vw] sm:w-[90vw] max-h-[85vh] p-0 flex flex-col" aria-describedby={undefined}>
           <DialogHeader className="p-3 border-b"><DialogTitle>{editingAddress?.id ? "Edit Address Details" : "Confirm Address Details"}</DialogTitle></DialogHeader>
           <div className="flex-grow overflow-y-auto p-3">
             <AddressForm
@@ -395,7 +395,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
 
       <Dialog open={isMapModalOpen} onOpenChange={setIsMapModalOpen}>
         <DialogContent 
-          className="max-w-3xl w-[95vw] sm:w-[90vw] h-[90vh] p-0 flex flex-col" 
+          className="max-w-3xl w-[95vw] sm:w-[90vw] h-[85vh] p-0 flex flex-col" 
           aria-describedby={undefined}
           onPointerDownOutside={(e) => {
             const target = e.target as HTMLElement;
