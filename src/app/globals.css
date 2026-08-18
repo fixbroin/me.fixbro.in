@@ -159,6 +159,6 @@ html, body {
     .keyboard-active .overflow-y-auto form,
     .keyboard-active [role="dialog"] .overflow-y-auto,
     .keyboard-active .dialog-content .overflow-y-auto {
-        padding-bottom: 260px !important;
+        padding-bottom: 160px !important;
     }
 }

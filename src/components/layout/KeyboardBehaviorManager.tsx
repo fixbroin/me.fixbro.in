@@ -6,7 +6,7 @@ import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 /**
  * Global Keyboard Behavior Manager
  * Handles:
- * 1. Scrolling focused input fields smoothly to the center of the viewport ONLY if they are covered by the virtual keyboard.
+ * 1. Automatically scrolling focused input fields smoothly to the center of the viewport ONLY if they are covered by the virtual keyboard.
  * 2. Toggling the `.keyboard-active` class on the HTML root dynamically when the virtual keyboard is active.
  * 3. Disabling autocorrect, spellcheck, and autocomplete globally on text inputs based on the admin config setting.
  */
@@ -15,8 +15,6 @@ export default function KeyboardBehaviorManager() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    let normalHeight = window.innerHeight;
 
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
@@ -48,17 +46,14 @@ export default function KeyboardBehaviorManager() {
         // 2. Set keyboard-active state immediately on focus
         document.documentElement.classList.add('keyboard-active');
 
-        // Record normal height right before keyboard opens
-        if (window.visualViewport) {
-          normalHeight = window.visualViewport.height;
-        }
-
-        // 3. Smoothly scroll the focused element ONLY if it is covered by the keyboard or out of viewport
+        // 3. Smoothly scroll the focused element ONLY if it is covered by the keyboard
         setTimeout(() => {
           const rect = target.getBoundingClientRect();
-          const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-          // Set a safe bottom boundary (80px buffer above the keyboard viewport)
-          const safeBottom = viewportHeight - 80;
+          const viewportHeight = window.innerHeight;
+          
+          // Mobile keyboard typically takes up ~280px at the bottom of the screen.
+          // Any focused element below (window.innerHeight - 280px) will be covered by it.
+          const safeBottom = viewportHeight - 280;
 
           // Scroll only if element is covered by the keyboard (bottom > safeBottom) or scrolled off top (top < 60)
           if (rect.bottom > safeBottom || rect.top < 60) {
@@ -99,13 +94,8 @@ export default function KeyboardBehaviorManager() {
         (active as HTMLElement).contentEditable === 'true'
       );
 
-      // If no input is focused, current height is the normal height
-      if (!isInputFocused) {
-        normalHeight = currentHeight;
-      }
-
-      // Check if visual viewport shrunk by more than 150px compared to normal height
-      const isKeyboardActive = isInputFocused && (normalHeight - currentHeight > 150);
+      // Height check: if visual viewport is significantly smaller than innerHeight, keyboard is open
+      const isKeyboardActive = isInputFocused && (window.innerHeight - currentHeight > 150);
 
       if (isKeyboardActive) {
         document.documentElement.classList.add('keyboard-active');
