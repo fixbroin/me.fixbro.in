@@ -128,6 +128,14 @@ export default function KeyboardBehaviorManager() {
         document.documentElement.classList.add('keyboard-active');
       } else {
         document.documentElement.classList.remove('keyboard-active');
+        
+        // Android device Back Button / dismiss keyboard clears the keyboard
+        // Collapses the padding back even if the input technically retains active focus state
+        if (paddedElement) {
+          paddedElement.style.paddingBottom = originalPaddingBottom;
+          paddedElement = null;
+          originalPaddingBottom = '';
+        }
       }
     };
 
