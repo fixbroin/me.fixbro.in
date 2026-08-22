@@ -8,6 +8,8 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import nodemailer from 'nodemailer';
 import { getBaseUrl } from '@/lib/config';
+import { getEmailTemplate } from '@/app/actions/emailSettingsActions';
+import { replacePlaceholders } from '@/lib/seoUtils';
 
 const UserCancellationEmailInputSchema = z.object({
   bookingId: z.string().describe("The unique ID of the booking."),
@@ -146,20 +148,29 @@ const userCancellationEmailFlow = ai.defineFlow(
           `;
       }
 
-      const customerEmailSubject = `Booking Cancellation Confirmation #${bookingId}`;
-      const customerBodyContent = `
-          <p>Dear ${customerName},</p>
-          <p>Your booking #${bookingId} has been cancelled as per your request.</p>
-          <p>If you have any questions, please contact our support team.</p>
-          ${paymentInfoHtml}
-          <p>Regards,<br>The ${siteName} Team</p>
-      `;
-      const customerEmailBody = createHtmlTemplate("Booking Cancelled", customerBodyContent, siteName, logoUrl);
+      const custTemplate = await getEmailTemplate('user_cancellation_customer');
+      const admTemplate = await getEmailTemplate('user_cancellation_admin');
       
-      const adminEmailSubject = `Booking Cancelled by User (ID: ${bookingId})`;
-      const adminBodyContent = `<p>Booking ID <strong>${bookingId}</strong> for <strong>${customerName}</strong> was cancelled by the user.</p><p>The user has been notified with the relevant payment/refund details.</p>`;
-      const adminEmailBody = createHtmlTemplate("Admin Alert: User Cancellation", adminBodyContent, siteName, logoUrl);
-      const adminEmail = "wecanfix.in@gmail.com"; 
+      const sendCustomer = custTemplate.isEnabled;
+      const sendAdmin = admTemplate.isEnabled;
+
+      let customerEmailSubject = "";
+      let customerEmailBody = "";
+      if (sendCustomer) {
+        const variables = { customerName, bookingId, paymentInfoHtml, siteName };
+        customerEmailSubject = replacePlaceholders(custTemplate.subject, variables);
+        customerEmailBody = createHtmlTemplate("Booking Cancelled", replacePlaceholders(custTemplate.body, variables), siteName, logoUrl);
+      }
+
+      let adminEmailSubject = "";
+      let adminEmailBody = "";
+      if (sendAdmin) {
+        const variables = { bookingId, customerName };
+        adminEmailSubject = replacePlaceholders(admTemplate.subject, variables);
+        adminEmailBody = createHtmlTemplate("Admin Alert: User Cancellation", replacePlaceholders(admTemplate.body, variables), siteName, logoUrl);
+      }
+
+      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com"; 
 
       if (!canAttemptRealEmail) {
         console.warn("SMTP configuration incomplete. Simulating cancellation emails.");
@@ -172,8 +183,17 @@ const userCancellationEmailFlow = ai.defineFlow(
         auth: { user: smtpUser, pass: smtpPass },
       });
 
-      await transporter.sendMail({ from: `${siteName} <${senderEmail}>`, to: customerEmail, subject: customerEmailSubject, html: customerEmailBody });
-      await transporter.sendMail({ from: `${siteName} Admin <${senderEmail}>`, to: adminEmail, subject: adminEmailSubject, html: adminEmailBody });
+      const promises = [];
+      if (sendCustomer && customerEmailSubject && customerEmailBody) {
+        promises.push(transporter.sendMail({ from: `${siteName} <${senderEmail}>`, to: customerEmail, subject: customerEmailSubject, html: customerEmailBody }));
+      }
+      if (sendAdmin && adminEmailSubject && adminEmailBody) {
+        promises.push(transporter.sendMail({ from: `${siteName} Admin <${senderEmail}>`, to: adminEmail, subject: adminEmailSubject, html: adminEmailBody }));
+      }
+
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
       
       return { success: true, message: "User cancellation emails sent successfully." };
 

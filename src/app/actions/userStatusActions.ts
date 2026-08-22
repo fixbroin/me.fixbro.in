@@ -5,7 +5,10 @@ import { getGlobalAppSettings } from '@/lib/webServerUtils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import nodemailer from 'nodemailer';
 import * as admin from 'firebase-admin';
-import { getAccountDisabledEmailHtml, getAccountActivatedEmailHtml } from '@/lib/accountStatusEmailTemplates';
+import { getAccountDisabledEmailHtml, getAccountActivatedEmailHtml, createHtmlTemplate } from '@/lib/accountStatusEmailTemplates';
+import { getEmailTemplate } from '@/app/actions/emailSettingsActions';
+import { replacePlaceholders } from '@/lib/seoUtils';
+import { getBaseUrl } from '@/lib/config';
 
 interface ActionResponse {
   success: boolean;
@@ -123,8 +126,8 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
       }
 
       // C. Send SMTP Email (If enabled in settings)
-      const enableEmail = appConfig?.enableAccountDisabledEmail !== false; // Enabled by default
-      if (enableEmail && userEmail) {
+      const template = await getEmailTemplate('account_disabled');
+      if (template.isEnabled && userEmail) {
         const smtpHost = appConfig?.smtpHost;
         const smtpPort = appConfig?.smtpPort;
         const smtpUser = appConfig?.smtpUser;
@@ -144,12 +147,20 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
                 auth: { user: smtpUser, pass: smtpPass },
               });
 
-              const emailHtml = getAccountDisabledEmailHtml(userName, siteName, logoUrl, contactEmail);
+              const variables = {
+                userName,
+                siteName,
+                supportEmail: contactEmail || "support@wecanfix.in"
+              };
+
+              const emailSubject = replacePlaceholders(template.subject, variables);
+              const emailBodyContent = replacePlaceholders(template.body, variables);
+              const emailHtml = createHtmlTemplate("Account Disabled", emailBodyContent, siteName, logoUrl);
 
               await transporter.sendMail({
                 from: `${siteName} <${senderEmail}>`,
                 to: userEmail,
-                subject: `Account Suspended - ${siteName}`,
+                subject: emailSubject,
                 html: emailHtml,
               });
             } catch (emailError) {
@@ -165,8 +176,8 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
     // 5. Handle Activation Flow
     if (newStatus === true) {
       // Send SMTP Email (If enabled in settings)
-      const enableEmail = appConfig?.enableAccountActivatedEmail !== false; // Enabled by default
-      if (enableEmail && userEmail) {
+      const template = await getEmailTemplate('account_activated');
+      if (template.isEnabled && userEmail) {
         const smtpHost = appConfig?.smtpHost;
         const smtpPort = appConfig?.smtpPort;
         const smtpUser = appConfig?.smtpUser;
@@ -186,12 +197,21 @@ export async function toggleUserStatusAction(userId: string, currentStatus: bool
                 auth: { user: smtpUser, pass: smtpPass },
               });
 
-              const emailHtml = getAccountActivatedEmailHtml(userName, siteName, logoUrl);
+              const loginUrl = `${getBaseUrl()}/auth/login`;
+              const variables = {
+                userName,
+                siteName,
+                loginUrl
+              };
+
+              const emailSubject = replacePlaceholders(template.subject, variables);
+              const emailBodyContent = replacePlaceholders(template.body, variables);
+              const emailHtml = createHtmlTemplate("Account Activated", emailBodyContent, siteName, logoUrl);
 
               await transporter.sendMail({
                 from: `${siteName} <${senderEmail}>`,
                 to: userEmail,
-                subject: `Account Reactivated - ${siteName}`,
+                subject: emailSubject,
                 html: emailHtml,
               });
             } catch (emailError) {

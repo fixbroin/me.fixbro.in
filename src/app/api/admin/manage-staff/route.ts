@@ -118,12 +118,13 @@ export async function DELETE(request: Request) {
       const targetRole = adminToDeleteData?.role;
 
       // 1. PROTECT MAIN SUPER ADMIN FROM DELETION (Cannot be deleted via API by anyone)
-      if (targetEmail === "wecanfix.in@gmail.com") {
+      const primaryAdminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
+      if (targetEmail === primaryAdminEmail) {
         return NextResponse.json({ error: 'The primary super admin cannot be removed.' }, { status: 403 });
       }
 
       // 2. PROTECT OTHER SUPER ADMINS (Only the Main Admin can delete other Super Admins)
-      if (targetRole === 'super_admin' && decodedToken.email !== "wecanfix.in@gmail.com") {
+      if (targetRole === 'super_admin' && decodedToken.email !== primaryAdminEmail) {
         return NextResponse.json({ error: 'Only the Primary Admin can remove other Super Admins.' }, { status: 403 });
       }
 

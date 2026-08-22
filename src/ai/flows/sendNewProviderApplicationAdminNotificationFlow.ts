@@ -119,7 +119,7 @@ const newProviderApplicationAdminEmailFlow = ai.defineFlow(
         siteName = "Wecanfix", logoUrl
       } = details;
 
-      const adminEmail = "wecanfix.in@gmail.com";
+      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
       const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
 
       const emailSubject = `New Provider Application: ${providerName}`;

@@ -13,6 +13,8 @@ import { z } from 'genkit';
 import nodemailer from 'nodemailer';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext'; // Import ADMIN_EMAIL
 import { getBaseUrl } from '@/lib/config';
+import { getEmailTemplate } from '@/app/actions/emailSettingsActions';
+import { replacePlaceholders } from '@/lib/seoUtils';
 
 const NewProviderApplicationAdminEmailInputSchema = z.object({
   applicationId: z.string().describe("The ID of the submitted provider application."),
@@ -120,25 +122,27 @@ const newProviderApplicationAdminEmailFlow = ai.defineFlow(
         siteName = "Wecanfix", logoUrl,
       } = details;
 
-      const adminEmail = "wecanfix.in@gmail.com";
-      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
+      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
+      const template = await getEmailTemplate('provider_registration_admin');
+      if (!template.isEnabled) {
+        console.log("New provider application notification email is disabled in settings. Skipping sending.");
+        return { success: true, message: "New provider application email is disabled. Skipping." };
+      }
 
-      const emailSubject = `New Provider Application: ${providerName}`;
-      const emailBodyContent = `
-        <p>A new provider application has been submitted on ${siteName}.</p>
-        <h3>Application Details:</h3>
-        <ul>
-            <li><strong>Provider Name:</strong> ${providerName}</li>
-            <li><strong>Provider Email:</strong> ${providerEmail}</li>
-            ${providerCategory ? `<li><strong>Primary Category:</strong> ${providerCategory}</li>` : ''}
-            <li><strong>Application ID:</strong> ${applicationId}</li>
-        </ul>
-        <p>Please review the application at your earliest convenience:</p>
-        <p><a href="${applicationUrl}" class="button">View Application</a></p>
-        <p>The ${siteName} System</p>
-      `;
+      const variables = {
+        providerName,
+        providerEmail,
+        providerCategory: providerCategory || 'N/A',
+        siteName,
+        applicationUrl,
+        applicationId
+      };
 
+      const emailSubject = replacePlaceholders(template.subject, variables);
+      const emailBodyContent = replacePlaceholders(template.body, variables);
       const htmlBody = createHtmlTemplate("New Provider Application", emailBodyContent, siteName, logoUrl);
+
+      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
 
       if (!canAttemptRealEmail) {
         console.warn("SMTP configuration incomplete. Simulating admin notification email.");

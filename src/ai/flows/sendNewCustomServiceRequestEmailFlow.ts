@@ -10,6 +10,8 @@ import { z } from 'genkit';
 import nodemailer from 'nodemailer';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import { getBaseUrl } from '@/lib/config';
+import { getEmailTemplate } from '@/app/actions/emailSettingsActions';
+import { replacePlaceholders } from '@/lib/seoUtils';
 
 const NewCustomServiceRequestEmailInputSchema = z.object({
   requestId: z.string().describe("The ID of the submitted request."),
@@ -120,10 +122,13 @@ const newCustomServiceRequestEmailFlow = ai.defineFlow(
     try {
       const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "Wecanfix", logoUrl, currencySymbol = "₹", ...requestDetails } = details;
 
-      const adminEmail = "wecanfix.in@gmail.com"; 
-      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
+      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com"; 
 
-      const emailSubject = `New Custom Service Request: ${requestDetails.serviceTitle}`;
+      const template = await getEmailTemplate('custom_service_request');
+      if (!template.isEnabled) {
+        console.log("Custom service request email is disabled in settings. Skipping sending.");
+        return { success: true, message: "Custom service request email is disabled. Skipping." };
+      }
 
       let mapButtonHtml = '';
       if (requestDetails.latitude && requestDetails.longitude) {
@@ -134,30 +139,29 @@ const newCustomServiceRequestEmailFlow = ai.defineFlow(
         mapButtonHtml = `<a href="${mapUrl}" class="button" style="background-color: #198754; margin-left: 10px; color: #ffffff !important;">View Location on Google Maps</a>`;
       }
 
-      const emailBodyContent = `
-        <p>A new custom service request has been submitted on ${siteName}.</p>
-        <h3>Request Details:</h3>
-        <ul>
-            <li><strong>Request ID:</strong> ${requestDetails.requestId}</li>
-            <li><strong>Customer Name:</strong> ${requestDetails.userName}</li>
-            <li><strong>Customer Email:</strong> ${requestDetails.userEmail}</li>
-            <li><strong>Customer Mobile:</strong> ${requestDetails.userMobile || 'N/A'}</li>
-            <li><strong>Service Title:</strong> ${requestDetails.serviceTitle}</li>
-            <li><strong>Category:</strong> ${requestDetails.category}</li>
-            <li><strong>Budget:</strong> ${currencySymbol}${requestDetails.minBudget || 'N/A'} - ${currencySymbol}${requestDetails.maxBudget || 'N/A'}</li>
-            <li><strong>Preferred Start Date:</strong> ${requestDetails.preferredStartDateText || 'N/A'}</li>
-            ${requestDetails.addressText ? `<li><strong>Service Address:</strong> ${requestDetails.addressText}</li>` : ''}
-        </ul>
-        <h3>Description:</h3>
-        <p>${requestDetails.description}</p>
-        <p>Please review the full request in the admin panel:</p>
-        <p>
-          <a href="${requestDetails.adminUrl}" class="button">View Full Request</a>
-          ${mapButtonHtml}
-        </p>
-      `;
+      const variables = {
+        userName: requestDetails.userName,
+        siteName,
+        serviceName: requestDetails.serviceTitle,
+        preferredDate: requestDetails.preferredStartDateText || 'N/A',
+        preferredTimeSlot: 'N/A', 
+        requestId: requestDetails.requestId,
+        customerEmail: requestDetails.userEmail,
+        customerMobile: requestDetails.userMobile || 'N/A',
+        category: requestDetails.category,
+        minBudget: String(requestDetails.minBudget || 'N/A'),
+        maxBudget: String(requestDetails.maxBudget || 'N/A'),
+        addressText: requestDetails.addressText || 'N/A',
+        description: requestDetails.description,
+        adminUrl: requestDetails.adminUrl,
+        mapButtonHtml
+      };
 
-      const htmlBody = createHtmlTemplate("New Custom Service Request", emailBodyContent, siteName, logoUrl);
+      const emailSubject = replacePlaceholders(template.subject, variables);
+      const emailBodyContent = replacePlaceholders(template.body, variables);
+      const htmlBody = createHtmlTemplate(emailSubject, emailBodyContent, siteName, logoUrl);
+
+      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
 
       if (!canAttemptRealEmail) {
         console.warn("SMTP configuration incomplete. Simulating admin notification email.");

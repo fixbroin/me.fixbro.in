@@ -9,6 +9,8 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import nodemailer from 'nodemailer';
 import { getBaseUrl } from '@/lib/config';
+import { getEmailTemplate } from '@/app/actions/emailSettingsActions';
+import { replacePlaceholders } from '@/lib/seoUtils';
 
 const NewReviewAdminNotificationEmailInputSchema = z.object({
   reviewId: z.string().describe("The ID of the submitted review."),
@@ -114,31 +116,28 @@ const newReviewAdminNotificationEmailFlow = ai.defineFlow(
     try {
       const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "Wecanfix", logoUrl, ...reviewDetails } = details;
 
-      const adminEmail = "wecanfix.in@gmail.com"; 
-      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
+      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com"; 
+      const template = await getEmailTemplate('new_review_admin');
+      if (!template.isEnabled) {
+        console.log("New review notification email is disabled in settings. Skipping sending.");
+        return { success: true, message: "New review notification email is disabled. Skipping." };
+      }
 
-      const stars = "★".repeat(reviewDetails.rating) + "☆".repeat(5 - reviewDetails.rating);
+      const variables = {
+        userName: reviewDetails.userName,
+        rating: String(reviewDetails.rating),
+        comment: reviewDetails.comment,
+        bookingId: reviewDetails.bookingId,
+        serviceName: reviewDetails.serviceName,
+        adminUrl: reviewDetails.adminUrl,
+        siteName
+      };
 
-      const emailSubject = `New Review Submitted for ${reviewDetails.serviceName} (${reviewDetails.rating} Stars)`;
-      const emailBodyContent = `
-        <p>A new service review has been submitted on ${siteName}.</p>
-        <div class="summary-box">
-            <div class="section-title">Review Summary</div>
-            <div class="star-rating">${stars}</div>
-            <p><strong>Service:</strong> ${reviewDetails.serviceName}</p>
-            <p><strong>Booking ID:</strong> ${reviewDetails.bookingId}</p>
-            <p><strong>Customer:</strong> ${reviewDetails.userName}</p>
-            <p><strong>Rating:</strong> ${reviewDetails.rating}/5</p>
-        </div>
-        <h3>Customer Comment:</h3>
-        <p style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #0B5ED7; font-style: italic;">
-            "${reviewDetails.comment}"
-        </p>
-        <p>You can manage this review in the admin panel:</p>
-        <p><a href="${reviewDetails.adminUrl}" class="button">View Reviews</a></p>
-      `;
-
+      const emailSubject = replacePlaceholders(template.subject, variables);
+      const emailBodyContent = replacePlaceholders(template.body, variables);
       const htmlBody = createHtmlTemplate("New Customer Review", emailBodyContent, siteName, logoUrl);
+
+      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
 
       if (!canAttemptRealEmail) {
         console.warn("SMTP configuration incomplete. Simulating admin review notification email.");

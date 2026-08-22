@@ -72,6 +72,7 @@ const navItems = [
   { href: '/admin/theme-settings', label: 'Theme Settings', icon: Palette },
   { href: '/admin/image-gallery', label: 'Image Gallery', icon: ImageIcon },
   { href: '/admin/settings', label: 'App Settings', icon: Settings },
+  { href: '/admin/email-settings', label: 'Email Settings', icon: Mail },
   { href: '/admin/login-settings', label: 'Login Settings', icon: KeyRound },
   { href: '/admin/web-settings', label: 'Web Settings', icon: Settings2 },
   { href: '/admin/cookie-settings', label: 'Cookie Settings', icon: Cookie },

@@ -182,7 +182,7 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         break;
 
       case 'admins':
-        await insert('superadmin', null, { email: 'wecanfix.in@gmail.com', name: 'Super Admin', role: 'superadmin', permissions: ['all'], isActive: true });
+        await insert('superadmin', null, { email: process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'wecanfix.in@gmail.com', name: 'Super Admin', role: 'superadmin', permissions: ['all'], isActive: true });
         break;
 
       case 'appConfiguration':
@@ -270,9 +270,9 @@ async function seedDemoDataForTable(conn: mysql.Pool | mysql.PoolConnection, tab
         await insert('applicationConfig', null, {
           smtpHost: "smtp.gmail.com",
           smtpPort: "465",
-          smtpUser: "wecanfix.in@gmail.com",
+          smtpUser: process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com",
           smtpPass: "your_app_password_here",
-          senderEmail: "wecanfix.in@gmail.com",
+          senderEmail: process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com",
           razorpayKeyId: "rzp_test_key_here",
           razorpayKeySecret: "rzp_secret_here",
           commissionPercentage: 15,

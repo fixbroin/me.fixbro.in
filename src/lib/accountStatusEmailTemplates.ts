@@ -1,6 +1,6 @@
 import { getBaseUrl } from './config';
 
-const createHtmlTemplate = (title: string, bodyContent: string, siteName: string, logoUrl?: string) => {
+export const createHtmlTemplate = (title: string, bodyContent: string, siteName: string, logoUrl?: string) => {
   let finalLogoUrl = logoUrl || `${getBaseUrl()}/default-image.png`;
   if (finalLogoUrl.startsWith('/')) {
     finalLogoUrl = getBaseUrl() + finalLogoUrl;

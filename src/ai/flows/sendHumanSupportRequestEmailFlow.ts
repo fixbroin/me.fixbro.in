@@ -8,6 +8,8 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import nodemailer from 'nodemailer';
 import { getBaseUrl } from '@/lib/config';
+import { getEmailTemplate } from '@/app/actions/emailSettingsActions';
+import { replacePlaceholders } from '@/lib/seoUtils';
 
 const HumanSupportRequestEmailInputSchema = z.object({
   userName: z.string().describe("The name of the user requesting support."),
@@ -111,27 +113,27 @@ const humanSupportRequestEmailFlow = ai.defineFlow(
       const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, siteName = "Wecanfix", logoUrl, ...requestDetails } = details;
 
       // Primary Admin Email
-      const adminEmail = "wecanfix.in@gmail.com"; 
-      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
+      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com"; 
+      const template = await getEmailTemplate('support_request');
+      if (!template.isEnabled) {
+        console.log("Human support request notification email is disabled in settings. Skipping sending.");
+        return { success: true, message: "Human support request email is disabled. Skipping." };
+      }
 
-      const emailSubject = `🚨 Human Support Required: ${requestDetails.userName}`;
-      const emailBodyContent = `
-        <p>A user has requested human assistance during an AI chat session on ${siteName}.</p>
-        <div class="summary-box">
-            <div class="section-title">User Details</div>
-            <p><strong>Name:</strong> ${requestDetails.userName}</p>
-            <p><strong>Email:</strong> ${requestDetails.userEmail}</p>
-            <p><strong>User ID:</strong> ${requestDetails.userId}</p>
-        </div>
-        <div class="summary-box">
-            <div class="section-title">Last Message From User</div>
-            <p style="font-style: italic; color: #555;">"${requestDetails.lastMessage}"</p>
-        </div>
-        <p>Please join the chat immediately to assist the user:</p>
-        <p style="text-align: center;"><a href="${requestDetails.chatUrl}" class="button">Open Admin Chat</a></p>
-      `;
+      const variables = {
+        userName: requestDetails.userName,
+        userEmail: requestDetails.userEmail,
+        userId: requestDetails.userId,
+        lastMessage: requestDetails.lastMessage,
+        chatUrl: requestDetails.chatUrl,
+        siteName
+      };
 
+      const emailSubject = replacePlaceholders(template.subject, variables);
+      const emailBodyContent = replacePlaceholders(template.body, variables);
       const htmlBody = createHtmlTemplate("Human Support Requested", emailBodyContent, siteName, logoUrl);
+
+      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
 
       if (!canAttemptRealEmail) {
         console.warn("SMTP configuration incomplete for support email. Simulating email.");

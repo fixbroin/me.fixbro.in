@@ -13,6 +13,8 @@ import { z } from 'genkit';
 import nodemailer from 'nodemailer';
 import type { ProviderApplicationStatus } from '@/types/firestore'; // Import status type
 import { getBaseUrl } from '@/lib/config';
+import { getEmailTemplate } from '@/app/actions/emailSettingsActions';
+import { replacePlaceholders } from '@/lib/seoUtils';
 
 const ProviderApplicationStatusEmailInputSchema = z.object({
   providerName: z.string().describe("The name of the provider."),
@@ -121,53 +123,54 @@ const providerApplicationStatusEmailFlow = ai.defineFlow(
         siteName = "Wecanfix", logoUrl,
       } = details;
       
-      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
-
-      let emailSubject = "";
-      let emailBodyContent = "";
-
-      switch (applicationStatus) {
-        case 'approved':
-          emailSubject = `Your ${siteName} Provider Application has been Approved!`;
-          emailBodyContent = `
-            <p>Dear ${providerName},</p>
-            <p>Congratulations! We are pleased to inform you that your provider application with ${siteName} has been approved.</p>
-            <p>You can now access your provider dashboard and start managing your services and jobs.</p>
-            <p><a href="${applicationUrl.replace('provider-registration', 'provider')}" class="button">Access Dashboard</a></p>
-            <p>Welcome aboard!</p>
-            <p>The ${siteName} Team</p>
-          `;
-          break;
-        case 'rejected':
-          emailSubject = `Update Regarding Your ${siteName} Provider Application`;
-          emailBodyContent = `
-            <p>Dear ${providerName},</p>
-            <p>Thank you for your interest in becoming a provider with ${siteName}.</p>
-            <p>After careful review, we regret to inform you that your application was not approved at this time.</p>
-            ${adminReviewNotes ? `<div class="notes"><p><strong>Reason/Feedback:</strong><br>${adminReviewNotes}</p></div>` : ''}
-            <p>If you have questions, please contact our support team.</p>
-            <p>Sincerely,</p>
-            <p>The ${siteName} Team</p>
-          `;
-          break;
-        case 'needs_update':
-          emailSubject = `Action Required: Update Your ${siteName} Provider Application`;
-          emailBodyContent = `
-            <p>Dear ${providerName},</p>
-            <p>We have reviewed your provider application for ${siteName} and require some additional information or corrections.</p>
-            ${adminReviewNotes ? `<div class="notes"><p><strong>Please address the following:</strong><br>${adminReviewNotes}</p></div>` : ''}
-            <p>Please log in to your application to make the necessary updates:</p>
-            <p><a href="${applicationUrl}" class="button">Update Application</a></p>
-            <p>Once updated, your application will be re-reviewed.</p>
-            <p>Thank you,</p>
-            <p>The ${siteName} Team</p>
-          `;
-          break;
-        default:
-          return { success: true, message: "No email template for this status." };
+      const template = await getEmailTemplate('provider_status_update');
+      if (!template.isEnabled) {
+        console.log("Provider status update email is disabled in settings. Skipping sending.");
+        return { success: true, message: "Provider status update email is disabled. Skipping." };
       }
 
-      const htmlBody = createHtmlTemplate(`Application Status: ${applicationStatus.replace(/_/g, ' ')}`, emailBodyContent, siteName, logoUrl);
+      let statusContentBlock = '';
+      const adminReviewNotesBlock = adminReviewNotes ? `<div class="notes"><p><strong>Reason/Feedback:</strong><br>${adminReviewNotes}</p></div>` : '';
+      
+      if (applicationStatus === 'approved') {
+        const dashboardUrl = applicationUrl.replace('provider-registration', 'provider');
+        statusContentBlock = `
+          <p>Congratulations! We are pleased to inform you that your provider application with ${siteName} has been approved.</p>
+          <p>You can now access your provider dashboard and start managing your services and jobs.</p>
+          <p><a href="${dashboardUrl}" class="button" style="color: #ffffff !important;">Access Dashboard</a></p>
+          <p>Welcome aboard!</p>
+        `;
+      } else if (applicationStatus === 'rejected') {
+        statusContentBlock = `
+          <p>Thank you for your interest in becoming a provider with ${siteName}.</p>
+          <p>After careful review, we regret to inform you that your application was not approved at this time.</p>
+          ${adminReviewNotesBlock}
+        `;
+      } else if (applicationStatus === 'needs_update') {
+        statusContentBlock = `
+          <p>We have reviewed your provider application for ${siteName} and require some additional information or corrections.</p>
+          ${adminReviewNotesBlock}
+          <p>Please log in to your application to make the necessary updates:</p>
+          <p><a href="${applicationUrl}" class="button" style="color: #ffffff !important;">Update Application</a></p>
+          <p>Once updated, your application will be re-reviewed.</p>
+        `;
+      } else {
+        return { success: true, message: "No email template for this status." };
+      }
+
+      const statusLabel = applicationStatus.replace(/_/g, ' ');
+      const variables = {
+        providerName,
+        statusContentBlock,
+        siteName,
+        status: statusLabel
+      };
+
+      const emailSubject = replacePlaceholders(template.subject, variables);
+      const emailBodyContent = replacePlaceholders(template.body, variables);
+      const htmlBody = createHtmlTemplate(`Application Status: ${statusLabel}`, emailBodyContent, siteName, logoUrl);
+
+      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
 
       if (!canAttemptRealEmail) {
         console.warn("SMTP configuration incomplete. Simulating provider status email.");

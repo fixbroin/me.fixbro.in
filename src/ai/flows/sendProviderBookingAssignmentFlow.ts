@@ -12,6 +12,8 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import nodemailer from 'nodemailer';
 import { getBaseUrl } from '@/lib/config'; // For constructing URLs
+import { getEmailTemplate } from '@/app/actions/emailSettingsActions';
+import { replacePlaceholders } from '@/lib/seoUtils';
 
 const ProviderBookingAssignmentEmailInputSchema = z.object({
   providerName: z.string().describe("The name of the provider."),
@@ -124,32 +126,32 @@ const providerBookingAssignmentEmailFlow = ai.defineFlow(
         siteName = "Wecanfix", logoUrl,
       } = details;
 
-      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
+      const template = await getEmailTemplate('provider_assignment');
+      if (!template.isEnabled) {
+        console.log("Provider assignment email is disabled in settings. Skipping sending.");
+        return { success: true, message: "Provider assignment email is disabled. Skipping." };
+      }
+
       const appBaseUrl = getBaseUrl();
       const jobDetailsUrl = `${appBaseUrl}/provider/booking/${bookingDocId}`;
 
-      const emailSubject = `New Job Assignment: Booking ID ${bookingId}`;
-      const emailBodyContent = `
-        <p>Dear ${providerName},</p>
-        <p>You have been assigned a new job on ${siteName}:</p>
-        <div class="summary-box">
-            <h3>Booking Details:</h3>
-            <ul>
-                <li><strong>Booking ID:</strong> ${bookingId}</li>
-                <li><strong>Service:</strong> ${serviceName}</li>
-                <li><strong>Scheduled Date:</strong> ${scheduledDate}</li>
-                <li><strong>Time Slot:</strong> ${scheduledTimeSlot}</li>
-                <li><strong>Customer:</strong> ${customerName}</li>
-                <li><strong>Address:</strong> ${customerAddress}</li>
-            </ul>
-        </div>
-        <p>Please review the job details and prepare accordingly.</p>
-        <p><a href="${jobDetailsUrl}" class="button">View Full Job Details</a></p>
-        <p>Thank you,</p>
-        <p>The ${siteName} Team</p>
-      `;
+      const variables = {
+        providerName,
+        siteName,
+        bookingId,
+        scheduledDate,
+        scheduledTimeSlot,
+        customerName,
+        customerAddress,
+        serviceName,
+        providerDashboardUrl: jobDetailsUrl
+      };
 
+      const emailSubject = replacePlaceholders(template.subject, variables);
+      const emailBodyContent = replacePlaceholders(template.body, variables);
       const htmlBody = createHtmlTemplate("New Job Assignment", emailBodyContent, siteName, logoUrl);
+
+      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
 
       if (!canAttemptRealEmail) {
         console.warn("SMTP configuration incomplete. Simulating provider assignment email.");

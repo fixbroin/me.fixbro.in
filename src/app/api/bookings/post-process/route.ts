@@ -12,7 +12,7 @@ import { getZonedDate, formatScheduledDate } from '@/lib/utils';
 import { getHaversineDistance } from '@/lib/locationUtils';
 
 // Define ADMIN_EMAIL - should match your AuthContext
-const ADMIN_EMAIL = "wecanfix.in@gmail.com"; 
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com"; 
 
 export async function POST(request: Request) {
   try {

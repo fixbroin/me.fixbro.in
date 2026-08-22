@@ -33,7 +33,7 @@ import { incrementSystemStats } from '@/lib/systemStatsUtils';
 import type { AdminPermissions, AdminRole } from '@/config/rbac';
 import { SUPER_ADMIN_PERMISSIONS, getFirstAccessiblePath } from '@/config/rbac';
 // Define and export ADMIN_EMAIL here
-export const ADMIN_EMAIL = "wecanfix.in@gmail.com";
+export const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
 
 export interface SignUpData {
   email: string;

@@ -11,6 +11,8 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import nodemailer from 'nodemailer';
 import { getBaseUrl } from '@/lib/config';
+import { getEmailTemplate } from '@/app/actions/emailSettingsActions';
+import { replacePlaceholders } from '@/lib/seoUtils';
 
 const InquiryReplyEmailInputSchema = z.object({
   inquiryId: z.string().describe("The ID of the inquiry being replied to."),
@@ -128,23 +130,26 @@ const inquiryReplyEmailFlow = ai.defineFlow(
         siteName = "Wecanfix", logoUrl,
       } = details;
 
-      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
+      const template = await getEmailTemplate('inquiry_reply');
+      if (!template.isEnabled) {
+        console.log("Inquiry reply email is disabled in settings. Skipping sending.");
+        return { success: true, message: "Inquiry reply email is disabled. Skipping." };
+      }
 
-      const emailSubject = `Re: Your Inquiry to ${siteName} (ID: ${inquiryId.substring(0,8)}...)`;
-      const emailBodyContent = `
-        <p>Dear ${userName},</p>
-        <p>Thank you for contacting ${siteName}. This is a reply to your recent inquiry.</p>
-        <div class="quote">
-          <p><strong>Your Original Inquiry:</strong></p>
-          <p><em>${originalMessage.trim()}</em></p>
-        </div>
-        <p><strong>Our Reply:</strong></p>
-        <p>${replyMessage.trim().replace(/\n/g, '<br/>')}</p>
-        <p>If you have any further questions, please feel free to reply to this email or contact us again.</p>
-        <p>Sincerely,<br>The ${adminName || `${siteName} Team`}</p>
-      `;
+      const originalSubject = `Your Inquiry to ${siteName} (ID: ${inquiryId.substring(0,8)}...)`;
+      const variables = {
+        userName,
+        replyMessage: replyMessage.trim().replace(/\n/g, '<br/>'),
+        originalMessage: originalMessage.trim(),
+        originalSubject,
+        siteName
+      };
 
+      const emailSubject = replacePlaceholders(template.subject, variables);
+      const emailBodyContent = replacePlaceholders(template.body, variables);
       const htmlBody = createHtmlTemplate("Regarding Your Inquiry", emailBodyContent, siteName, logoUrl);
+
+      const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
 
       if (!canAttemptRealEmail) {
         console.warn("SMTP config incomplete. Simulating inquiry reply.");

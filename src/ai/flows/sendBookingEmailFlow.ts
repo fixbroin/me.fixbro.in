@@ -9,6 +9,8 @@ import { z } from 'genkit';
 import nodemailer from 'nodemailer';
 import { getBaseUrl } from '@/lib/config';
 import { formatScheduledDate as utilsFormatScheduledDate } from '@/lib/utils';
+import { getEmailTemplate } from '@/app/actions/emailSettingsActions';
+import { replacePlaceholders } from '@/lib/seoUtils';
 
 // Define Zod schema for individual service items
 const EmailBookingServiceItemSchema = z.object({
@@ -237,9 +239,11 @@ const bookingEmailFlow = ai.defineFlow(
 
       let customerEmailSubject = "";
       let customerEmailBody = "";
-      const adminEmail = "wecanfix.in@gmail.com"; 
+      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com"; 
       let adminEmailSubject = "";
       let adminEmailBody = "";
+      let sendCustomer = true;
+      let sendAdmin = true;
       const attachments: any[] = [];
 
       if (emailType === 'booking_completion') {
@@ -286,106 +290,111 @@ const bookingEmailFlow = ai.defineFlow(
             </p>
         `, siteName, logoUrl);
       } else if (emailType === 'booking_cancelled_by_admin') {
-        customerEmailSubject = `Your Booking Has Been Cancelled`;
-        customerEmailBody = createHtmlTemplate('Booking Cancelled', `
-            <p>Dear ${bookingDetails.customerName},</p>
-            <p>We regret to inform you that your booking #${bookingDetails.bookingId} has been cancelled.</p>
-            ${cancellationReason ? `<p><strong>Reason:</strong> ${cancellationReason}</p>` : ''}
-            <p>If you did not request this cancellation, please note that it may have been cancelled by our system or service provider due to technician unavailability or service coverage limitations in your area. We sincerely apologize for the inconvenience and will try our best to serve you again soon.</p>
-            <p>If you have paid online, your refund will be processed within 7 working days.</p>
-        `, siteName, logoUrl);
-        adminEmailSubject = `Booking Cancelled by Admin (ID: ${bookingDetails.bookingId})`;
-        adminEmailBody = createHtmlTemplate('Admin Alert: Booking Cancelled', `<p>Booking ID <strong>${bookingDetails.bookingId}</strong> for <strong>${bookingDetails.customerName}</strong> was cancelled by an admin.</p>`, siteName, logoUrl);
-      } else if (emailType === 'booking_status_update') {
-        if (bookingDetails.status === 'AssignedToProvider') {
-          customerEmailSubject = `Technician Assigned to your Booking (ID: ${bookingDetails.bookingId})`;
-          customerEmailBody = createHtmlTemplate('Technician Assigned', `
-              <p>Hi ${bookingDetails.customerName},</p>
-              <p>We have successfully assigned a service professional to your booking (ID: <strong>${bookingDetails.bookingId}</strong>).</p>
-              <div class="summary-box">
-                <div class="section-title">Technician Details</div>
-                <p style="margin: 5px 0;"><strong>Name:</strong> ${providerName || 'N/A'}</p>
-                <p style="margin: 5px 0; margin-top: 15px;"><strong>Scheduled Time:</strong> ${formatScheduledDate(bookingDetails.scheduledDate)} at ${bookingDetails.scheduledTimeSlot}</p>
-              </div>
-              <p style="text-align: center; margin-top: 30px;">
-                <a href="${getBaseUrl()}/my-bookings" class="button">View Booking Details</a>
-              </p>
-          `, siteName, logoUrl);
-          adminEmailSubject = `Provider Assigned to Booking (ID: ${bookingDetails.bookingId})`;
-          adminEmailBody = createHtmlTemplate('Admin Alert: Provider Assigned', `
-              <p>Booking ID <strong>${bookingDetails.bookingId}</strong> has been successfully assigned to provider <strong>${providerName || 'N/A'}</strong>.</p>
-              <p style="margin-top: 20px;">
-                <a href="${getBaseUrl()}/admin/bookings" class="button">Open Admin Panel</a>
-              </p>
-          `, siteName, logoUrl);
-        } else {
-          customerEmailSubject = `Update on your ${siteName} booking (ID: ${bookingDetails.bookingId})`;
-          customerEmailBody = createHtmlTemplate('Booking Status Updated', `
-              <p>Hi ${bookingDetails.customerName},</p>
-              <p>The status of your service booking (ID: <strong>${bookingDetails.bookingId}</strong>) has been updated to: <strong>${bookingDetails.status}</strong>.</p>
-              <p style="text-align: center; margin-top: 30px;">
-                <a href="${getBaseUrl()}/my-bookings" class="button">View Booking Status</a>
-              </p>
-          `, siteName, logoUrl);
-          adminEmailSubject = `Booking Status Updated (ID: ${bookingDetails.bookingId})`;
-          adminEmailBody = createHtmlTemplate('Admin Alert: Status Updated', `<p>Booking ID <strong>${bookingDetails.bookingId}</strong> status changed to <strong>${bookingDetails.status}</strong>.</p>`, siteName, logoUrl);
-        }
-      } else { // booking_confirmation (default)
-        customerEmailSubject = `Your ${siteName} Booking Confirmed! (ID: ${bookingDetails.bookingId})`;
-        customerEmailBody = createHtmlTemplate('Booking Confirmed!', `
-          <p>Hi ${bookingDetails.customerName},</p>
-          <p>Thank you for booking with ${siteName}! Your service has been scheduled successfully.</p>
-          <div class="summary-box">
-            <div class="section-title">Booking Details</div>
-            <p style="margin: 5px 0;"><strong>Booking ID:</strong> ${bookingDetails.bookingId}</p>
-            <p style="margin: 5px 0;"><strong>Scheduled:</strong> ${formatScheduledDate(bookingDetails.scheduledDate)} | ${bookingDetails.scheduledTimeSlot}</p>
-            <p style="margin: 5px 0;"><strong>Address:</strong> ${bookingDetails.addressLine1}${bookingDetails.addressLine2 ? ', ' + bookingDetails.addressLine2 : ''}, ${bookingDetails.city}</p>
-            
-            <div class="section-title" style="margin-top: 25px;">Services</div>
-            ${servicesHtml}
-            
-            <div class="section-title" style="margin-top: 25px;">Payment Summary</div>
-            ${paymentSummaryHtml}
-          </div>
-          <p style="text-align: center;">
-            <a href="${getBaseUrl()}/my-bookings" class="button">Manage Your Booking</a>
-          </p>
-        `, siteName, logoUrl);
+        const custTemplate = await getEmailTemplate('booking_cancellation_customer');
+        const admTemplate = await getEmailTemplate('booking_cancellation_admin');
         
-        // --- ADMIN EMAIL ---
-        let addressBlock = `<li><strong>Address:</strong> ${bookingDetails.addressLine1}${bookingDetails.addressLine2 ? ', ' + bookingDetails.addressLine2 : ''}, ${bookingDetails.city}, ${bookingDetails.state} - ${bookingDetails.pincode}</li>`;
-        if (bookingDetails.latitude && bookingDetails.longitude) {
-            const mapsUrl = `https://www.google.com/maps?q=${bookingDetails.latitude},${bookingDetails.longitude}`;
-            addressBlock += `<li style="margin-top: 10px;"><a href="${mapsUrl}" target="_blank" class="button-secondary">📍 View on Google Maps</a></li>`;
+        sendCustomer = custTemplate.isEnabled;
+        sendAdmin = admTemplate.isEnabled;
+
+        if (sendCustomer) {
+          const reasonBlock = cancellationReason ? `<p><strong>Reason:</strong> ${cancellationReason}</p>` : '';
+          const variables = { customerName: bookingDetails.customerName, bookingId: bookingDetails.bookingId, cancellationReasonBlock: reasonBlock };
+          customerEmailSubject = replacePlaceholders(custTemplate.subject, variables);
+          customerEmailBody = createHtmlTemplate('Booking Cancelled', replacePlaceholders(custTemplate.body, variables), siteName, logoUrl);
         }
 
-        adminEmailSubject = `New Booking Received (ID: ${bookingDetails.bookingId})`;
-        adminEmailBody = createHtmlTemplate('Admin Alert: New Booking', `
-          <p>A new booking has been made on ${siteName}. Here are the full details:</p>
-          <div class="summary-box">
-            <div class="section-title">Customer & Schedule</div>
-            <ul style="list-style: none; padding: 0; margin: 0; font-size: 14px;">
-              <li style="margin-bottom: 5px;"><strong>Booking ID:</strong> ${bookingDetails.bookingId}</li>
-              <li style="margin-bottom: 5px;"><strong>Customer:</strong> ${bookingDetails.customerName}</li>
-              <li style="margin-bottom: 5px;"><strong>Email:</strong> ${bookingDetails.customerEmail}</li>
-              <li style="margin-bottom: 5px;"><strong>Phone:</strong> ${bookingDetails.customerPhone}</li>
-              <li style="margin-bottom: 5px;"><strong>Scheduled:</strong> ${formatScheduledDate(bookingDetails.scheduledDate)} at ${bookingDetails.scheduledTimeSlot}</li>
-              ${addressBlock}
-              <li style="margin-bottom: 5px; margin-top: 10px;"><strong>Payment:</strong> ${bookingDetails.paymentMethod}</li>
-              <li style="margin-bottom: 5px;"><strong>Status:</strong> ${bookingDetails.status}</li>
-              ${providerName ? `<li style="margin-bottom: 5px; margin-top: 10px; color: #0B5ED7;"><strong>Auto-Assigned Provider:</strong> ${providerName}</li>` : ''}
-            </ul>
-            
-            <div class="section-title" style="margin-top: 25px;">Services Requested</div>
-            ${servicesHtml}
-            
-            <div class="section-title" style="margin-top: 25px;">Payment Details</div>
-            ${paymentSummaryHtml}
-          </div>
-          <p style="text-align: center;">
-            <a href="${getBaseUrl()}/admin/bookings" class="button">Open Admin Panel</a>
-          </p>
-        `, siteName, logoUrl);
+        if (sendAdmin) {
+          const variables = { bookingId: bookingDetails.bookingId, customerName: bookingDetails.customerName };
+          adminEmailSubject = replacePlaceholders(admTemplate.subject, variables);
+          adminEmailBody = createHtmlTemplate('Admin Alert: Booking Cancelled', replacePlaceholders(admTemplate.body, variables), siteName, logoUrl);
+        }
+      } else if (emailType === 'booking_status_update') {
+        if (bookingDetails.status === 'AssignedToProvider') {
+          const custTemplate = await getEmailTemplate('booking_assigned_customer');
+          const admTemplate = await getEmailTemplate('booking_assigned_admin');
+          
+          sendCustomer = custTemplate.isEnabled;
+          sendAdmin = admTemplate.isEnabled;
+
+          if (sendCustomer) {
+            const variables = { customerName: bookingDetails.customerName, bookingId: bookingDetails.bookingId, providerName: providerName || 'N/A', scheduledDate: formatScheduledDate(bookingDetails.scheduledDate), scheduledTimeSlot: bookingDetails.scheduledTimeSlot, myBookingsUrl: `${getBaseUrl()}/my-bookings` };
+            customerEmailSubject = replacePlaceholders(custTemplate.subject, variables);
+            customerEmailBody = createHtmlTemplate('Technician Assigned', replacePlaceholders(custTemplate.body, variables), siteName, logoUrl);
+          }
+
+          if (sendAdmin) {
+            const variables = { bookingId: bookingDetails.bookingId, providerName: providerName || 'N/A', adminBookingsUrl: `${getBaseUrl()}/admin/bookings` };
+            adminEmailSubject = replacePlaceholders(admTemplate.subject, variables);
+            adminEmailBody = createHtmlTemplate('Admin Alert: Provider Assigned', replacePlaceholders(admTemplate.body, variables), siteName, logoUrl);
+          }
+        } else {
+          const custTemplate = await getEmailTemplate('booking_status_update_customer');
+          const admTemplate = await getEmailTemplate('booking_status_update_admin');
+          
+          sendCustomer = custTemplate.isEnabled;
+          sendAdmin = admTemplate.isEnabled;
+
+          if (sendCustomer) {
+            const variables = { customerName: bookingDetails.customerName, siteName, bookingId: bookingDetails.bookingId, status: bookingDetails.status, myBookingsUrl: `${getBaseUrl()}/my-bookings` };
+            customerEmailSubject = replacePlaceholders(custTemplate.subject, variables);
+            customerEmailBody = createHtmlTemplate('Booking Status Updated', replacePlaceholders(custTemplate.body, variables), siteName, logoUrl);
+          }
+
+          if (sendAdmin) {
+            const variables = { bookingId: bookingDetails.bookingId, status: bookingDetails.status };
+            adminEmailSubject = replacePlaceholders(admTemplate.subject, variables);
+            adminEmailBody = createHtmlTemplate('Admin Alert: Status Updated', replacePlaceholders(admTemplate.body, variables), siteName, logoUrl);
+          }
+        }
+      } else { // booking_confirmation (default)
+        const custTemplate = await getEmailTemplate('booking_confirmation_customer');
+        const admTemplate = await getEmailTemplate('booking_confirmation_admin');
+        
+        sendCustomer = custTemplate.isEnabled;
+        sendAdmin = admTemplate.isEnabled;
+
+        if (sendCustomer) {
+          const variables = { 
+            customerName: bookingDetails.customerName, 
+            siteName, 
+            bookingId: bookingDetails.bookingId, 
+            scheduledDate: formatScheduledDate(bookingDetails.scheduledDate), 
+            scheduledTimeSlot: bookingDetails.scheduledTimeSlot, 
+            customerAddress: `${bookingDetails.addressLine1}${bookingDetails.addressLine2 ? ', ' + bookingDetails.addressLine2 : ''}, ${bookingDetails.city}`, 
+            servicesList: servicesHtml, 
+            paymentSummary: paymentSummaryHtml, 
+            myBookingsUrl: `${getBaseUrl()}/my-bookings` 
+          };
+          customerEmailSubject = replacePlaceholders(custTemplate.subject, variables);
+          customerEmailBody = createHtmlTemplate('Booking Confirmed!', replacePlaceholders(custTemplate.body, variables), siteName, logoUrl);
+        }
+
+        if (sendAdmin) {
+          let addressBlock = `<li><strong>Address:</strong> ${bookingDetails.addressLine1}${bookingDetails.addressLine2 ? ', ' + bookingDetails.addressLine2 : ''}, ${bookingDetails.city}, ${bookingDetails.state} - ${bookingDetails.pincode}</li>`;
+          if (bookingDetails.latitude && bookingDetails.longitude) {
+              const mapsUrl = `https://www.google.com/maps?q=${bookingDetails.latitude},${bookingDetails.longitude}`;
+              addressBlock += `<li style="margin-top: 10px;"><a href="${mapsUrl}" target="_blank" class="button-secondary">📍 View on Google Maps</a></li>`;
+          }
+
+          const variables = { 
+            bookingId: bookingDetails.bookingId, 
+            siteName, 
+            customerName: bookingDetails.customerName, 
+            customerEmail: bookingDetails.customerEmail, 
+            customerPhone: bookingDetails.customerPhone, 
+            scheduledDate: formatScheduledDate(bookingDetails.scheduledDate), 
+            scheduledTimeSlot: bookingDetails.scheduledTimeSlot, 
+            addressBlock, 
+            paymentMethod: bookingDetails.paymentMethod, 
+            status: bookingDetails.status, 
+            assignedProviderBlock: providerName ? `<li style="margin-bottom: 5px; margin-top: 10px; color: #0B5ED7;"><strong>Auto-Assigned Provider:</strong> ${providerName}</li>` : '', 
+            servicesList: servicesHtml, 
+            paymentSummary: paymentSummaryHtml, 
+            adminBookingsUrl: `${getBaseUrl()}/admin/bookings` 
+          };
+          adminEmailSubject = replacePlaceholders(admTemplate.subject, variables);
+          adminEmailBody = createHtmlTemplate('Admin Alert: New Booking', replacePlaceholders(admTemplate.body, variables), siteName, logoUrl);
+        }
       }
 
       if (!smtpHost || !smtpUser || !smtpPass || !senderEmail) {
@@ -395,12 +404,18 @@ const bookingEmailFlow = ai.defineFlow(
       const portNumber = parseInt(smtpPort!, 10) || 587;
       const transporter = nodemailer.createTransport({ host: smtpHost, port: portNumber, secure: portNumber === 465, auth: { user: smtpUser, pass: smtpPass }});
       
-      const customerMailOptions = { from: `${siteName} <${senderEmail}>`, to: bookingDetails.customerEmail, subject: customerEmailSubject, html: customerEmailBody, attachments };
+      const promises = [];
+      if (sendCustomer && customerEmailSubject && customerEmailBody) {
+        const customerMailOptions = { from: `${siteName} <${senderEmail}>`, to: bookingDetails.customerEmail, subject: customerEmailSubject, html: customerEmailBody, attachments };
+        promises.push(transporter.sendMail(customerMailOptions));
+      }
+      if (sendAdmin && adminEmailSubject && adminEmailBody) {
+        promises.push(transporter.sendMail({ from: `${siteName} Admin <${senderEmail}>`, to: adminEmail, subject: adminEmailSubject, html: adminEmailBody }));
+      }
 
-      await Promise.all([
-          transporter.sendMail(customerMailOptions),
-          transporter.sendMail({ from: `${siteName} Admin <${senderEmail}>`, to: adminEmail, subject: adminEmailSubject, html: adminEmailBody })
-      ]);
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
       
       return { success: true, message: "Booking emails sent successfully." };
 

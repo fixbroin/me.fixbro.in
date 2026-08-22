@@ -8,6 +8,8 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import nodemailer from 'nodemailer';
 import { getBaseUrl } from '@/lib/config'; // Import the base URL helper
+import { getEmailTemplate } from '@/app/actions/emailSettingsActions';
+import { replacePlaceholders } from '@/lib/seoUtils';
 
 // Input schema for the welcome email flow
 const WelcomeEmailInputSchema = z.object({
@@ -108,20 +110,19 @@ const welcomeEmailFlow = ai.defineFlow(
   async (details) => {
     const { smtpHost, smtpPort, smtpUser, smtpPass, senderEmail, userName, userEmail, siteName = "Wecanfix", logoUrl } = details;
     
-    const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
+    const template = await getEmailTemplate('welcome_email');
+    if (!template.isEnabled) {
+      console.log("Welcome email is disabled in settings. Skipping sending.");
+      return { success: true, message: "Welcome email is disabled in settings. Skipping sending." };
+    }
 
     const categoriesUrl = `${getBaseUrl()}/categories`;
-    const emailSubject = `Welcome to ${siteName}, ${userName}!`;
-    const emailBodyContent = `
-        <p>Hi ${userName},</p>
-        <p>Welcome to ${siteName}! We are thrilled to have you join our community.</p>
-        <p>You can now browse our wide range of home services, book appointments with trusted professionals, and manage everything from your personal dashboard.</p>
-        <p>To get started, why not explore our popular services?</p>
-        <p><a href="${categoriesUrl}" class="button">Explore Services</a></p>
-        <p>If you have any questions, feel free to contact our support team.</p>
-        <p>Thanks,<br>The ${siteName} Team</p>
-    `;
+    const variables = { userName, siteName, categoriesUrl };
+    const emailSubject = replacePlaceholders(template.subject, variables);
+    const emailBodyContent = replacePlaceholders(template.body, variables);
     const htmlBody = createHtmlTemplate(`Welcome to ${siteName}!`, emailBodyContent, siteName, logoUrl);
+
+    const canAttemptRealEmail = smtpHost && smtpPort && smtpUser && smtpPass && senderEmail;
 
     if (!canAttemptRealEmail) {
       console.warn("SMTP configuration incomplete. Simulating welcome email.");
