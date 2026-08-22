@@ -380,7 +380,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
     const { user } = userCredentialForProfileCompletion;
     const providerId = user.providerData[0]?.providerId;
     const isCustomAuth = providerId === 'password' || providerId === 'phone';
-  
+    let initialWalletBalance = 0;
     try {
       // 1. Email Uniqueness Verification
       const targetEmail = (details.email || user.email)?.toLowerCase();
@@ -453,7 +453,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
         const referralSettingsDocRef = doc(db, "appConfiguration", "referral");
         const referralSettingsSnap = await transaction.get(referralSettingsDocRef);
         const referralSettings = referralSettingsSnap.exists() ? referralSettingsSnap.data() as ReferralSettings : null;
-        let initialWalletBalance = 0;
+        initialWalletBalance = 0;
         let referrerId: string | null = null;
         let deviceId: string | null = null;
         let ipAddress: string | null = null;
@@ -571,6 +571,19 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       localStorage.removeItem('referralCode');
       
       await syncCartOnLogin(user.uid);
+
+      if (initialWalletBalance > 0) {
+        triggerPushNotification({
+          userId: user.uid,
+          title: "Welcome Reward!",
+          body: `You received a ₹${initialWalletBalance} welcome bonus in your wallet!`,
+          href: '/referral',
+          type: 'referral_signup_bonus',
+          variables: {
+            amount: String(initialWalletBalance)
+          }
+        }).catch(err => console.error("Error sending welcome referral push:", err));
+      }
   
       if (appConfig.smtpHost && details.email) {
           sendWelcomeEmail({

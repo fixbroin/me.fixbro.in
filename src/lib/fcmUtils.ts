@@ -137,6 +137,8 @@ export const triggerPushNotification = async (params: {
   href?: string;
   icon?: string;
   sound?: 'order' | 'default';
+  type?: string;
+  variables?: Record<string, string | number | undefined>;
 }) => {
   try {
     const response = await fetch('/api/send-push', {

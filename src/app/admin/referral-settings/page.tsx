@@ -4,11 +4,12 @@
 
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Handshake, Banknote, UserPlus, SendToBack } from "lucide-react";
+import { Handshake, Banknote, UserPlus, SendToBack, Users } from "lucide-react";
 import ReferralSettingsTab from '@/components/admin/referral/ReferralSettingsTab';
 import WithdrawalSettingsTab from '@/components/admin/referral/WithdrawalSettingsTab';
 import ReferralSignupsTab from "@/components/admin/referral/ReferralSignupsTab";
 import WithdrawalRequestsTab from "@/components/admin/referral/WithdrawalRequestsTab";
+import ReferralUsersTab from "@/components/admin/referral/ReferralUsersTab";
 import { useAuth } from "@/hooks/useAuth";
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
@@ -50,6 +51,12 @@ export default function ReferralSettingsPage() {
                 <UserPlus className="mr-2 h-4 w-4"/>Referral Signups
               </TabsTrigger>
               <TabsTrigger 
+                value="referral_users"
+                className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+              >
+                <Users className="mr-2 h-4 w-4"/>Users
+              </TabsTrigger>
+              <TabsTrigger 
                 value="withdrawal_requests"
                 className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
               >
@@ -66,6 +73,9 @@ export default function ReferralSettingsPage() {
           </TabsContent>
           <TabsContent value="referral_signups">
             <ReferralSignupsTab />
+          </TabsContent>
+          <TabsContent value="referral_users">
+            <ReferralUsersTab />
           </TabsContent>
           <TabsContent value="withdrawal_requests">
             <WithdrawalRequestsTab />

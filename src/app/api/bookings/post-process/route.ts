@@ -620,6 +620,7 @@ export async function POST(request: Request) {
 
     // --- NEW: Referral Reward Logic on Completion ---
     if (isCompleted && userId) {
+        let pushParams: any = null;
         const referralTask = adminDb.runTransaction(async (transaction) => {
             // 1. Check if this user was referred
             const referralQuery = await adminDb.collection('referrals')
@@ -690,7 +691,29 @@ export async function POST(request: Request) {
                         createdAt: Timestamp.now()
                     };
                     transaction.set(adminDb.collection('userNotifications').doc(), notification);
+
+                    pushParams = {
+                        userId: referralData.referrerId,
+                        title: "Referral Bonus Credited!",
+                        body: `Your friend ${booking.customerName} completed their first booking. ${currencySymbol}${bonusAmount.toFixed(2)} has been added to your wallet.`,
+                        href: '/referral?tab=wallet',
+                        type: 'referral_reward_completed',
+                        variables: {
+                            friendName: booking.customerName,
+                            amount: bonusAmount.toFixed(2),
+                            currencySymbol
+                        }
+                    };
                 }
+            }
+        }).then(() => {
+            if (pushParams) {
+                const baseUrl = getBaseUrl();
+                fetch(`${baseUrl}/api/send-push`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(pushParams)
+                }).catch(e => console.error("Error triggering referral completed push:", e));
             }
         });
         tasks.push(referralTask);

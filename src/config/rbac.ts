@@ -52,6 +52,7 @@ export const PERMISSION_MODULES = [
   { id: 'image_gallery', label: 'Image Gallery', paths: ['/admin/image-gallery'] },
   { id: 'settings', label: 'App Settings', paths: ['/admin/settings'] },
   { id: 'email_settings', label: 'Email Settings', paths: ['/admin/email-settings'] },
+  { id: 'push_settings', label: 'Push Settings', paths: ['/admin/push-settings'] },
   { id: 'login_settings', label: 'Login Settings', paths: ['/admin/login-settings'] },
   { id: 'web_settings', label: 'Web Settings', paths: ['/admin/web-settings'] },
   { id: 'cookie_settings', label: 'Cookie Settings', paths: ['/admin/cookie-settings'] },

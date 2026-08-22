@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 import * as admin from 'firebase-admin';
 
+import { getPushTemplate } from '@/app/actions/pushSettingsActions';
+import { replacePlaceholders } from '@/lib/seoUtils';
+
 // Initialize messaging only once
 let messaging: admin.messaging.Messaging;
 try {
@@ -12,12 +15,60 @@ try {
     // If somehow it's not ready, we can't send.
 }
 
+function determinePushType(title: string): string {
+  const lowerTitle = (title || "").toLowerCase();
+  if (lowerTitle.includes('message') || lowerTitle.includes('chat')) {
+    return 'chat_message';
+  } else if (lowerTitle.includes('completed')) {
+    return 'booking_completed';
+  } else if (lowerTitle.includes('confirmed') || lowerTitle.includes('received')) {
+    return 'booking_created';
+  } else if (lowerTitle.includes('assigned')) {
+    return 'provider_assigned';
+  } else if (lowerTitle.includes('cancelled')) {
+    return 'booking_cancelled';
+  } else if (lowerTitle.includes('withdrawal')) {
+    return 'withdrawal_status';
+  } else if (lowerTitle.includes('review')) {
+    return 'new_review';
+  } else if (lowerTitle.includes('inquiry') || lowerTitle.includes('contact')) {
+    return 'new_inquiry';
+  } else if (lowerTitle.includes('custom')) {
+    return 'custom_request';
+  }
+  return 'other';
+}
+
 export async function POST(request: Request) {
   try {
-    const { userId, title, body, href, icon, sound } = await request.json();
+    const { userId, title, body, href, icon, sound, type: customType, variables } = await request.json();
 
     if (!userId || !title || !body) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    let finalTitle = title;
+    let finalBody = body;
+
+    // Check if push notification category is enabled
+    const pushType = customType || determinePushType(title);
+    if (pushType !== 'other') {
+      const template = await getPushTemplate(pushType);
+      if (!template.isEnabled) {
+        console.log(`Push notification type "${pushType}" is disabled in settings. Skipping dispatch.`);
+        return NextResponse.json({ success: true, message: 'Push notification is disabled in settings.' });
+      }
+
+      // If database has override templates, replace placeholders
+      if (template.subject && template.body) {
+        const mergedVariables = {
+          title,
+          body,
+          ...(variables || {})
+        };
+        finalTitle = replacePlaceholders(template.subject, mergedVariables);
+        finalBody = replacePlaceholders(template.body, mergedVariables);
+      }
     }
 
     // 1. Get user's FCM tokens from Firestore
@@ -37,8 +88,8 @@ export async function POST(request: Request) {
     // 2. Prepare the message
     const messagePayload = {
       notification: {
-        title,
-        body,
+        title: finalTitle,
+        body: finalBody,
       },
       data: {
         click_action: href || '/',
@@ -48,8 +99,8 @@ export async function POST(request: Request) {
       // Essential for background handling in modern browsers
       webpush: {
         notification: {
-          title,
-          body,
+          title: finalTitle,
+          body: finalBody,
           icon: icon || '/android-chrome-192x192.png',
           data: {
             url: href || '/',
