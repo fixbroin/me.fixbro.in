@@ -393,23 +393,42 @@ export default function ProviderWithdrawalsPage() {
       </div>
 
       <Tabs defaultValue="requests" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-5 max-w-4xl mb-6 h-auto p-1 bg-muted/50 rounded-xl gap-1">
-          <TabsTrigger value="requests" className="rounded-lg font-bold">
-            <Banknote className="mr-2 h-4 w-4"/> Payout Requests
-          </TabsTrigger>
-          <TabsTrigger value="balances" onClick={loadProviders} className="rounded-lg font-bold">
-            <Users className="mr-2 h-4 w-4"/> Provider Balances
-          </TabsTrigger>
-          <TabsTrigger value="wallet_complaints" className="rounded-lg font-bold">
-            <AlertTriangle className="mr-2 h-4 w-4"/> Wallet Complaints
-          </TabsTrigger>
-          <TabsTrigger value="wallet_details" onClick={loadProviders} className="rounded-lg font-bold">
-            <Wallet className="mr-2 h-4 w-4"/> Provider Wallet Details
-          </TabsTrigger>
-          <TabsTrigger value="wallet_settings" className="rounded-lg font-bold">
-            <Settings className="mr-2 h-4 w-4"/> Wallet Settings
-          </TabsTrigger>
-        </TabsList>
+        <div className="relative mb-6">
+          <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
+            <TabsTrigger 
+              value="requests" 
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Banknote className="mr-2 h-4 w-4"/> Payout Requests
+            </TabsTrigger>
+            <TabsTrigger 
+              value="balances" 
+              onClick={loadProviders} 
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Users className="mr-2 h-4 w-4"/> Provider Balances
+            </TabsTrigger>
+            <TabsTrigger 
+              value="wallet_complaints" 
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <AlertTriangle className="mr-2 h-4 w-4"/> Wallet Complaints
+            </TabsTrigger>
+            <TabsTrigger 
+              value="wallet_details" 
+              onClick={loadProviders} 
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Wallet className="mr-2 h-4 w-4"/> Provider Wallet Details
+            </TabsTrigger>
+            <TabsTrigger 
+              value="wallet_settings" 
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Settings className="mr-2 h-4 w-4"/> Wallet Settings
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="requests">
           <Card>
@@ -424,94 +443,226 @@ export default function ProviderWithdrawalsPage() {
                   <p className="text-muted-foreground">No withdrawal requests received yet.</p>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader><TableRow><TableHead>Provider</TableHead><TableHead>Amount</TableHead><TableHead>Method</TableHead><TableHead>Details</TableHead><TableHead>Requested</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                  <TableBody>
+                <>
+                  <div className="hidden lg:block overflow-x-auto">
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Provider</TableHead><TableHead>Amount</TableHead><TableHead>Method</TableHead><TableHead>Details</TableHead><TableHead>Requested</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {requests.map(req => {
+                           const providerProfile = providers.find(p => p.uid === req.providerId);
+                           const currentBalance = providerProfile?.withdrawableBalance ?? null;
+
+                           return (
+                           <TableRow key={req.id}>
+                              <TableCell>
+                                <div className="font-medium">{req.providerName}</div>
+                                <div className="text-xs text-muted-foreground">{req.providerEmail}</div>
+                                {currentBalance !== null && (
+                                    <div className={cn("text-[10px] font-bold mt-1 px-1.5 py-0.5 rounded w-fit", currentBalance < 0 ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700")}>
+                                        Current Wallet: {formatCurrency(currentBalance, symbol, decimals, code)}
+                                    </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="font-bold">{formatCurrency(req.amount, symbol, decimals, code)}</TableCell>
+                              <TableCell className="capitalize">{req.method.replace('_', ' ')}</TableCell>
+                              <TableCell>
+                                <Button variant="outline" size="sm" onClick={() => handleViewDetails(req)}>
+                                  <Eye className="mr-1 h-4 w-4" /> View
+                                </Button>
+                              </TableCell>
+                              <TableCell className="text-xs">{formatDate(req.requestedAt, appConfig)}</TableCell>
+                              <TableCell><Badge variant={getStatusBadgeVariant(req.status)} className={`capitalize ${getStatusBadgeClass(req.status)}`}>{req.status.replace(/_/g, ' ')}</Badge></TableCell>
+                              <TableCell className="text-right">
+                                  <div className="flex justify-end gap-2">
+                                      {req.status === 'pending' && (
+                                          <>
+                                              <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                                  <Button variant="outline" size="sm" className="text-green-600 font-bold hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'completed')} disabled={isUpdating === req.id}>
+                                                      Complete
+                                                  </Button>
+                                              </PermissionGuard>
+                                              <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                                  <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'approved')} disabled={isUpdating === req.id}>
+                                                      <Check className="h-4 w-4" />
+                                                  </Button>
+                                              </PermissionGuard>
+                                              <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                                  <Button variant="outline" size="sm" className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50" onClick={() => openRejectionDialog(req, 're_submit')} disabled={isUpdating === req.id}>
+                                                      <AlertTriangle className="h-4 w-4" />
+                                                  </Button>
+                                              </PermissionGuard>
+                                              <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                                  <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => openRejectionDialog(req, 'rejected')} disabled={isUpdating === req.id}>
+                                                      <X className="h-4 w-4" />
+                                                  </Button>
+                                              </PermissionGuard>
+                                          </>
+                                      )}
+                                      {req.status === 'approved' && (
+                                          <div className="flex gap-2">
+                                              <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                                  <Button variant="outline" size="sm" className="text-green-600 font-bold hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'completed')} disabled={isUpdating === req.id}>
+                                                      Complete
+                                                  </Button>
+                                              </PermissionGuard>
+                                              <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                                  <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req, 'processing')} disabled={isUpdating === req.id}>
+                                                      Process
+                                                  </Button>
+                                              </PermissionGuard>
+                                          </div>
+                                      )}
+                                      {req.status === 'processing' && (
+                                          <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                              <Button variant="outline" size="sm" className="text-green-600 font-bold hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'completed')} disabled={isUpdating === req.id}>
+                                                  Complete
+                                              </Button>
+                                          </PermissionGuard>
+                                      )}
+
+                                      <PermissionGuard moduleId="provider_withdrawals" action="delete">
+                                          <AlertDialog>
+                                              <AlertDialogTrigger asChild>
+                                                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" disabled={isUpdating === req.id}>
+                                                      <Trash2 className="h-4 w-4" />
+                                                  </Button>
+                                              </AlertDialogTrigger>
+                                              <AlertDialogContent>
+                                                  <AlertDialogHeader>
+                                                      <AlertDialogTitle>Delete Request?</AlertDialogTitle>
+                                                      <AlertDialogDescriptionComponent>Permanently remove this request record. This action will adjust the provider's balance if the request was not yet completed.</AlertDialogDescriptionComponent>
+                                                  </AlertDialogHeader>
+                                                  <AlertDialogFooter>
+                                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                      <AlertDialogAction onClick={() => handleDeleteRequest(req)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                                                  </AlertDialogFooter>
+                                              </AlertDialogContent>
+                                          </AlertDialog>
+                                      </PermissionGuard>
+                                  </div>
+                              </TableCell>
+                           </TableRow>
+                        ); })}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="lg:hidden space-y-4">
                     {requests.map(req => {
-                       const providerProfile = providers.find(p => p.uid === req.providerId);
-                       const currentBalance = providerProfile?.withdrawableBalance ?? null;
+                      const providerProfile = providers.find(p => p.uid === req.providerId);
+                      const currentBalance = providerProfile?.withdrawableBalance ?? null;
 
-                       return (
-                       <TableRow key={req.id}>
-                          <TableCell>
-                            <div className="font-medium">{req.providerName}</div>
-                            <div className="text-xs text-muted-foreground">{req.providerEmail}</div>
-                            {currentBalance !== null && (
+                      return (
+                        <Card key={req.id} className="p-4 space-y-3 border border-border shadow-sm">
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <div className="font-bold text-sm text-left">{req.providerName}</div>
+                              <div className="text-xs text-muted-foreground text-left">{req.providerEmail}</div>
+                              {currentBalance !== null && (
                                 <div className={cn("text-[10px] font-bold mt-1 px-1.5 py-0.5 rounded w-fit", currentBalance < 0 ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700")}>
-                                    Current Wallet: {formatCurrency(currentBalance, symbol, decimals, code)}
+                                  Wallet: {formatCurrency(currentBalance, symbol, decimals, code)}
                                 </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-bold">{formatCurrency(req.amount, symbol, decimals, code)}</TableCell>
-                          <TableCell className="capitalize">{req.method.replace('_', ' ')}</TableCell>
-                          <TableCell>
-                            <Button variant="outline" size="sm" onClick={() => handleViewDetails(req)}>
-                              <Eye className="mr-1 h-4 w-4" /> View
-                            </Button>
-                          </TableCell>
-                          <TableCell className="text-xs">{formatDate(req.requestedAt, appConfig)}</TableCell>
-                          <TableCell><Badge variant={getStatusBadgeVariant(req.status)} className={`capitalize ${getStatusBadgeClass(req.status)}`}>{req.status.replace(/_/g, ' ')}</Badge></TableCell>
-                          <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                  {req.status === 'pending' && (
-                                      <>
-                                          <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                              <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'approved')} disabled={isUpdating === req.id}>
-                                                  <Check className="h-4 w-4" />
-                                              </Button>
-                                          </PermissionGuard>
-                                          <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                              <Button variant="outline" size="sm" className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50" onClick={() => openRejectionDialog(req, 're_submit')} disabled={isUpdating === req.id}>
-                                                  <AlertTriangle className="h-4 w-4" />
-                                              </Button>
-                                          </PermissionGuard>
-                                          <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                              <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => openRejectionDialog(req, 'rejected')} disabled={isUpdating === req.id}>
-                                                  <X className="h-4 w-4" />
-                                              </Button>
-                                          </PermissionGuard>
-                                      </>
-                                  )}
-                                  {req.status === 'approved' && (
-                                      <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                          <Button variant="outline" size="sm" onClick={() => handleUpdateStatus(req, 'processing')} disabled={isUpdating === req.id}>
-                                              Process
-                                          </Button>
-                                      </PermissionGuard>
-                                  )}
-                                  {req.status === 'processing' && (
-                                      <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                          <Button variant="outline" size="sm" className="text-green-600" onClick={() => handleUpdateStatus(req, 'completed')} disabled={isUpdating === req.id}>
-                                              Complete
-                                          </Button>
-                                      </PermissionGuard>
-                                  )}
+                              )}
+                            </div>
+                            <Badge variant={getStatusBadgeVariant(req.status)} className={`capitalize ${getStatusBadgeClass(req.status)}`}>
+                              {req.status.replace(/_/g, ' ')}
+                            </Badge>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2 text-xs border-t pt-2">
+                            <div className="text-left">
+                              <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">Amount</span>
+                              <span className="font-bold text-sm">{formatCurrency(req.amount, symbol, decimals, code)}</span>
+                            </div>
+                            <div className="text-left">
+                              <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">Method</span>
+                              <span className="capitalize font-semibold">{req.method.replace('_', ' ')}</span>
+                            </div>
+                          </div>
 
-                                  <PermissionGuard moduleId="provider_withdrawals" action="delete">
-                                      <AlertDialog>
-                                          <AlertDialogTrigger asChild>
-                                              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" disabled={isUpdating === req.id}>
-                                                  <Trash2 className="h-4 w-4" />
-                                              </Button>
-                                          </AlertDialogTrigger>
-                                          <AlertDialogContent>
-                                              <AlertDialogHeader>
-                                                  <AlertDialogTitle>Delete Request?</AlertDialogTitle>
-                                                  <AlertDialogDescriptionComponent>Permanently remove this request record. This action will adjust the provider's balance if the request was not yet completed.</AlertDialogDescriptionComponent>
-                                              </AlertDialogHeader>
-                                              <AlertDialogFooter>
-                                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                  <AlertDialogAction onClick={() => handleDeleteRequest(req)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                                              </AlertDialogFooter>
-                                          </AlertDialogContent>
-                                      </AlertDialog>
+                          <div className="flex justify-between items-center text-xs border-t pt-2">
+                            <span className="text-muted-foreground">Requested:</span>
+                            <span className="font-medium">{formatDate(req.requestedAt, appConfig)}</span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-2">
+                            <Button variant="outline" size="sm" onClick={() => handleViewDetails(req)} className="h-8">
+                              <Eye className="mr-1 h-3.5 w-3.5" /> Details
+                            </Button>
+                            
+                            <div className="flex items-center gap-1.5">
+                              {req.status === 'pending' && (
+                                <>
+                                  <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                    <Button variant="outline" size="sm" className="h-8 text-green-600 font-bold hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'completed')} disabled={isUpdating === req.id}>
+                                      Complete
+                                    </Button>
                                   </PermissionGuard>
-                              </div>
-                          </TableCell>
-                       </TableRow>
-                    ); })}
-                  </TableBody>
-                </Table>
+                                  <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                    <Button variant="outline" size="sm" className="h-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'approved')} disabled={isUpdating === req.id}>
+                                      Approve
+                                    </Button>
+                                  </PermissionGuard>
+                                  <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                    <Button variant="outline" size="sm" className="h-8 text-yellow-600" onClick={() => openRejectionDialog(req, 're_submit')} disabled={isUpdating === req.id}>
+                                      Re-submit
+                                    </Button>
+                                  </PermissionGuard>
+                                  <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                    <Button variant="outline" size="sm" className="h-8 text-destructive" onClick={() => openRejectionDialog(req, 'rejected')} disabled={isUpdating === req.id}>
+                                      Reject
+                                    </Button>
+                                  </PermissionGuard>
+                                </>
+                              )}
+                              {req.status === 'approved' && (
+                                <div className="flex gap-1.5">
+                                  <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                    <Button variant="outline" size="sm" className="h-8 text-green-600 font-bold hover:text-green-700 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'completed')} disabled={isUpdating === req.id}>
+                                      Complete
+                                    </Button>
+                                  </PermissionGuard>
+                                  <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                    <Button variant="outline" size="sm" className="h-8" onClick={() => handleUpdateStatus(req, 'processing')} disabled={isUpdating === req.id}>
+                                      Process
+                                    </Button>
+                                  </PermissionGuard>
+                                </div>
+                              )}
+                              {req.status === 'processing' && (
+                                <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                  <Button variant="outline" size="sm" className="h-8 text-green-600 font-bold" onClick={() => handleUpdateStatus(req, 'completed')} disabled={isUpdating === req.id}>
+                                    Complete
+                                  </Button>
+                                </PermissionGuard>
+                              )}
+
+                              <PermissionGuard moduleId="provider_withdrawals" action="delete">
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-destructive" disabled={isUpdating === req.id}>
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Request?</AlertDialogTitle>
+                                      <AlertDialogDescriptionComponent>Permanently remove this request record.</AlertDialogDescriptionComponent>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteRequest(req)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </PermissionGuard>
+                            </div>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -535,36 +686,110 @@ export default function ProviderWithdrawalsPage() {
                 <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
               ) : providers.length === 0 ? (
                 <p className="text-center py-10 text-muted-foreground">No providers found.</p>
-              ) : (                 <Table>
-                  <TableHeader><TableRow><TableHead>Provider</TableHead><TableHead>Month Gross</TableHead><TableHead>Month Net</TableHead><TableHead>Wallet Balance</TableHead><TableHead>Lifetime Paid</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {providers.map(p => {
-                       const now = new Date();
-                       const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                       const stats = p.monthlyStats?.monthKey === monthKey ? p.monthlyStats : { gross: 0, commission: 0 };
-                       const monthNet = stats.gross - stats.commission;
+              ) : (                <>
+                  <div className="hidden lg:block overflow-x-auto">
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Provider</TableHead><TableHead>Month Gross</TableHead><TableHead>Month Net</TableHead><TableHead>Wallet Balance</TableHead><TableHead>Lifetime Paid</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {providers.map(p => {
+                           const now = new Date();
+                           const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                           const stats = p.monthlyStats?.monthKey === monthKey ? p.monthlyStats : { gross: 0, commission: 0 };
+                           const monthNet = stats.gross - stats.commission;
 
-                       return (
-                       <TableRow key={p.uid}>
-                          <TableCell><div className="font-medium">{p.displayName}</div><div className="text-xs text-muted-foreground">{p.email}</div></TableCell>
-                          <TableCell className="text-xs font-semibold">{formatCurrency(stats.gross, symbol, decimals, code)}</TableCell>
-                          <TableCell className="text-xs font-bold text-green-600">{formatCurrency(monthNet, symbol, decimals, code)}</TableCell>
-                          <TableCell>
-                            <div className={cn("text-lg font-bold", (p.withdrawableBalance || 0) < 0 ? "text-destructive" : "text-blue-600")}>
-                                {formatCurrency(p.withdrawableBalance || 0, symbol, decimals, code)}
+                           return (
+                           <TableRow key={p.uid}>
+                              <TableCell><div className="font-medium">{p.displayName}</div><div className="text-xs text-muted-foreground">{p.email}</div></TableCell>
+                              <TableCell className="text-xs font-semibold">{formatCurrency(stats.gross, symbol, decimals, code)}</TableCell>
+                              <TableCell className="text-xs font-bold text-green-600">{formatCurrency(monthNet, symbol, decimals, code)}</TableCell>
+                              <TableCell>
+                                <div className={cn("text-lg font-bold", (p.withdrawableBalance || 0) < 0 ? "text-destructive" : "text-blue-600")}>
+                                    {formatCurrency(p.withdrawableBalance || 0, symbol, decimals, code)}
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-semibold text-muted-foreground">{formatCurrency(p.totalPaidOut || 0, symbol, decimals, code)}</TableCell>
+                              <TableCell>
+                                {(p.withdrawableBalance || 0) < 0 ? (
+                                    <Badge variant="destructive">Settlement Due</Badge>
+                                ) : (p.withdrawableBalance || 0) > 0 ? (
+                                    <Badge variant="default" className="bg-green-500">Owed</Badge>
+                                ) : (
+                                    <Badge variant="outline">Cleared</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <PermissionGuard moduleId="provider_withdrawals" action="write">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setProviderToClear(p);
+                                      setShowClearWalletDialog(true);
+                                    }}
+                                    disabled={(p.withdrawableBalance || 0) === 0 || isClearingWallet === p.uid}
+                                    className="h-8 px-2 text-xs border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive rounded-lg font-medium"
+                                  >
+                                    {isClearingWallet === p.uid ? (
+                                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                    ) : (
+                                      <Trash2 className="h-3 w-3 mr-1" />
+                                    )}
+                                    Clear Wallet
+                                  </Button>
+                                </PermissionGuard>
+                              </TableCell>
+                           </TableRow>
+                        ); })}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="lg:hidden space-y-4">
+                    {providers.map(p => {
+                      const now = new Date();
+                      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                      const stats = p.monthlyStats?.monthKey === monthKey ? p.monthlyStats : { gross: 0, commission: 0 };
+                      const monthNet = stats.gross - stats.commission;
+                      const balance = p.withdrawableBalance || 0;
+
+                      return (
+                        <Card key={p.uid} className="p-4 space-y-3 border border-border shadow-sm">
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <div className="font-bold text-sm text-left">{p.displayName}</div>
+                              <div className="text-xs text-muted-foreground text-left">{p.email}</div>
                             </div>
-                          </TableCell>
-                          <TableCell className="font-semibold text-muted-foreground">{formatCurrency(p.totalPaidOut || 0, symbol, decimals, code)}</TableCell>
-                          <TableCell>
-                            {(p.withdrawableBalance || 0) < 0 ? (
-                                <Badge variant="destructive">Settlement Due</Badge>
-                            ) : (p.withdrawableBalance || 0) > 0 ? (
-                                <Badge variant="default" className="bg-green-500">Owed</Badge>
+                            {balance < 0 ? (
+                              <Badge variant="destructive">Settlement Due</Badge>
+                            ) : balance > 0 ? (
+                              <Badge variant="default" className="bg-green-500">Owed</Badge>
                             ) : (
-                                <Badge variant="outline">Cleared</Badge>
+                              <Badge variant="outline">Cleared</Badge>
                             )}
-                          </TableCell>
-                          <TableCell className="text-right">
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3 text-xs border-t pt-2">
+                            <div className="text-left">
+                              <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">Month Gross</span>
+                              <span className="font-semibold">{formatCurrency(stats.gross, symbol, decimals, code)}</span>
+                            </div>
+                            <div className="text-left">
+                              <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">Month Net</span>
+                              <span className="font-bold text-green-600">{formatCurrency(monthNet, symbol, decimals, code)}</span>
+                            </div>
+                            <div className="text-left">
+                              <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">Wallet Balance</span>
+                              <span className={cn("font-extrabold text-sm", balance < 0 ? "text-destructive" : "text-blue-600")}>
+                                {formatCurrency(balance, symbol, decimals, code)}
+                              </span>
+                            </div>
+                            <div className="text-left">
+                              <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">Lifetime Paid</span>
+                              <span className="font-semibold text-muted-foreground">{formatCurrency(p.totalPaidOut || 0, symbol, decimals, code)}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end border-t pt-2">
                             <PermissionGuard moduleId="provider_withdrawals" action="write">
                               <Button
                                 variant="outline"
@@ -573,22 +798,23 @@ export default function ProviderWithdrawalsPage() {
                                   setProviderToClear(p);
                                   setShowClearWalletDialog(true);
                                 }}
-                                disabled={(p.withdrawableBalance || 0) === 0 || isClearingWallet === p.uid}
-                                className="h-8 px-2 text-xs border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive rounded-lg font-medium"
+                                disabled={balance === 0 || isClearingWallet === p.uid}
+                                className="w-full h-8 text-xs border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive rounded-lg font-medium"
                               >
                                 {isClearingWallet === p.uid ? (
-                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
                                 ) : (
-                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  <Trash2 className="h-3.5 w-3.5 mr-1" />
                                 )}
                                 Clear Wallet
                               </Button>
                             </PermissionGuard>
-                          </TableCell>
-                       </TableRow>
-                    ); })}
-                  </TableBody>
-                </Table>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -604,126 +830,138 @@ export default function ProviderWithdrawalsPage() {
               <CardTitle>Provider Wallet Details & Ledger</CardTitle>
               <CardDescription>Select a service provider to inspect their prepaid wallet balance and transaction ledger.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2 max-w-md">
-                <Label htmlFor="provider-wallet-search">Search Provider Name or Email</Label>
-                <div className="relative">
-                  <Input 
-                    id="provider-wallet-search"
-                    placeholder="Type name or email..."
-                    value={providerSearch}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProviderSearch(e.target.value)}
-                  />
-                  {providerSearch && (
-                    <div className="absolute z-10 w-full mt-1 bg-popover text-popover-foreground border rounded-xl shadow-lg max-h-60 overflow-y-auto">
-                      {filteredProvidersForSelect.length === 0 ? (
-                        <div className="p-3 text-xs text-muted-foreground text-center">No matching providers found.</div>
-                      ) : (
-                        filteredProvidersForSelect.map(p => (
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left panel: List of Providers */}
+                <div className="lg:col-span-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="provider-wallet-search" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Search Provider</Label>
+                    <Input 
+                      id="provider-wallet-search"
+                      placeholder="Type name or email..."
+                      value={providerSearch}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProviderSearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="border rounded-xl max-h-[500px] overflow-y-auto divide-y bg-background">
+                    {filteredProvidersForSelect.length === 0 ? (
+                      <div className="p-4 text-xs text-muted-foreground text-center">No matching providers found.</div>
+                    ) : (
+                      filteredProvidersForSelect.map(p => {
+                        const isSelected = selectedProvider?.uid === p.uid;
+                        return (
                           <div 
                             key={p.uid}
-                            className="p-3 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors border-b last:border-b-0 text-left"
-                            onClick={() => {
-                              fetchSelectedProviderWallet(p);
-                              setProviderSearch('');
-                            }}
+                            className={cn(
+                              "p-3 text-sm cursor-pointer transition-colors border-b last:border-b-0 text-left",
+                              isSelected ? "bg-primary/10 border-l-4 border-l-primary font-semibold" : "hover:bg-accent hover:text-accent-foreground"
+                            )}
+                            onClick={() => fetchSelectedProviderWallet(p)}
                           >
-                            <div className="font-bold">{p.displayName}</div>
-                            <div className="text-xs text-muted-foreground font-mono">{p.email}</div>
+                            <div className="font-bold truncate">{p.displayName}</div>
+                            <div className="text-[10px] text-muted-foreground font-mono truncate">{p.email}</div>
                           </div>
-                        ))
-                      )}
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Right panel: Details */}
+                <div className="lg:col-span-8">
+                  {selectedProvider ? (
+                    <div className="space-y-6">
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-muted/30 p-4 rounded-xl border">
+                        <div className="text-left">
+                          <h3 className="font-bold text-lg">{selectedProvider.displayName}</h3>
+                          <p className="text-sm text-muted-foreground font-mono">{selectedProvider.email}</p>
+                        </div>
+                        
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto md:justify-end">
+                          <div className="text-left sm:text-right">
+                            <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider block">Prepaid Balance</span>
+                            <span className="font-mono text-3xl font-extrabold text-primary">{symbol}{walletBalance.toFixed(2)}</span>
+                          </div>
+                          <Button 
+                            onClick={() => setIsWalletModalOpen(true)}
+                            className="w-full sm:w-auto h-10 px-4 font-bold flex items-center justify-center gap-1.5"
+                          >
+                            <Wallet className="h-4 w-4" /> Adjust Wallet / Refund
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <h4 className="font-bold text-base flex items-center gap-1.5 text-left">
+                          <History className="h-4 w-4 text-primary" />
+                          Transaction Ledger History
+                        </h4>
+
+                        {isLoadingWallet ? (
+                          <div className="flex items-center justify-center py-10">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                          </div>
+                        ) : walletHistory.length === 0 ? (
+                          <div className="text-center py-10 text-xs text-muted-foreground border border-dashed rounded-xl">
+                            No prepaid transactions found for this provider.
+                          </div>
+                        ) : (
+                          <div className="border rounded-xl overflow-hidden">
+                            <Table>
+                              <TableHeader className="bg-muted/40">
+                                <TableRow>
+                                  <TableHead className="pl-6">Date</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>Description</TableHead>
+                                  <TableHead className="text-right pr-6">Amount</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {walletHistory.map(tx => {
+                                  const isCredit = tx.amount >= 0;
+                                  return (
+                                    <TableRow key={tx.id}>
+                                      <TableCell className="pl-6 text-xs font-mono whitespace-nowrap text-left">
+                                        {new Date(tx.timestamp).toLocaleString('en-IN')}
+                                      </TableCell>
+                                      <TableCell className="text-left">
+                                        <Badge variant={tx.type === 'deposit' ? 'default' : tx.type === 'commission_deduction' ? 'destructive' : 'outline'} className="capitalize">
+                                          {tx.type.replace('_', ' ')}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell className="text-xs font-medium max-w-xs text-left">
+                                        <div className="truncate" title={tx.description}>{tx.description}</div>
+                                        {tx.bookingId && <span className="block text-[10px] text-muted-foreground font-mono mt-0.5">Ref: #{tx.bookingId}</span>}
+                                        {tx.razorpayPaymentId && (
+                                          <span className="block text-[10px] text-muted-foreground font-mono select-all mt-0.5" title={tx.razorpayPaymentId}>
+                                            Razorpay ID: {tx.razorpayPaymentId}
+                                          </span>
+                                        )}
+                                      </TableCell>
+                                      <TableCell className={cn(
+                                        "text-right pr-6 font-bold whitespace-nowrap font-mono",
+                                        isCredit ? "text-emerald-600" : "text-rose-600"
+                                      )}>
+                                        {isCredit ? '+' : ''}{symbol}{tx.amount.toFixed(2)}
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-20 text-muted-foreground border border-dashed rounded-xl h-full flex flex-col justify-center items-center">
+                      <Wallet className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                      <p className="font-bold text-sm">No Provider Selected</p>
+                      <p className="text-xs max-w-xs mx-auto mt-1">Select a service provider from the list on the left to load their prepaid balance details.</p>
                     </div>
                   )}
                 </div>
               </div>
-
-              {selectedProvider ? (
-                <div className="space-y-6 border-t pt-6">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-muted/30 p-4 rounded-xl border">
-                    <div>
-                      <h3 className="font-bold text-lg text-left">{selectedProvider.displayName}</h3>
-                      <p className="text-sm text-muted-foreground font-mono text-left">{selectedProvider.email}</p>
-                    </div>
-                    
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider block">Prepaid Balance</span>
-                        <span className="font-mono text-3xl font-extrabold text-primary">{symbol}{walletBalance.toFixed(2)}</span>
-                      </div>
-                      <Button 
-                        onClick={() => setIsWalletModalOpen(true)}
-                        className="h-10 px-4 font-bold flex items-center gap-1.5"
-                      >
-                        <Wallet className="h-4 w-4" /> Adjust Wallet / Refund
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="font-bold text-base flex items-center gap-1.5 text-left">
-                      <History className="h-4 w-4 text-primary" />
-                      Transaction Ledger History
-                    </h4>
-
-                    {isLoadingWallet ? (
-                      <div className="flex items-center justify-center py-10">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      </div>
-                    ) : walletHistory.length === 0 ? (
-                      <div className="text-center py-10 text-xs text-muted-foreground border border-dashed rounded-xl">
-                        No prepaid transactions found for this provider.
-                      </div>
-                    ) : (
-                      <div className="border rounded-xl overflow-hidden">
-                        <Table>
-                          <TableHeader className="bg-muted/40">
-                            <TableRow>
-                              <TableHead className="pl-6">Date</TableHead>
-                              <TableHead>Type</TableHead>
-                              <TableHead>Description</TableHead>
-                              <TableHead className="text-right pr-6">Amount</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {walletHistory.map(tx => {
-                              const isCredit = tx.amount >= 0;
-                              return (
-                                <TableRow key={tx.id}>
-                                  <TableCell className="pl-6 text-xs font-mono whitespace-nowrap text-left">
-                                    {new Date(tx.timestamp).toLocaleString('en-IN')}
-                                  </TableCell>
-                                  <TableCell className="text-left">
-                                    <Badge variant={tx.type === 'deposit' ? 'default' : tx.type === 'commission_deduction' ? 'destructive' : 'outline'} className="capitalize">
-                                      {tx.type.replace('_', ' ')}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-xs font-medium max-w-xs truncate text-left">
-                                    {tx.description}
-                                    {tx.bookingId && <span className="block text-[10px] text-muted-foreground font-mono">Ref: #{tx.bookingId}</span>}
-                                  </TableCell>
-                                  <TableCell className={cn(
-                                    "text-right pr-6 font-bold whitespace-nowrap font-mono",
-                                    isCredit ? "text-emerald-600" : "text-rose-600"
-                                  )}>
-                                    {isCredit ? '+' : ''}{symbol}{tx.amount.toFixed(2)}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-20 text-muted-foreground border border-dashed rounded-xl">
-                  <Wallet className="mx-auto h-12 w-12 text-muted-foreground/30 mb-3" />
-                  <p className="font-bold text-sm">No Provider Selected</p>
-                  <p className="text-xs max-w-xs mx-auto mt-1">Search and select a service provider from the search box above to load their prepaid balance details.</p>
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>

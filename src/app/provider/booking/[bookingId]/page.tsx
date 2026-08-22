@@ -53,6 +53,27 @@ export default function ProviderBookingDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const [providerWalletBalance, setProviderWalletBalance] = useState<number>(0);
+  const [minBalanceForJobs, setMinBalanceForJobs] = useState<number>(50);
+
+  useEffect(() => {
+    if (!providerUser || authIsLoading) return;
+    
+    // Fetch provider wallet balance
+    const userDocRef = doc(db, 'users', providerUser.uid);
+    getDoc(userDocRef).then(snap => {
+      if (snap.exists()) {
+        setProviderWalletBalance(snap.data()?.providerWalletBalance || 0);
+      }
+    }).catch(err => console.error("Error loading wallet balance:", err));
+
+    // Fetch minimum balance setting
+    getDoc(doc(db, 'webSettings', 'walletSettings')).then(snap => {
+      if (snap.exists()) {
+        setMinBalanceForJobs(snap.data()?.minBalanceForJobs ?? 50);
+      }
+    }).catch(err => console.error("Error loading wallet settings:", err));
+  }, [providerUser, authIsLoading]);
 
   useEffect(() => {
     if (!bookingId || !providerUser) {
@@ -206,6 +227,7 @@ export default function ProviderBookingDetailsPage() {
   }
 
   const isJobCompleted = booking.status === 'Completed';
+  const isLowBalance = (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && providerWalletBalance < minBalanceForJobs;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -237,9 +259,9 @@ export default function ProviderBookingDetailsPage() {
           <section>
             <h3 className="text-lg font-semibold mb-2 flex items-center"><UserCircle className="mr-2 text-primary"/>Customer Information</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <p><strong>Name:</strong> {isJobCompleted ? "[Hidden for Privacy]" : booking.customerName}</p>
-              <p className="flex items-center gap-1"><strong>Email:</strong> {isJobCompleted ? "[Hidden for Privacy]" : (booking.customerEmail || 'N/A')}</p>
-              <p className="flex items-center gap-1"><strong>Phone:</strong> {isJobCompleted ? "[Hidden for Privacy]" : (
+              <p><strong>Name:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked - Add Money to Reveal]" : booking.customerName}</p>
+              <p className="flex items-center gap-1"><strong>Email:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked]" : (booking.customerEmail || 'N/A')}</p>
+              <p className="flex items-center gap-1"><strong>Phone:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked]" : (
                 <a href={`tel:${booking.customerPhone}`} className="text-primary hover:underline font-medium">{booking.customerPhone}</a>
               )}</p>
             </div>

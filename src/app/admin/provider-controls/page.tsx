@@ -2,7 +2,7 @@
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserCheck, Settings, ListChecks, Languages, Paperclip, Power, MapPin, HandCoins, Banknote, FileText, Wallet, MessageSquareWarning } from "lucide-react";
+import { UserCheck, Settings, ListChecks, Languages, Paperclip, Power, MapPin, HandCoins, Banknote, FileText } from "lucide-react";
 import ExperienceLevelManager from "@/components/admin/provider-controls/ExperienceLevelManager";
 import SkillLevelManager from "@/components/admin/provider-controls/SkillLevelManager";
 import QualificationManager from "@/components/admin/provider-controls/QualificationManager";
@@ -12,8 +12,6 @@ import ProviderRegistrationToggleTab from "@/components/admin/provider-controls/
 import ProviderFeesSetupTab from "@/components/admin/provider-controls/ProviderFeesSetupTab"; 
 import WithdrawalSettingsTab from "@/components/admin/provider-controls/WithdrawalSettingsTab";
 import ProviderTermsManager from "@/components/admin/provider-controls/ProviderTermsManager";
-import WalletSettingsTab from "@/components/admin/provider-controls/WalletSettingsTab";
-import WalletComplaintsTab from "@/components/admin/provider-controls/WalletComplaintsTab";
 import { useAuth } from "@/hooks/useAuth";
 import PermissionGuard from "@/components/admin/PermissionGuard";
 
@@ -78,18 +76,7 @@ export default function ProviderControlsPage() {
               >
                 <Banknote className="mr-2 h-4 w-4"/>Withdrawals
               </TabsTrigger>
-              <TabsTrigger 
-                value="wallet_settings"
-                className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
-              >
-                <Wallet className="mr-2 h-4 w-4"/>Wallet Settings
-              </TabsTrigger>
-              <TabsTrigger 
-                value="wallet_complaints"
-                className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
-              >
-                <MessageSquareWarning className="mr-2 h-4 w-4"/>Wallet Complaints
-              </TabsTrigger>
+
               <TabsTrigger 
                 value="registration_access"
                 className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
@@ -126,12 +113,7 @@ export default function ProviderControlsPage() {
           <TabsContent value="withdrawal_settings">
             <WithdrawalSettingsTab />
           </TabsContent>
-          <TabsContent value="wallet_settings">
-            <WalletSettingsTab />
-          </TabsContent>
-          <TabsContent value="wallet_complaints">
-            <WalletComplaintsTab />
-          </TabsContent>
+
           <TabsContent value="registration_access">
             <ProviderRegistrationToggleTab />
           </TabsContent>

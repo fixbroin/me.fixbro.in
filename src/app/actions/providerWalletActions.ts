@@ -5,6 +5,7 @@ import * as admin from 'firebase-admin';
 import { revalidatePath } from 'next/cache';
 import { getPushTemplate } from '@/app/actions/pushSettingsActions';
 import { replacePlaceholders } from '@/lib/seoUtils';
+import { getTimestampMillis } from '@/lib/utils';
 
 // MySQL database imports
 import { db } from '@/lib/mysqlDb';
@@ -26,6 +27,8 @@ export interface WalletTransaction {
   description: string;
   timestamp: number;
   bonusAmount?: number;
+  razorpayPaymentId?: string | null;
+  razorpayOrderId?: string | null;
 }
 
 const DEFAULT_SETTINGS: WalletProviderSettings = {
@@ -99,8 +102,10 @@ export async function getProviderWalletDetailsAction(providerId: string) {
         type: data.type,
         bookingId: data.bookingId || null,
         description: data.description,
-        timestamp: data.timestamp?.toMillis() || Date.now(),
+        timestamp: getTimestampMillis(data.timestamp) || Date.now(),
         bonusAmount: data.bonusAmount,
+        razorpayPaymentId: data.razorpay_payment_id || null,
+        razorpayOrderId: data.razorpay_order_id || null,
       });
     });
 
@@ -367,13 +372,15 @@ export async function updateBookingStatusByProviderAction(
 
 export interface WalletComplaint {
   id: string;
+  complaintId?: string | null;
   providerId: string;
   providerName: string;
-  bookingId: string;
-  bookingHumanId: string;
+  bookingId?: string | null;
+  bookingHumanId?: string | null;
+  transactionId?: string | null;
   message: string;
   amount: number;
-  status: 'pending' | 'resolved';
+  status: 'pending' | 'accepted' | 'rejected' | 'processed' | 'solved';
   createdAt: number;
   resolvedAt?: number;
   resolutionNotes?: string;
@@ -382,37 +389,45 @@ export interface WalletComplaint {
 // 7. Submit a new wallet complaint (Provider) (MySQL)
 export async function submitWalletComplaintAction(
   providerId: string,
-  bookingId: string,
   message: string,
-  amount: number
+  amount: number,
+  transactionId: string,
+  bookingId?: string | null
 ) {
   try {
     const providerSnap = await getDoc(doc(db, 'users', providerId));
     const providerName = providerSnap.exists() ? (providerSnap.data()?.displayName || 'Provider') : 'Provider';
 
-    const bookingSnap = await getDoc(doc(db, 'bookings', bookingId));
-    const bookingHumanId = bookingSnap.exists() ? (bookingSnap.data()?.bookingId || bookingId) : bookingId;
+    let bookingHumanId = '';
+    if (bookingId) {
+      const bookingSnap = await getDoc(doc(db, 'bookings', bookingId));
+      bookingHumanId = bookingSnap.exists() ? (bookingSnap.data()?.bookingId || bookingId) : bookingId;
+    }
 
-    // Check if complaint already exists for this booking in MySQL
+    // Check if complaint already exists for this transaction ID in MySQL
     const existing = await getDocs(
       query(
         collection(db, 'providerComplaints'),
         where('providerId', '==', providerId),
-        where('bookingId', '==', bookingId),
+        where('transactionId', '==', transactionId),
         limit(1)
       )
     );
 
     if (!existing.empty) {
-      return { success: false, message: "A complaint has already been submitted for this booking." };
+      return { success: false, message: "A complaint has already been submitted for this transaction." };
     }
+
+    const complaintId = String(Math.floor(100000 + Math.random() * 900000));
 
     // Add complaint document to MySQL
     await addDoc(collection(db, 'providerComplaints'), {
+      complaintId,
       providerId,
       providerName,
-      bookingId,
-      bookingHumanId,
+      bookingId: bookingId || null,
+      bookingHumanId: bookingHumanId || null,
+      transactionId,
       message,
       amount,
       status: 'pending',
@@ -427,9 +442,9 @@ export async function submitWalletComplaintAction(
         await addDoc(collection(db, 'userNotifications'), {
           userId: adminDoc.id,
           title: "New Wallet Complaint",
-          message: `Provider ${providerName} submitted a dispute for booking #${bookingHumanId}.`,
+          message: `Provider ${providerName} submitted a dispute for transaction ${transactionId}${bookingHumanId ? ` (Booking #${bookingHumanId})` : ''}.`,
           type: 'admin_alert',
-          href: '/admin/provider-controls?tab=wallet_complaints',
+          href: '/admin/provider-withdrawals?tab=wallet_complaints',
           read: false,
           createdAt: Timestamp.now(),
         });
@@ -442,12 +457,12 @@ export async function submitWalletComplaintAction(
           sendServerPushNotification({
             userId: adminDoc.id,
             title: "New Wallet Dispute Filed",
-            body: `Provider ${providerName} filed a dispute for booking #${bookingHumanId}.`,
-            href: '/admin/provider-controls?tab=wallet_complaints',
+            body: `Provider ${providerName} filed a dispute for transaction ${transactionId}${bookingHumanId ? ` (Booking #${bookingHumanId})` : ''}.`,
+            href: '/admin/provider-withdrawals?tab=wallet_complaints',
             type: 'admin_wallet_complaint_alert',
             variables: {
               providerName,
-              bookingHumanId,
+              bookingHumanId: bookingHumanId || 'None',
               amount: amount.toFixed(2),
               currencySymbol: '₹'
             }
@@ -476,15 +491,17 @@ export async function getPendingWalletComplaintsAction(): Promise<WalletComplain
       const data = docSnap.data();
       complaints.push({
         id: docSnap.id,
+        complaintId: data.complaintId || docSnap.id,
         providerId: data.providerId,
         providerName: data.providerName,
         bookingId: data.bookingId,
         bookingHumanId: data.bookingHumanId || data.bookingId,
+        transactionId: data.transactionId || null,
         message: data.message,
         amount: data.amount || 0,
         status: data.status || 'pending',
-        createdAt: data.createdAt?.toMillis() || Date.now(),
-        resolvedAt: data.resolvedAt?.toMillis(),
+        createdAt: getTimestampMillis(data.createdAt) || Date.now(),
+        resolvedAt: data.resolvedAt ? getTimestampMillis(data.resolvedAt) : undefined,
         resolutionNotes: data.resolutionNotes,
       });
     });
@@ -496,10 +513,48 @@ export async function getPendingWalletComplaintsAction(): Promise<WalletComplain
   }
 }
 
+// 8b. Fetch wallet complaints for a specific provider (MySQL)
+export async function getProviderWalletComplaintsAction(providerId: string): Promise<WalletComplaint[]> {
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, 'providerComplaints'),
+        where('providerId', '==', providerId),
+        orderBy('createdAt', 'desc')
+      )
+    );
+
+    const complaints: WalletComplaint[] = [];
+    snap.docs.forEach(docSnap => {
+      const data = docSnap.data();
+      complaints.push({
+        id: docSnap.id,
+        complaintId: data.complaintId || docSnap.id,
+        providerId: data.providerId,
+        providerName: data.providerName,
+        bookingId: data.bookingId,
+        bookingHumanId: data.bookingHumanId || data.bookingId,
+        transactionId: data.transactionId || null,
+        message: data.message,
+        amount: data.amount || 0,
+        status: data.status || 'pending',
+        createdAt: getTimestampMillis(data.createdAt) || Date.now(),
+        resolvedAt: data.resolvedAt ? getTimestampMillis(data.resolvedAt) : undefined,
+        resolutionNotes: data.resolutionNotes,
+      });
+    });
+
+    return complaints;
+  } catch (error) {
+    console.error("Error loading provider complaints:", error);
+    return [];
+  }
+}
+
 // 9. Resolve wallet complaint (Admin manually refunds or dismisses) (MySQL)
 export async function resolveWalletComplaintAction(
   complaintId: string,
-  approveRefund: boolean,
+  resolutionStatus: 'accepted' | 'rejected' | 'processed' | 'solved',
   refundAmount: number,
   resolutionNotes: string
 ) {
@@ -510,14 +565,16 @@ export async function resolveWalletComplaintAction(
       throw new Error("Complaint record not found.");
     }
     const compData = compSnap.data() as any;
-    if (compData.status === 'resolved') {
+    if (compData.status !== 'pending') {
       throw new Error("This complaint has already been resolved.");
     }
 
     const providerId = compData.providerId;
     const providerUserRef = doc(db, 'users', providerId);
 
-    if (approveRefund) {
+    const shouldRefund = (resolutionStatus === 'accepted' || resolutionStatus === 'solved');
+
+    if (shouldRefund && refundAmount > 0) {
       const pSnap = await getDoc(providerUserRef);
       if (!pSnap.exists()) {
         throw new Error("Provider profile not found.");
@@ -534,31 +591,33 @@ export async function resolveWalletComplaintAction(
         providerId,
         amount: refundAmount,
         type: 'commission_refund',
-        bookingId: compData.bookingId,
-        description: `Dispute Refund: ${resolutionNotes}`,
+        bookingId: compData.bookingId || null,
+        description: `Dispute Refund (${resolutionStatus}): ${resolutionNotes}`,
         timestamp: Timestamp.now(),
       });
 
-      // 3. Mark booking as refunded in MySQL
-      const bookingRef = doc(db, 'bookings', compData.bookingId);
-      await updateDoc(bookingRef, { commissionRefunded: true });
+      // 3. Mark booking as refunded in MySQL if bookingId exists
+      if (compData.bookingId) {
+        const bookingRef = doc(db, 'bookings', compData.bookingId);
+        await updateDoc(bookingRef, { commissionRefunded: true });
+      }
 
       // 4. Send approval notification in MySQL
       await addDoc(collection(db, 'userNotifications'), {
         userId: providerId,
-        title: "Wallet Dispute Approved",
-        message: `Your dispute for booking #${compData.bookingHumanId} was approved. ₹${refundAmount.toFixed(2)} refunded. Notes: ${resolutionNotes}`,
+        title: `Dispute ${resolutionStatus === 'accepted' ? 'Accepted' : 'Solved'}`,
+        message: `Your dispute (ID: ${compData.complaintId || compSnap.id}) was marked as ${resolutionStatus}. ₹${refundAmount.toFixed(2)} refunded. Notes: ${resolutionNotes}`,
         type: 'success',
         href: '/provider/wallet',
         read: false,
         createdAt: Timestamp.now(),
       });
     } else {
-      // Send rejection notification in MySQL
+      // Send notification in MySQL for rejected or processed without refund
       await addDoc(collection(db, 'userNotifications'), {
         userId: compData.providerId,
-        title: "Wallet Dispute Rejected",
-        message: `Your dispute for booking #${compData.bookingHumanId} was closed. Notes: ${resolutionNotes}`,
+        title: `Dispute ${resolutionStatus === 'rejected' ? 'Rejected' : 'Processed'}`,
+        message: `Your dispute (ID: ${compData.complaintId || compSnap.id}) was marked as ${resolutionStatus}. Notes: ${resolutionNotes}`,
         type: 'info',
         href: '/provider/wallet',
         read: false,
@@ -566,37 +625,37 @@ export async function resolveWalletComplaintAction(
       });
     }
 
-    // Mark complaint as resolved in MySQL
+    // Mark complaint status in MySQL
     await updateDoc(complaintRef, {
-      status: 'resolved',
+      status: resolutionStatus,
       resolutionNotes,
       resolvedAt: Timestamp.now(),
     });
 
     // Send push notification to the provider
     try {
-      if (approveRefund) {
+      if (shouldRefund && refundAmount > 0) {
         await sendServerPushNotification({
           userId: providerId,
-          title: "Wallet Adjusted!",
-          body: `Your prepaid wallet has been credited with ₹${refundAmount.toFixed(2)}.`,
+          title: `Dispute ${resolutionStatus === 'accepted' ? 'Accepted' : 'Solved'}!`,
+          body: `Your prepaid wallet has been credited with ₹${refundAmount.toFixed(2)}. Status: ${resolutionStatus}`,
           href: '/provider/wallet',
           type: 'provider_wallet_refund',
           variables: {
             amount: refundAmount.toFixed(2),
-            reason: `Dispute Approved: ${resolutionNotes}`,
+            reason: `Dispute ${resolutionStatus}: ${resolutionNotes}`,
             currencySymbol: '₹'
           }
         });
       } else {
         await sendServerPushNotification({
           userId: providerId,
-          title: "Wallet Dispute Closed",
-          body: `Your dispute for booking #${compData.bookingHumanId} was resolved without refund.`,
+          title: `Dispute Update`,
+          body: `Your dispute was marked as ${resolutionStatus}. Notes: ${resolutionNotes}`,
           href: '/provider/wallet',
           type: 'withdrawal_status',
           variables: {
-            status: 'Closed',
+            status: resolutionStatus,
             amount: refundAmount.toFixed(2)
           }
         });
@@ -606,7 +665,8 @@ export async function resolveWalletComplaintAction(
     }
 
     revalidatePath('/provider/wallet');
-    return { success: true, message: approveRefund ? "Dispute approved and refunded." : "Dispute closed without refund." };
+    revalidatePath('/admin/provider-withdrawals');
+    return { success: true, message: `Dispute marked as ${resolutionStatus} successfully.` };
   } catch (error: any) {
     console.error("Error resolving wallet complaint:", error);
     return { success: false, message: error.message || "Failed to resolve complaint." };
@@ -700,5 +760,18 @@ export async function sendServerPushNotification(params: {
   } catch (error) {
     console.error("sendServerPushNotification error:", error);
     return { error };
+  }
+}
+
+// 11. Delete wallet complaint (Admin only) (MySQL)
+export async function deleteWalletComplaintAction(complaintId: string) {
+  try {
+    const complaintRef = doc(db, 'providerComplaints', complaintId);
+    await deleteDoc(complaintRef);
+    revalidatePath('/admin/provider-withdrawals');
+    return { success: true, message: "Dispute complaint deleted successfully." };
+  } catch (error: any) {
+    console.error("Error deleting wallet complaint:", error);
+    return { success: false, message: error.message || "Failed to delete complaint." };
   }
 }

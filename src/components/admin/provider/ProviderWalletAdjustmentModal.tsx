@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Wallet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 import { adjustProviderWalletAction } from "@/app/actions/providerWalletActions";
 
 interface ProviderWalletAdjustmentModalProps {
@@ -35,6 +36,8 @@ export default function ProviderWalletAdjustmentModal({
   onSuccess
 }: ProviderWalletAdjustmentModalProps) {
   const { toast } = useToast();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
   const [actionType, setActionType] = useState<'credit' | 'debit'>('credit');
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState(bookingId ? `Refund for booking #${bookingId}` : '');
@@ -80,7 +83,7 @@ export default function ProviderWalletAdjustmentModal({
       if (result.success) {
         toast({
           title: "Wallet Updated",
-          description: `Successfully adjusted balance by ${actionType === 'credit' ? '+' : '-'}₹${parsedAmount.toFixed(2)}.`
+          description: `Successfully adjusted balance by ${actionType === 'credit' ? '+' : '-'}${symbol}${parsedAmount.toFixed(2)}.`
         });
         setAmount('');
         setReason('');
@@ -144,7 +147,7 @@ export default function ProviderWalletAdjustmentModal({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="adjust-amount">Amount (₹)</Label>
+            <Label htmlFor="adjust-amount">Amount ({symbol})</Label>
             <Input
               id="adjust-amount"
               type="number"

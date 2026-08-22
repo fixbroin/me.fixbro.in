@@ -9,6 +9,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, getDocs, collectionGroup, where, limit } from '@/lib/mysqlDb';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
 
 interface ReferralUserRecord extends Referral {
@@ -31,6 +32,8 @@ const formatDate = (timestamp?: any): string => {
 };
 
 export default function ReferralUsersTab() {
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
   const [records, setRecords] = useState<ReferralUserRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -156,14 +159,14 @@ export default function ReferralUsersTab() {
                         <div className="text-xs text-muted-foreground">{record.referredUserMobile || 'N/A'}</div>
                     </TableCell>
                     <TableCell>
-                        <span className="font-bold text-green-600">₹{(record.referredUserWalletBalance || 0).toFixed(2)}</span>
+                        <span className="font-bold text-green-600">{symbol}{(record.referredUserWalletBalance || 0).toFixed(2)}</span>
                     </TableCell>
                     <TableCell>
                         <div className="font-medium">{record.referrerName || record.referrerId}</div>
                         <div className="text-xs text-muted-foreground">Code: {record.referrerCode || 'N/A'}</div>
                     </TableCell>
                     <TableCell>
-                        <span className="font-bold text-green-600">₹{(record.referrerWalletBalance || 0).toFixed(2)}</span>
+                        <span className="font-bold text-green-600">{symbol}{(record.referrerWalletBalance || 0).toFixed(2)}</span>
                     </TableCell>
                     <TableCell className="text-xs">{formatDate(record.createdAt)}</TableCell>
                     <TableCell><Badge variant="outline">{record.bookingStatus || 'N/A'}</Badge></TableCell>

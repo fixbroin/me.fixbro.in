@@ -10,14 +10,16 @@ import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, formatDateInTimezone } from '@/lib/utils';
 import { 
   getProviderWalletDetailsAction, 
   getProviderWalletSettingsAction,
   depositProviderWalletAction,
   submitWalletComplaintAction,
+  getProviderWalletComplaintsAction,
   WalletTransaction,
-  WalletProviderSettings
+  WalletProviderSettings,
+  WalletComplaint
 } from '@/app/actions/providerWalletActions';
 import { 
   Dialog, 
@@ -44,6 +46,7 @@ export default function ProviderWalletPage() {
 
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [complaints, setComplaints] = useState<WalletComplaint[]>([]);
   const [walletSettings, setWalletSettings] = useState<WalletProviderSettings | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(true);
 
@@ -63,6 +66,9 @@ export default function ProviderWalletPage() {
       const details = await getProviderWalletDetailsAction(providerUser.uid);
       setWalletBalance(details.balance);
       setTransactions(details.transactions);
+
+      const complaintList = await getProviderWalletComplaintsAction(providerUser.uid);
+      setComplaints(complaintList);
 
       const settings = await getProviderWalletSettingsAction();
       setWalletSettings(settings);
@@ -209,13 +215,7 @@ export default function ProviderWalletPage() {
   };
 
   const formatDate = (timestamp: number): string => {
-    return new Date(timestamp).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return formatDateInTimezone(new Date(timestamp), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
   };
 
   const getTransactionBadge = (type: WalletTransaction['type']) => {
@@ -242,15 +242,17 @@ export default function ProviderWalletPage() {
     try {
       const result = await submitWalletComplaintAction(
         providerUser.uid,
-        selectedTxForComplaint.bookingId!,
         complaintMessage.trim(),
-        Math.abs(selectedTxForComplaint.amount)
+        Math.abs(selectedTxForComplaint.amount),
+        selectedTxForComplaint.id,
+        selectedTxForComplaint.bookingId || null
       );
 
       if (result.success) {
         toast({ title: "Dispute Filed", description: result.message });
         setComplaintMessage('');
         setSelectedTxForComplaint(null);
+        loadWalletDetails();
       } else {
         toast({ title: "Submission Failed", description: result.message, variant: "destructive" });
       }
@@ -331,11 +333,11 @@ export default function ProviderWalletPage() {
                 <form onSubmit={handleDepositSubmit} className="space-y-4">
                   <div className="space-y-2">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-slate-600">Enter Amount (₹)</span>
+                      <span className="font-bold text-slate-600">Enter Amount ({symbol})</span>
                       <span className="text-muted-foreground font-mono">Min: {walletSettings.minDepositAmount} | Max: {walletSettings.maxDepositAmount}</span>
                     </div>
                     <div className="relative">
-                      <span className="absolute left-3.5 top-2.5 text-muted-foreground font-mono">₹</span>
+                      <span className="absolute left-3.5 top-2.5 text-muted-foreground font-mono">{symbol}</span>
                       <Input
                         type="number"
                         placeholder="Enter amount"
@@ -353,7 +355,7 @@ export default function ProviderWalletPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {[500, 1000, 2000, 5000].map(val => (
                       <Button
                         key={val}
@@ -409,52 +411,185 @@ export default function ProviderWalletPage() {
                   <p className="text-xs">Once you top up or accept bookings, they will reflect here.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-muted/40">
-                      <TableRow>
-                        <TableHead className="pl-6">Date</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="text-right pr-6">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {transactions.map(tx => {
-                        const isCredit = tx.amount >= 0;
-                        return (
-                          <TableRow key={tx.id}>
-                            <TableCell className="pl-6 text-xs font-mono whitespace-nowrap">
+                <>
+                  <div className="hidden lg:block overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-muted/40">
+                        <TableRow>
+                          <TableHead className="pl-6">Date</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead className="text-right pr-6">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {transactions.map(tx => {
+                          const isCredit = tx.amount >= 0;
+                          return (
+                            <TableRow key={tx.id}>
+                              <TableCell className="pl-6 text-xs font-mono whitespace-nowrap">
+                                {formatDate(tx.timestamp)}
+                              </TableCell>
+                              <TableCell>{getTransactionBadge(tx.type)}</TableCell>
+                              <TableCell className="max-w-xs text-xs font-medium" title={tx.description}>
+                                <div className="truncate">{tx.description}</div>
+                                {tx.bookingId && (
+                                  <span className="block text-[10px] text-muted-foreground font-mono mt-0.5">
+                                    Ref: #{tx.bookingId}
+                                  </span>
+                                )}
+                                {tx.razorpayPaymentId && (
+                                  <span className="block text-[10px] text-muted-foreground font-mono mt-0.5 select-all">
+                                    Razorpay ID: {tx.razorpayPaymentId}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className={cn(
+                                "text-right font-bold whitespace-nowrap font-mono",
+                                isCredit ? "text-emerald-600" : "text-rose-600"
+                              )}>
+                                {isCredit ? '+' : ''}{symbol}{tx.amount.toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-right pr-6">
+                                {!isCredit && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-[10px] text-amber-600 hover:text-amber-700 hover:bg-amber-50 font-bold border border-amber-200/50 rounded-lg px-2"
+                                    onClick={() => { setSelectedTxForComplaint(tx); setComplaintMessage(''); }}
+                                  >
+                                    Raise Complaint
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="lg:hidden space-y-3 p-4">
+                    {transactions.map(tx => {
+                      const isCredit = tx.amount >= 0;
+                      return (
+                        <Card key={tx.id} className="p-4 space-y-2 border border-border shadow-sm">
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-[10px] text-muted-foreground font-mono">
                               {formatDate(tx.timestamp)}
-                            </TableCell>
-                            <TableCell>{getTransactionBadge(tx.type)}</TableCell>
-                            <TableCell className="max-w-xs truncate text-xs font-medium" title={tx.description}>
-                              {tx.description}
-                              {tx.bookingId && (
-                                <span className="block text-[10px] text-muted-foreground font-mono">
-                                  Ref: #{tx.bookingId}
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell className={cn(
-                              "text-right font-bold whitespace-nowrap font-mono",
+                            </span>
+                            {getTransactionBadge(tx.type)}
+                          </div>
+                          
+                          <div className="text-xs font-semibold text-foreground text-left">
+                            {tx.description}
+                            {tx.bookingId && (
+                              <span className="block text-[10px] text-muted-foreground font-mono mt-0.5">
+                                Ref: #{tx.bookingId}
+                              </span>
+                            )}
+                            {tx.razorpayPaymentId && (
+                              <span className="block text-[10px] text-muted-foreground font-mono mt-0.5 select-all">
+                                Razorpay ID: {tx.razorpayPaymentId}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex justify-between items-center border-t pt-2 mt-2">
+                            <span className={cn(
+                              "font-bold font-mono text-sm",
                               isCredit ? "text-emerald-600" : "text-rose-600"
                             )}>
                               {isCredit ? '+' : ''}{symbol}{tx.amount.toFixed(2)}
+                            </span>
+
+                            {!isCredit && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-[10px] text-amber-600 hover:text-amber-700 hover:bg-amber-50 font-bold border border-amber-200/50 rounded-lg px-2"
+                                onClick={() => { setSelectedTxForComplaint(tx); setComplaintMessage(''); }}
+                              >
+                                Raise Complaint
+                              </Button>
+                            )}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Raised Complaints & Disputes */}
+          {complaints.length > 0 && (
+            <Card className="mt-6 border border-slate-100 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4 px-6">
+                <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-amber-50 text-amber-600">⚠️</span>
+                  Raised Disputes & Complaints
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Track the status and resolution details of your filed transaction disputes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                {/* Desktop view */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent bg-slate-50/20">
+                        <TableHead className="pl-6 text-xs font-bold text-slate-500">Complaint ID</TableHead>
+                        <TableHead className="text-xs font-bold text-slate-500">Date Filed</TableHead>
+                        <TableHead className="text-xs font-bold text-slate-500">Transaction ID</TableHead>
+                        <TableHead className="text-xs font-bold text-slate-500">Dispute Message</TableHead>
+                        <TableHead className="text-xs font-bold text-slate-500">Disputed Amount</TableHead>
+                        <TableHead className="text-xs font-bold text-slate-500">Status</TableHead>
+                        <TableHead className="pr-6 text-xs font-bold text-slate-500">Resolution Details</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {complaints.map((comp) => {
+                        const formattedDate = formatDateInTimezone(new Date(comp.createdAt), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
+                        return (
+                          <TableRow key={comp.id} className="hover:bg-slate-50/30 transition-colors">
+                            <TableCell className="pl-6 font-bold text-xs text-slate-700 font-mono select-all">
+                              {comp.complaintId || comp.id.substring(0, 8)}
                             </TableCell>
-                            <TableCell className="text-right pr-6">
-                              {tx.type === 'commission_deduction' && tx.bookingId && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 text-[10px] text-amber-600 hover:text-amber-700 hover:bg-amber-50 font-bold border border-amber-200/50 rounded-lg px-2"
-                                  onClick={() => { setSelectedTxForComplaint(tx); setComplaintMessage(''); }}
-                                >
-                                  Dispute Fee
-                                </Button>
-                              )}
+                            <TableCell className="text-xs text-slate-600 font-mono">
+                              {formattedDate}
+                            </TableCell>
+                            <TableCell className="text-xs text-slate-500 font-mono select-all">
+                              {comp.transactionId || "N/A"}
+                            </TableCell>
+                            <TableCell className="text-xs text-slate-600 max-w-xs truncate" title={comp.message}>
+                              {comp.message}
+                            </TableCell>
+                            <TableCell className="text-xs font-bold text-rose-600 font-mono">
+                              {symbol}{Number(comp.amount).toFixed(2)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                className={cn(
+                                  "capitalize font-bold text-[10px] px-2 py-0.5",
+                                  comp.status === 'pending' && "bg-amber-500 hover:bg-amber-600 text-white",
+                                  comp.status === 'accepted' && "bg-emerald-600 hover:bg-emerald-700 text-white",
+                                  comp.status === 'solved' && "bg-green-500 hover:bg-green-600 text-white",
+                                  comp.status === 'rejected' && "bg-rose-600 hover:bg-rose-700 text-white",
+                                  comp.status === 'processed' && "bg-blue-600 hover:bg-blue-700 text-white"
+                                )}
+                                variant="default"
+                              >
+                                {comp.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="pr-6 text-xs text-slate-500 italic max-w-xs whitespace-pre-wrap">
+                              {comp.resolutionNotes || "Awaiting admin review..."}
                             </TableCell>
                           </TableRow>
                         );
@@ -462,9 +597,66 @@ export default function ProviderWalletPage() {
                     </TableBody>
                   </Table>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                {/* Mobile view */}
+                <div className="md:hidden divide-y divide-slate-100">
+                  {complaints.map((comp) => {
+                    const formattedDate = formatDateInTimezone(new Date(comp.createdAt), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
+                    return (
+                      <div key={comp.id} className="p-4 space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[10px] text-muted-foreground font-mono block">COMPLAINT ID</span>
+                            <span className="text-xs font-bold font-mono text-slate-800 select-all">{comp.complaintId || comp.id.substring(0, 8)}</span>
+                          </div>
+                          <Badge 
+                            className={cn(
+                              "capitalize font-bold text-[10px] px-2 py-0.5",
+                              comp.status === 'pending' && "bg-amber-500 hover:bg-amber-600 text-white",
+                              comp.status === 'accepted' && "bg-emerald-600 hover:bg-emerald-700 text-white",
+                              comp.status === 'solved' && "bg-green-500 hover:bg-green-600 text-white",
+                              comp.status === 'rejected' && "bg-rose-600 hover:bg-rose-700 text-white",
+                              comp.status === 'processed' && "bg-blue-600 hover:bg-blue-700 text-white"
+                            )}
+                            variant="default"
+                          >
+                            {comp.status}
+                          </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-[10px] text-muted-foreground block">DATE FILED</span>
+                            <span className="font-mono">{formattedDate}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-muted-foreground block">DISPUTED AMOUNT</span>
+                            <span className="font-bold text-rose-600 font-mono">{symbol}{Number(comp.amount).toFixed(2)}</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] text-muted-foreground block">TRANSACTION ID</span>
+                          <span className="font-mono text-xs text-slate-700 select-all block break-all">{comp.transactionId || "N/A"}</span>
+                        </div>
+
+                        <div className="bg-slate-50 p-2.5 rounded-xl text-xs space-y-2">
+                          <div>
+                            <span className="text-[10px] text-muted-foreground block font-semibold">YOUR MESSAGE</span>
+                            <p className="text-slate-700 text-[11px] leading-relaxed whitespace-pre-wrap">{comp.message}</p>
+                          </div>
+                          <div className="border-t pt-2 mt-1">
+                            <span className="text-[10px] text-muted-foreground block font-semibold">ADMIN RESOLUTION</span>
+                            <p className="text-slate-600 text-[11px] leading-relaxed italic">{comp.resolutionNotes || "Awaiting admin review..."}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
@@ -475,24 +667,26 @@ export default function ProviderWalletPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-amber-500" />
-                Dispute Commission Fee
+                Raise Wallet Complaint
               </DialogTitle>
               <DialogDescription>
-                File a dispute to request a manual refund from the admin for this commission charge.
+                File a complaint to request a review or manual refund from the admin for this transaction.
               </DialogDescription>
             </DialogHeader>
 
             <form onSubmit={handleComplaintSubmit} className="space-y-4 py-2">
-              <div className="space-y-1 text-xs">
-                <p><strong>Booking ID:</strong> #{selectedTxForComplaint.bookingId}</p>
-                <p><strong>Deducted Fee:</strong> {symbol}{Math.abs(selectedTxForComplaint.amount).toFixed(2)}</p>
+              <div className="space-y-1.5 text-xs bg-muted/50 p-3 rounded-lg border">
+                <p><strong>Transaction ID:</strong> <span className="font-mono text-muted-foreground select-all">{selectedTxForComplaint.id}</span></p>
+                <p><strong>Booking ID:</strong> {selectedTxForComplaint.bookingId ? `#${selectedTxForComplaint.bookingId}` : <span className="text-muted-foreground italic">None</span>}</p>
+                <p><strong>Description:</strong> {selectedTxForComplaint.description}</p>
+                <p><strong>Transaction Amount:</strong> {selectedTxForComplaint.amount >= 0 ? '+' : '-'}{symbol}{Math.abs(selectedTxForComplaint.amount).toFixed(2)}</p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="complaint-msg">Why should this fee be refunded?</Label>
+                <Label htmlFor="complaint-msg">Enter your complaint message / reason</Label>
                 <Textarea
                   id="complaint-msg"
-                  placeholder="Explain what happened (e.g., customer cancelled on-site, cash was not collected)..."
+                  placeholder="Explain what went wrong or why you are disputing this transaction..."
                   value={complaintMessage}
                   onChange={(e) => setComplaintMessage(e.target.value)}
                   disabled={isSubmittingComplaint}

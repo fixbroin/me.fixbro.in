@@ -40,9 +40,12 @@ const ProviderJobCard: React.FC<{
   onStartWork?: (bookingId: string) => void;
   onCompleteWork?: (bookingId: string) => void;
   isProcessingAction?: boolean;
-}> = ({ job, type, onAccept, onReject, onStartWork, onCompleteWork, isProcessingAction }) => {
+  providerWalletBalance: number;
+  minBalanceForJobs: number;
+}> = ({ job, type, onAccept, onReject, onStartWork, onCompleteWork, isProcessingAction, providerWalletBalance, minBalanceForJobs }) => {
   const { showLoading } = useLoading();
   const isJobCompleted = job.status === 'Completed';
+  const isLowBalance = type === 'new' && providerWalletBalance < minBalanceForJobs;
 
   const handleViewDetailsClick = () => {
     showLoading();
@@ -119,7 +122,7 @@ const ProviderJobCard: React.FC<{
           <div className="flex items-start gap-2 text-muted-foreground pt-1 border-t border-muted/50 mt-1">
             <MapPin className="h-4 w-4 text-primary shrink-0 mt-0.5" />
             <span className="line-clamp-2 text-xs">
-              {isJobCompleted ? "[Hidden for Privacy]" : `${job.addressLine1}${job.addressLine2 ? `, ${job.addressLine2}` : ''}, ${job.city}`}
+              {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked - Add Money to Reveal]" : `${job.addressLine1}${job.addressLine2 ? `, ${job.addressLine2}` : ''}, ${job.city}`}
             </span>
           </div>
 
@@ -127,11 +130,11 @@ const ProviderJobCard: React.FC<{
             <div className="flex items-center gap-2 text-muted-foreground">
               <User className="h-4 w-4 text-primary shrink-0" />
               <span className="font-medium text-foreground truncate max-w-[120px]">
-                {isJobCompleted ? "[Hidden]" : job.customerName}
+                {isJobCompleted ? "[Hidden]" : isLowBalance ? "[Locked - Add Money to Reveal]" : job.customerName}
               </span>
             </div>
             
-            {!isJobCompleted && job.customerPhone && (
+            {!isJobCompleted && !isLowBalance && job.customerPhone && (
               <Button
                 variant="outline"
                 size="sm"
@@ -143,6 +146,18 @@ const ProviderJobCard: React.FC<{
               </Button>
             )}
           </div>
+
+          {isLowBalance && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-xl font-bold flex flex-col gap-1.5 mt-2 text-left">
+              <div className="flex items-center gap-1.5">
+                <span>⚠️</span>
+                <span>Low Wallet Balance</span>
+              </div>
+              <p className="font-semibold text-[11px] leading-snug">
+                You have a booking you need to accept, you need to add money.
+              </p>
+            </div>
+          )}
         </div>
       </CardContent>
 
@@ -158,7 +173,18 @@ const ProviderJobCard: React.FC<{
             <Button size="sm" onClick={() => onReject(job.id!)} variant="destructive" disabled={isProcessingAction} className="w-full sm:w-auto text-xs">
               {isProcessingAction ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/> : <XCircle className="mr-1.5 h-3.5 w-3.5"/>} Reject
             </Button>
-            <Button size="sm" onClick={() => onAccept(job.id!)} disabled={isProcessingAction} className="w-full sm:w-auto text-xs">
+            <Button 
+              size="sm" 
+              onClick={() => {
+                if (isLowBalance) {
+                  alert("You have a booking you need to accept, you need to add money.");
+                  return;
+                }
+                onAccept(job.id!);
+              }} 
+              disabled={isProcessingAction} 
+              className={cn("w-full sm:w-auto text-xs", isLowBalance && "opacity-50 cursor-not-allowed")}
+            >
               {isProcessingAction ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/> : <CheckCircle className="mr-1.5 h-3.5 w-3.5"/>} Accept
             </Button>
           </>
@@ -203,10 +229,31 @@ export default function ProviderDashboardPage() {
   const [processingBookingAction, setProcessingBookingAction] = useState<string | null>(null);
   const [displayLimit, setDisplayLimit] = useState(50);
   const [bookingCounts, setBookingCounts] = useState({ completed: 0, newRequests: 0, ongoing: 0 });
+  const [providerWalletBalance, setProviderWalletBalance] = useState<number>(0);
+  const [minBalanceForJobs, setMinBalanceForJobs] = useState<number>(50);
 
   // Completion Dialog State
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [bookingToComplete, setBookingToComplete] = useState<FirestoreBooking | null>(null);
+
+  useEffect(() => {
+    if (!providerUser || authIsLoading) return;
+    
+    // Fetch provider wallet balance
+    const userDocRef = doc(db, 'users', providerUser.uid);
+    getDoc(userDocRef).then(snap => {
+      if (snap.exists()) {
+        setProviderWalletBalance(snap.data()?.providerWalletBalance || 0);
+      }
+    }).catch(err => console.error("Error loading wallet balance:", err));
+
+    // Fetch minimum balance setting
+    getDoc(doc(db, 'webSettings', 'walletSettings')).then(snap => {
+      if (snap.exists()) {
+        setMinBalanceForJobs(snap.data()?.minBalanceForJobs ?? 50);
+      }
+    }).catch(err => console.error("Error loading wallet settings:", err));
+  }, [providerUser, authIsLoading]);
 
   useEffect(() => {
     if (!providerUser || authIsLoading) {
@@ -389,6 +436,8 @@ export default function ProviderDashboardPage() {
                 onAccept={(id) => updateBookingStatus(id, 'ProviderAccepted')}
                 onReject={(id) => updateBookingStatus(id, 'ProviderRejected')}
                 isProcessingAction={processingBookingAction === job.id}
+                providerWalletBalance={providerWalletBalance}
+                minBalanceForJobs={minBalanceForJobs}
               />
             ))}
           </div>
@@ -419,6 +468,8 @@ export default function ProviderDashboardPage() {
                 onStartWork={(id) => updateBookingStatus(id, 'InProgressByProvider')}
                 onCompleteWork={(id) => updateBookingStatus(id, 'Completed')}
                 isProcessingAction={processingBookingAction === job.id}
+                providerWalletBalance={providerWalletBalance}
+                minBalanceForJobs={minBalanceForJobs}
               />
             ))}
           </div>
@@ -444,7 +495,10 @@ export default function ProviderDashboardPage() {
         {completedJobs.length > 0 ? (
           <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
             {completedJobs.slice(0, 3).map((job) => (
-              <ProviderJobCard key={job.id} job={job} type="completed" />
+              <ProviderJobCard key={job.id} job={job} type="completed"
+                providerWalletBalance={providerWalletBalance}
+                minBalanceForJobs={minBalanceForJobs}
+              />
             ))}
           </div>
         ) : (
