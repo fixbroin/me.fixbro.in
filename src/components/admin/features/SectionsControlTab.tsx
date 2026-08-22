@@ -26,6 +26,7 @@ const sectionsControlSchema = z.object({
   showBlogSection: z.boolean().default(true),
   showCustomServiceButton: z.boolean().default(true),
   enableUserActivityLogging: z.boolean().default(true),
+  enableProviderActivityLogging: z.boolean().default(true),
 });
 
 type SectionsControlFormData = z.infer<typeof sectionsControlSchema>;
@@ -37,6 +38,7 @@ const defaultFeaturesConfig: SectionsControlFormData = {
   showBlogSection: true,
   showCustomServiceButton: true,
   enableUserActivityLogging: true,
+  enableProviderActivityLogging: true,
 };
 
 export default function SectionsControlTab() {
@@ -63,6 +65,7 @@ export default function SectionsControlTab() {
           showBlogSection: data.showBlogSection ?? defaultFeaturesConfig.showBlogSection,
           showCustomServiceButton: data.showCustomServiceButton ?? defaultFeaturesConfig.showCustomServiceButton,
           enableUserActivityLogging: data.enableUserActivityLogging ?? defaultFeaturesConfig.enableUserActivityLogging,
+          enableProviderActivityLogging: data.enableProviderActivityLogging ?? defaultFeaturesConfig.enableProviderActivityLogging,
         });
       } else {
         form.reset(defaultFeaturesConfig);
@@ -91,6 +94,7 @@ export default function SectionsControlTab() {
         showBlogSection: data.showBlogSection,
         showCustomServiceButton: data.showCustomServiceButton,
         enableUserActivityLogging: data.enableUserActivityLogging,
+        enableProviderActivityLogging: data.enableProviderActivityLogging,
         updatedAt: Timestamp.now(),
       };
       await setDoc(configDocRef, dataToSave, { merge: true });
@@ -194,8 +198,21 @@ export default function SectionsControlTab() {
               render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm bg-primary/5 border-primary/20">
                   <div className="space-y-0.5">
-                    <FormLabel className="text-base flex items-center"><Activity className="mr-2 h-4 w-4 text-primary"/>User Activity Logging</FormLabel>
-                    <FormDescription>Enable or disable tracking of user events (page views, clicks, etc.) to Firestore.</FormDescription>
+                    <FormLabel className="text-base flex items-center"><Activity className="mr-2 h-4 w-4 text-primary"/>Customer Activity Feed Logging</FormLabel>
+                    <FormDescription>Record customer action streams (logins, bookings, cart actions, page views) to display in the Admin Activity Feed.</FormDescription>
+                  </div>
+                  <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSaving} /></FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="enableProviderActivityLogging"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm bg-primary/5 border-primary/20">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base flex items-center"><Activity className="mr-2 h-4 w-4 text-primary"/>Provider Activity Feed Logging</FormLabel>
+                    <FormDescription>Record provider action streams (accepting/completing jobs, provider page views) to display in the Admin Activity Feed.</FormDescription>
                   </div>
                   <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSaving} /></FormControl>
                 </FormItem>

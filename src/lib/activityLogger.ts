@@ -20,7 +20,9 @@ const removeUndefinedProps = (obj: any): any => {
 
 // Simple cache for logging enabled state to avoid excessive Firestore reads
 let isLoggingEnabledCache: boolean | null = null;
+let isProviderLoggingEnabledCache: boolean | null = null;
 let lastCacheUpdate: number = 0;
+let lastProviderCacheUpdate: number = 0;
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 const isBot = (): boolean => {
@@ -34,14 +36,16 @@ const isBot = (): boolean => {
     return botPatterns.some(pattern => ua.includes(pattern));
 };
 
-const checkIsLoggingEnabled = async (): Promise<boolean> => {
+const checkIsLoggingEnabled = async (isProvider: boolean): Promise<boolean> => {
     // If it's a bot, we don't even care if logging is enabled, we skip it
     if (isBot()) return false;
+
+    const cacheKey = isProvider ? 'fb-provider-logging-enabled' : 'fb-logging-enabled';
 
     // Check session storage first for client-side persistence
     if (typeof window !== 'undefined') {
         try {
-            const sessionCache = sessionStorage.getItem('fb-logging-enabled');
+            const sessionCache = sessionStorage.getItem(cacheKey);
             if (sessionCache !== null) {
                 return sessionCache === 'true';
             }
@@ -49,8 +53,10 @@ const checkIsLoggingEnabled = async (): Promise<boolean> => {
     }
 
     const now = Date.now();
-    if (isLoggingEnabledCache !== null && (now - lastCacheUpdate < CACHE_TTL)) {
-        return isLoggingEnabledCache;
+    const cacheVal = isProvider ? isProviderLoggingEnabledCache : isLoggingEnabledCache;
+    const cacheTime = isProvider ? lastProviderCacheUpdate : lastCacheUpdate;
+    if (cacheVal !== null && (now - cacheTime < CACHE_TTL)) {
+        return cacheVal;
     }
 
     try {
@@ -59,14 +65,23 @@ const checkIsLoggingEnabled = async (): Promise<boolean> => {
         let isEnabled = true;
         if (docSnap.exists()) {
             const data = docSnap.data() as FeaturesConfiguration;
-            isEnabled = data.enableUserActivityLogging !== false;
+            if (isProvider) {
+                isEnabled = data.enableProviderActivityLogging !== false;
+            } else {
+                isEnabled = data.enableUserActivityLogging !== false;
+            }
         }
         
-        isLoggingEnabledCache = isEnabled;
-        lastCacheUpdate = now;
+        if (isProvider) {
+            isProviderLoggingEnabledCache = isEnabled;
+            lastProviderCacheUpdate = now;
+        } else {
+            isLoggingEnabledCache = isEnabled;
+            lastCacheUpdate = now;
+        }
 
         if (typeof window !== 'undefined') {
-            try { sessionStorage.setItem('fb-logging-enabled', String(isEnabled)); } catch (e) {}
+            try { sessionStorage.setItem(cacheKey, String(isEnabled)); } catch (e) {}
         }
 
         return isEnabled;
@@ -89,8 +104,12 @@ export const logUserActivity = async (
     return;
   }
 
+  const isProviderActivity = !!(eventType.startsWith('provider') || 
+                                eventData?.pageUrl?.startsWith('/provider') || 
+                                eventData?.pageUrl?.includes('/provider'));
+
   // Check if logging is enabled in Admin Panel
-  const isEnabled = await checkIsLoggingEnabled();
+  const isEnabled = await checkIsLoggingEnabled(isProviderActivity);
   if (!isEnabled) {
       return;
   }

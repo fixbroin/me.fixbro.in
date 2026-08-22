@@ -1281,6 +1281,7 @@ export interface FeaturesConfiguration {
   homepageCategoryVisibility: { [categoryId: string]: boolean };
   ads?: HomepageAd[];
   enableUserActivityLogging?: boolean;
+  enableProviderActivityLogging?: boolean;
   updatedAt?: Timestamp;
 }
 

@@ -1127,9 +1127,9 @@ export default function AdminSettingsPage() {
                 <h3 className="text-lg font-semibold flex items-center"><Activity className="mr-2 h-5 w-5 text-muted-foreground"/>Performance & Logging</h3>
                 <div className="flex items-center justify-between rounded-lg border p-4">
                   <div className="space-y-0.5">
-                    <Label htmlFor="enableVisitorLogging" className="text-base">Enable Visitor Logging</Label>
+                    <Label htmlFor="enableVisitorLogging" className="text-base">Enable Visitor IP & Location Logging</Label>
                     <p className="text-sm text-muted-foreground">
-                      Track and log anonymous visitor information for website analytics. Disable to reduce database connection usage.
+                      Track page visits, IP addresses, city, country, browser, and ISP data to show in Visitor Info tab. Disable to stop visitor tracking and reduce database connection usage.
                     </p>
                   </div>
                   <Switch

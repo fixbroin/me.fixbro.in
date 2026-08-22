@@ -26,6 +26,7 @@ import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import { getTimestampMillis } from '@/lib/utils';
 import { nanoid } from 'nanoid';
+import { triggerPushNotification } from '@/lib/fcmUtils';
 
 const withdrawalFormSchema = z.object({
   amount: z.coerce.number().positive("Withdrawal amount must be positive.").nullable(),
@@ -316,6 +317,14 @@ function WithdrawalPageContent() {
                 type: 'admin_alert', href: `/admin/provider-withdrawals`, read: false, createdAt: Timestamp.now(),
             };
             await addDoc(collection(db, "userNotifications"), adminNotification);
+            
+            triggerPushNotification({
+                userId: adminUid,
+                title: adminNotification.title,
+                body: adminNotification.message,
+                href: adminNotification.href,
+                sound: 'default'
+            }).catch(pushErr => console.error("Error sending admin withdrawal push:", pushErr));
         }
         form.reset();
     } catch (error) {
