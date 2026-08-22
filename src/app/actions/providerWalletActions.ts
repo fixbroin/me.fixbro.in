@@ -9,7 +9,7 @@ import { getTimestampMillis } from '@/lib/utils';
 
 // MySQL database imports
 import { db } from '@/lib/mysqlDb';
-import { doc, getDoc, getDocs, updateDoc, addDoc, collection, query, where, orderBy, limit, Timestamp } from '@/lib/mysqlDb';
+import { doc, getDoc, getDocs, updateDoc, addDoc, collection, query, where, orderBy, limit, Timestamp, deleteDoc } from '@/lib/mysqlDb';
 
 export interface WalletProviderSettings {
   minDepositAmount: number;
