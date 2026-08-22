@@ -37,8 +37,8 @@ const PageViewTracker = () => {
 
     const fullUrl = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
 
-    // Exclude admin, provider, API routes, and common static file extensions from logging
-    const excludedPrefixes = ['/admin', '/provider', '/api/', '/_next/', '/firebase-messaging-sw.js'];
+    // Exclude admin, API routes, and common static file extensions from logging
+    const excludedPrefixes = ['/admin', '/api/', '/_next/', '/firebase-messaging-sw.js'];
     const excludedExtensions = ['.ico', '.png', '.jpg', '.jpeg', '.svg', '.webmanifest', '.xml', '.txt'];
     if (excludedPrefixes.some(prefix => pathname.startsWith(prefix)) || 
         excludedExtensions.some(ext => pathname.endsWith(ext))) {
