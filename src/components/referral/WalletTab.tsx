@@ -10,14 +10,14 @@ import { collection, query, where, onSnapshot, doc, getDoc, getDocs } from '@/li
 import { db } from '@/lib/firebase';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
 import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 
 const formatDate = (timestamp?: any): string => {
     if (!timestamp) return 'N/A';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     if (isNaN(date.getTime())) return 'Invalid Date';
-    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    return formatDateInTimezone(date, 'Asia/Kolkata');
 };
 
 // Define a type for combined history items for clarity

@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import type { FirestoreContactUsInquiry, FirestorePopupInquiry } from '@/types/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { Copy } from 'lucide-react';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 
 type Inquiry = FirestoreContactUsInquiry | FirestorePopupInquiry;
 type InquiryType = 'contact' | 'popup';
@@ -22,7 +22,8 @@ interface InquiryDetailsModalProps {
 const formatDate = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
-  return new Date(millis).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const d = new Date(millis);
+  return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
 };
 
 const DetailItem = ({ label, value, isPre = false, copyable = false }: { label: string; value?: string | number | null; isPre?: boolean; copyable?: boolean }) => {

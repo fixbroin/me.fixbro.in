@@ -133,15 +133,111 @@ export function convertWallClockToUTC(wallClockDate: Date, timeZone: string = 'A
   return new Date(wallClockDate.getTime() - offset);
 }
 
+function getClientSideDateFormat(): string | undefined {
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('wecanfix_cache_app-config');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.data?.dateFormat) {
+          return parsed.data.dateFormat;
+        }
+      }
+    } catch (e) {}
+  }
+  return undefined;
+}
+
+export function formatCustomDate(date: Date, formatStr: string, timeZone: string = 'Asia/Kolkata'): string {
+  try {
+    const validTz = (timeZone && typeof timeZone === 'string' && timeZone.trim()) ? timeZone.trim() : 'Asia/Kolkata';
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: validTz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      weekday: 'long',
+      hour12: false
+    });
+    
+    const parts = dtf.formatToParts(date);
+    const partMap: Record<string, string> = {};
+    parts.forEach(p => {
+      partMap[p.type] = p.value;
+    });
+
+    const yyyy = partMap.year || '0000';
+    const yy = yyyy.slice(-2);
+    const mm = partMap.month || '00';
+    const m = String(parseInt(mm, 10));
+    const dd = partMap.day || '00';
+    const d = String(parseInt(dd, 10));
+    const weekday = partMap.weekday || '';
+    const ddd = weekday.slice(0, 3);
+    
+    const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthsLong = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthIndex = parseInt(mm, 10) - 1;
+    const mmm = monthsShort[monthIndex] || '';
+    const mmmm = monthsLong[monthIndex] || '';
+
+    let result = formatStr;
+    result = result.replace(/dddd/g, weekday);
+    result = result.replace(/ddd/g, ddd);
+    result = result.replace(/YYYY/g, yyyy);
+    result = result.replace(/YY/g, yy);
+    result = result.replace(/MMMM/g, mmmm);
+    result = result.replace(/MMM/g, mmm);
+    result = result.replace(/MM/g, mm);
+    result = result.replace(/M/g, m);
+    result = result.replace(/DD/g, dd);
+    result = result.replace(/D/g, d);
+
+    return result;
+  } catch (err) {
+    return date.toLocaleDateString();
+  }
+}
+
 /**
  * Formats a date string or object for display, respecting the target timezone.
  */
-export function formatDateInTimezone(date: Date | string | number | undefined, timeZone: string = 'Asia/Kolkata', options: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' }): string {
+export function formatDateInTimezone(
+  date: Date | string | number | undefined,
+  timeZone: string = 'Asia/Kolkata',
+  optionsOrFormat?: Intl.DateTimeFormatOptions | string
+): string {
     if (!date) return 'N/A';
     try {
       const d = new Date(date);
       if (isNaN(d.getTime())) return String(date);
       const validTz = (timeZone && typeof timeZone === 'string' && timeZone.trim()) ? timeZone.trim() : 'Asia/Kolkata';
+
+      if (typeof optionsOrFormat === 'string') {
+        return formatCustomDate(d, optionsOrFormat, validTz);
+      }
+
+      const hasDefaultOptions = !optionsOrFormat || (
+        typeof optionsOrFormat === 'object' &&
+        optionsOrFormat.day === '2-digit' &&
+        optionsOrFormat.month === '2-digit' &&
+        optionsOrFormat.year === 'numeric' &&
+        Object.keys(optionsOrFormat).length === 3
+      );
+
+      if (hasDefaultOptions) {
+        const clientFormat = getClientSideDateFormat();
+        if (clientFormat) {
+          return formatCustomDate(d, clientFormat, validTz);
+        }
+      }
+
+      const options: Intl.DateTimeFormatOptions = (typeof optionsOrFormat === 'object' && optionsOrFormat !== null)
+        ? optionsOrFormat
+        : { day: '2-digit', month: '2-digit', year: 'numeric' as const };
       return new Intl.DateTimeFormat('en-IN', { ...options, timeZone: validTz }).format(d);
     } catch (e) {
       return String(date);
@@ -164,17 +260,83 @@ export function formatTimeInTimezone(date: Date | string | number | undefined, t
 }
 
 /**
- * Converts a raw database date string (YYYY-MM-DD) to Indian format (DD-MM-YYYY)
+ * Converts a raw database date string (YYYY-MM-DD) to a configured format
  */
-export function formatScheduledDate(dateStr: string | undefined): string {
+export function formatScheduledDate(dateStr: string | undefined, formatStr?: string): string {
   if (!dateStr) return 'N/A';
+  
+  let yyyy = '';
+  let mm = '';
+  let dd = '';
+
   if (dateStr.includes('-')) {
     const parts = dateStr.split('-');
-    if (parts.length === 3 && parts[0].length === 4) {
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        yyyy = parts[0];
+        mm = parts[1];
+        dd = parts[2];
+      } else if (parts[2].length === 4) {
+        dd = parts[0];
+        mm = parts[1];
+        yyyy = parts[2];
+      }
+    }
+  } else if (dateStr.includes('/')) {
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        yyyy = parts[0];
+        mm = parts[1];
+        dd = parts[2];
+      } else if (parts[2].length === 4) {
+        dd = parts[0];
+        mm = parts[1];
+        yyyy = parts[2];
+      }
     }
   }
-  return dateStr;
+
+  if (!yyyy || !mm || !dd) {
+    return dateStr;
+  }
+
+  const activeFormat = formatStr || getClientSideDateFormat() || 'DD/MM/YYYY';
+
+  const yy = yyyy.slice(-2);
+  const m = String(parseInt(mm, 10));
+  const d = String(parseInt(dd, 10));
+  
+  let weekday = '';
+  let ddd = '';
+  if (activeFormat.includes('ddd') || activeFormat.includes('dddd')) {
+    try {
+      const tempDate = new Date(parseInt(yyyy, 10), parseInt(mm, 10) - 1, parseInt(dd, 10));
+      const parts = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).formatToParts(tempDate);
+      weekday = parts.find(p => p.type === 'weekday')?.value || '';
+      ddd = weekday.slice(0, 3);
+    } catch (e) {}
+  }
+
+  const monthsShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const monthsLong = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const monthIndex = parseInt(mm, 10) - 1;
+  const mmm = monthsShort[monthIndex] || '';
+  const mmmm = monthsLong[monthIndex] || '';
+
+  let result = activeFormat;
+  result = result.replace(/dddd/g, weekday);
+  result = result.replace(/ddd/g, ddd);
+  result = result.replace(/YYYY/g, yyyy);
+  result = result.replace(/YY/g, yy);
+  result = result.replace(/MMMM/g, mmmm);
+  result = result.replace(/MMM/g, mmm);
+  result = result.replace(/MM/g, mm);
+  result = result.replace(/M/g, m);
+  result = result.replace(/DD/g, dd);
+  result = result.replace(/D/g, d);
+
+  return result;
 }
 
 /**

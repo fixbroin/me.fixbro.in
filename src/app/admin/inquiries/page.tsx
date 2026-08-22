@@ -23,15 +23,15 @@ import { sendInquiryReplyEmail, type InquiryReplyEmailInput } from '@/ai/flows/s
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import InquiryDetailsModal from '@/components/admin/InquiryDetailsModal';
 import { Separator } from "@/components/ui/separator";
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 
 type Inquiry = FirestoreContactUsInquiry | FirestorePopupInquiry;
 type InquiryType = 'contact' | 'popup';
 
-const formatTimestamp = (timestamp?: any): string => {
+const formatTimestamp = (timestamp?: any, appConfig?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
-  return new Date(millis).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return `${formatDateInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)} ${formatTimeInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata')}`;
 };
 
 export default function AdminInquiriesPage() {
@@ -231,7 +231,7 @@ export default function AdminInquiriesPage() {
                       </div>
                   )}
                 </TableCell>
-                <TableCell className="text-xs">{formatTimestamp(inquiry.submittedAt)}</TableCell>
+                <TableCell className="text-xs">{formatTimestamp(inquiry.submittedAt, appConfig)}</TableCell>
                 <TableCell>
                   <Badge variant={getStatusBadgeVariant(inquiry.status)} className="text-[10px] capitalize">
                     {inquiry.status}
@@ -313,7 +313,7 @@ export default function AdminInquiriesPage() {
           {type === 'popup' && (inquiry as FirestorePopupInquiry).popupName && (
               <p className="text-[10px] text-muted-foreground">Source: {(inquiry as FirestorePopupInquiry).popupName}</p>
           )}
-          <p className="text-[10px] text-muted-foreground pt-1">Submitted: {formatTimestamp(inquiry.submittedAt)}</p>
+          <p className="text-[10px] text-muted-foreground pt-1">Submitted: {formatTimestamp(inquiry.submittedAt, appConfig)}</p>
       </CardContent>
       <CardFooter className="p-4 pt-0 flex flex-wrap gap-2 justify-end border-t mt-2 pt-4">
         <Button variant="outline" size="sm" onClick={() => handleViewDetails(inquiry, type)} className="h-8 text-xs">

@@ -36,17 +36,17 @@ interface EnrichedBooking extends FirestoreBooking {
 const formatBookingTimestamp = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
-  return new Date(millis).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+  const d = new Date(millis);
+  return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
 };
 
 const formatDateForDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
     try {
-        // Assuming dateString is YYYY-MM-DD or easily parsable by new Date()
         const date = new Date(dateString.replace(/-/g, '/'));
-        return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        return formatDateInTimezone(date, 'Asia/Kolkata');
     } catch (e) {
-        return dateString; // Fallback to original string if parsing fails
+        return dateString;
     }
 };
 
@@ -446,6 +446,7 @@ export default function MyBookingsPage() {
         logoUrl: globalCompanySettings?.logoUrl || undefined,
         timezone: appConfig?.timezone || "Asia/Kolkata",
         currencySymbol: appConfig?.currencySymbol || "₹",
+        dateFormat: appConfig?.dateFormat,
       };
       await generateInvoicePdf(booking, companyDetailsForInvoice);
     } catch (error) {

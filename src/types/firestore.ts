@@ -600,6 +600,7 @@ export interface AppSettings {
   enableVisitorLogging: boolean;
   enableUserPresence: boolean;
   enableKeyboardSuggestions?: boolean;
+  dateFormat?: string;
   // Payment
   enableOnlinePayment: boolean;
   razorpayKeyId: string;
@@ -1247,6 +1248,7 @@ export interface CompanyDetailsForPdf {
   contactMobile: string;
   logoUrl?: string;
   currencySymbol?: string;
+  dateFormat?: string;
 }
 
 // --- Homepage Features Configuration ---

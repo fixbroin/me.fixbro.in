@@ -5,6 +5,7 @@ import 'jspdf-autotable';
 import type { UserOptions } from 'jspdf-autotable';
 import type { ProviderApplication, KycDocument, BankDetails, CompanyDetailsForPdf } from '@/types/firestore';
 import { Timestamp } from '@/lib/mysqlDb';
+import { formatDateInTimezone } from './utils';
 
 declare module 'jspdf' {
   interface jsPDF {
@@ -28,7 +29,7 @@ const formatTimestampToReadable = (timestamp?: Timestamp | Date | string): strin
       return String(timestamp); // Fallback
     }
   }
-  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  return formatDateInTimezone(date, 'Asia/Kolkata');
 };
 
 // Colors matching Wecanfix theme (Teal/Dark Gray)

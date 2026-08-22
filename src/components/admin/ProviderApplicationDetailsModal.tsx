@@ -19,7 +19,7 @@ import { triggerPdfDownload } from '@/lib/pdfUtils';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { Separator } from "@/components/ui/separator";
-import { cn, getTimestampMillis } from "@/lib/utils";
+import { cn, getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from "@/lib/utils";
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, Timestamp } from '@/lib/mysqlDb';
 import { useRouter } from 'next/navigation';
@@ -37,7 +37,8 @@ interface ProviderApplicationDetailsModalProps {
 const formatTimestampToReadable = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return "N/A";
-  return new Date(millis).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+  const d = new Date(millis);
+  return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
 };
 
 

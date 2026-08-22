@@ -22,6 +22,7 @@ import PaymentSummary from '@/components/checkout/payment/PaymentSummary';
 import PaymentMethods from '@/components/checkout/payment/PaymentMethods';
 import { logUserActivity } from '@/lib/activityLogger';
 import { getGuestId } from '@/lib/guestIdManager';
+import { formatDateInTimezone } from '@/lib/utils';
 
 interface AppliedPromoCodeInfo {
   id: string;
@@ -204,7 +205,7 @@ export default function CheckoutPage() {
 
   const formatDate = (date: Date | null) => {
     if (!date) return "Not selected";
-    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    return formatDateInTimezone(date, appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
   };
 
   if (!isMounted || isLoadingAppSettings || isLoadingAuth) {

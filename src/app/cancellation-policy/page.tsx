@@ -9,7 +9,8 @@ import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config'; 
 import AppImage from '@/components/ui/AppImage';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
-import { getContentPageData, getGlobalWebSettings } from '@/lib/webServerUtils';
+import { getContentPageData, getGlobalWebSettings, getGlobalAppSettings } from '@/lib/webServerUtils';
+import { formatDateInTimezone } from '@/lib/utils';
 
 function getTimestampMillis(ts: any): number {
   if (!ts) return 0;
@@ -82,6 +83,7 @@ export async function generateMetadata(
 export default async function CancellationPolicyPage() {
   try {
     const pageData = await getContentPageData(PAGE_SLUG);
+    const appConfig = await getGlobalAppSettings();
 
     const breadcrumbItems = [
         { label: "Home", href: "/" },
@@ -140,7 +142,7 @@ export default async function CancellationPolicyPage() {
               <p className="text-sm text-muted-foreground">
                 Last updated: {(() => {
                     const millis = getTimestampMillis(pageData.updatedAt);
-                    return millis ? new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A';
+                    return millis ? formatDateInTimezone(new Date(millis), 'Asia/Kolkata', appConfig?.dateFormat) : 'N/A';
                 })()}
               </p>
             )}

@@ -21,13 +21,14 @@ declare module 'jspdf' {
   }
 }
 
+import { formatDateInTimezone } from './utils';
 import { robotoFontBase64 } from './pdfFonts';
 
-const formatDateForIndiaDisplay = (timestamp?: Timestamp): string => {
+const formatDateForIndiaDisplay = (timestamp?: Timestamp, formatStr?: string): string => {
     if (!timestamp) return 'N/A';
     try {
         const date = timestamp.toDate();
-        return date.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return formatDateInTimezone(date, 'Asia/Kolkata', formatStr);
     } catch (e) {
         return 'Invalid Date'; 
     }
@@ -70,9 +71,9 @@ export const generateInvoicePdf = async (invoice: FirestoreInvoice, companyDetai
 
   doc.setFontSize(10);
   doc.text(`Invoice #: ${invoice.invoiceNumber}`, 196, 30, { align: "right" });
-  doc.text(`Date: ${formatDateForIndiaDisplay(invoice.invoiceDate)}`, 196, 36, { align: "right" });
+  doc.text(`Date: ${formatDateForIndiaDisplay(invoice.invoiceDate, companyDetails?.dateFormat)}`, 196, 36, { align: "right" });
   if (invoice.dueDate) {
-    doc.text(`Due Date: ${formatDateForIndiaDisplay(invoice.dueDate)}`, 196, 42, { align: "right" });
+    doc.text(`Due Date: ${formatDateForIndiaDisplay(invoice.dueDate, companyDetails?.dateFormat)}`, 196, 42, { align: "right" });
   }
 
   // Customer Details Section

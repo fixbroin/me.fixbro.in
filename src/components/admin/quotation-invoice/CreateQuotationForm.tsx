@@ -25,7 +25,7 @@ import { generateQuotationPdf } from '@/lib/quotationGenerator';
 import { uploadPdfToStorage, triggerPdfDownload, dataUriToBlob } from '@/lib/pdfUtils';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 
@@ -260,6 +260,7 @@ export default function CreateQuotationForm({ initialData, onSaveSuccess }: Crea
         contactEmail: companySettings?.contactEmail || "", contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
         currencySymbol: appConfig?.currencySymbol || "₹",
+        dateFormat: appConfig?.dateFormat,
       };
 
       const pdfDataUri = await generateQuotationPdf(savedQuotation, companyInfo);
@@ -309,6 +310,7 @@ export default function CreateQuotationForm({ initialData, onSaveSuccess }: Crea
         contactEmail: companySettings?.contactEmail || "", contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
         currencySymbol: appConfig?.currencySymbol || "₹",
+        dateFormat: appConfig?.dateFormat,
       };
 
       const pdfDataUri = await generateQuotationPdf(savedQuotation, companyInfo);
@@ -371,7 +373,7 @@ export default function CreateQuotationForm({ initialData, onSaveSuccess }: Crea
                 <FormField control={form.control} name="quotationDate" render={({ field }) => (
                   <FormItem className="flex flex-col"><FormLabel>Quotation Date <span className="text-destructive">*</span></FormLabel>
                     <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSaving}>
-                      {field.value ? new Date(field.value).toLocaleDateString('en-IN') : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      {field.value ? formatDateInTimezone(new Date(field.value), 'Asia/Kolkata') : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                     </Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus disabled={isSaving}/></PopoverContent></Popover><FormMessage /></FormItem>
                 )}/>
               </div>

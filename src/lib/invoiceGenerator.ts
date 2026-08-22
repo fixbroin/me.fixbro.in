@@ -26,6 +26,7 @@ interface CompanyDetails {
   logoUrl?: string;
   timezone?: string;
   currencySymbol?: string;
+  dateFormat?: string;
 }
 
 const getBasePriceForInvoice = (displayedPrice: number, isTaxInclusive?: boolean, taxPercent?: number): number => {
@@ -73,14 +74,15 @@ export const generateInvoicePdf = async (booking: FirestoreBooking, companyDetai
   doc.setFontSize(10);
   doc.text(`Booking No: #${booking.bookingNumber || 'N/A'}`, 196, 28, { align: "right" });
   doc.text(`Invoice ID: ${booking.bookingId}`, 196, 34, { align: "right" });
-  doc.text(`Date: ${formatDateInTimezone(new Date(), timezone)}`, 196, 40, { align: "right" });
+  const dateFormat = companyDetails?.dateFormat || 'DD/MM/YYYY';
+  doc.text(`Date: ${formatDateInTimezone(new Date(), timezone, dateFormat)}`, 196, 40, { align: "right" });
   
   // Format scheduledDate correctly - it's usually YYYY-MM-DD string
   let displayScheduledDate = booking.scheduledDate || 'N/A';
   if (booking.scheduledDate && booking.scheduledDate.includes('-')) {
       const [y, m, d] = booking.scheduledDate.split('-').map(Number);
       const dateObj = new Date(y, m - 1, d);
-      displayScheduledDate = formatDateInTimezone(dateObj, timezone);
+      displayScheduledDate = formatDateInTimezone(dateObj, timezone, dateFormat);
   }
 
   doc.text(`Service Date: ${displayScheduledDate}`, 196, 46, { align: "right" });

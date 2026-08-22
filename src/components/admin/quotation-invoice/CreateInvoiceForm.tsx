@@ -26,7 +26,7 @@ import { uploadPdfToStorage, triggerPdfDownload, dataUriToBlob } from '@/lib/pdf
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
 
 const invoiceItemSchema = z.object({
   id: z.string().optional(),
@@ -285,6 +285,7 @@ export default function CreateInvoiceForm({ initialData, onSaveSuccess }: Create
         contactEmail: companySettings?.contactEmail || "", contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
         currencySymbol: appConfig?.currencySymbol || "₹",
+        dateFormat: appConfig?.dateFormat,
       };
 
       const pdfDataUri = await generateInvoicePdf(savedInvoice, companyInfo);
@@ -330,6 +331,7 @@ export default function CreateInvoiceForm({ initialData, onSaveSuccess }: Create
         contactEmail: companySettings?.contactEmail || "", contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
         currencySymbol: appConfig?.currencySymbol || "₹",
+        dateFormat: appConfig?.dateFormat,
       };
 
       const pdfDataUri = await generateInvoicePdf(savedInvoice, companyInfo);
@@ -392,13 +394,13 @@ export default function CreateInvoiceForm({ initialData, onSaveSuccess }: Create
                 <FormField control={form.control} name="invoiceDate" render={({ field }) => (
                   <FormItem className="flex flex-col"><FormLabel>Invoice Date <span className="text-destructive">*</span></FormLabel>
                     <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSaving}>
-                      {field.value ? new Date(field.value).toLocaleDateString('en-IN') : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      {field.value ? formatDateInTimezone(new Date(field.value), 'Asia/Kolkata') : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                     </Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus disabled={isSaving}/></PopoverContent></Popover><FormMessage /></FormItem>
                 )}/>
                 <FormField control={form.control} name="dueDate" render={({ field }) => (
                   <FormItem className="flex flex-col"><FormLabel>Due Date (Optional)</FormLabel>
                     <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSaving}>
-                      {field.value ? new Date(field.value).toLocaleDateString('en-IN') : <span>Pick a due date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      {field.value ? formatDateInTimezone(new Date(field.value), 'Asia/Kolkata') : <span>Pick a due date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                     </Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value || undefined} onSelect={field.onChange} disabled={(date) => form.getValues("invoiceDate") ? date < form.getValues("invoiceDate") : false} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
                 )}/>
               </div>

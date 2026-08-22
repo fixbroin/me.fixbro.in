@@ -266,7 +266,7 @@ export async function POST(request: Request) {
                         bookingId: booking.bookingId,
                         bookingDocId: bookingDocId,
                         serviceName: servicesSummary,
-                        scheduledDate: booking.scheduledDate,
+                        scheduledDate: formatScheduledDate(booking.scheduledDate, appConfig.dateFormat || "DD/MM/YYYY"),
                         scheduledTimeSlot: booking.scheduledTimeSlot,
                         customerName: booking.customerName,
                         customerAddress: `${booking.addressLine1}, ${booking.addressLine2 ? booking.addressLine2 + ', ' : ''}${booking.city}`,
@@ -518,6 +518,7 @@ export async function POST(request: Request) {
                 contactMobile: appConfig?.companyPhone || '+91-7353113455',
                 timezone: appConfig?.timezone || 'Asia/Kolkata',
                 currencySymbol: appConfig?.currencySymbol || "₹",
+                dateFormat: appConfig?.dateFormat || "DD/MM/YYYY",
             };
             const pdfDataUri = await generateInvoicePdf(booking, companyDetails);
             if (pdfDataUri && pdfDataUri.includes(',')) {
@@ -562,6 +563,7 @@ export async function POST(request: Request) {
         smtpUser: appConfig.smtpUser,
         smtpPass: appConfig.smtpPass,
         senderEmail: appConfig.senderEmail,
+        dateFormat: appConfig.dateFormat || "DD/MM/YYYY",
         invoicePdfBase64: invoicePdfBase64 || undefined,
         additionalCharges: booking.additionalCharges,
         appliedPlatformFees: booking.appliedPlatformFees?.map((fee: any) => ({ 

@@ -8,7 +8,7 @@ import { Settings, Save, Loader2, AlertCircle, MapPin as MapIcon, MailIcon, Play
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp, collection, getDocs, addDoc, deleteDoc, query, orderBy } from '@/lib/mysqlDb';
-import { cn, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
+import { cn, formatDateInTimezone, formatTimeInTimezone, formatCustomDate } from '@/lib/utils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import type { AppSettings, DayAvailability } from '@/types/firestore'; 
 import { defaultAppSettings } from '@/config/appDefaults'; 
@@ -23,9 +23,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Check, ChevronsUpDown, Search as SearchIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import PermissionGuard from '@/components/admin/PermissionGuard';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const APP_CONFIG_COLLECTION = "webSettings";
 const APP_CONFIG_DOC_ID = "applicationConfig";
+
+const DATE_FORMATS = [
+  'DD/MM/YYYY',
+  'DD-MM-YYYY',
+  'DD.MM.YYYY',
+  'MM/DD/YYYY',
+  'YYYY-MM-DD',
+  'YYYY/MM/DD',
+  'DD MMM YYYY',
+  'MMM DD, YYYY',
+  'DD MMMM YYYY',
+  'MMMM DD, YYYY',
+];
 
 interface TimezoneOption {
   label: string;
@@ -116,6 +130,7 @@ export default function AdminSettingsPage() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<AppSettings>(defaultAppSettings);
   const symbol = settings.currencySymbol || '₹';
+  const previewDate = useMemo(() => new Date(), []);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [timezoneSearch, setTimezoneSearch] = useState("");
@@ -780,6 +795,35 @@ export default function AdminSettingsPage() {
                   </Dialog>
                   <p className="text-xs text-muted-foreground">
                     Search and select from all world timezones. This will be used for booking slots, email timestamps, and all date/time calculations.
+                  </p>
+                </div>
+              </div>
+
+              {/* Date Format Configuration */}
+              <div className="space-y-4 p-4 border rounded-md shadow-sm bg-muted/5">
+                <h3 className="text-lg font-semibold flex items-center">
+                  <CalendarDays className="mr-2 h-5 w-5 text-primary" /> Application Date Format
+                </h3>
+                <div className="space-y-2">
+                  <Label htmlFor="dateFormat">Select Date Format</Label>
+                  <Select
+                    value={settings.dateFormat || 'DD/MM/YYYY'}
+                    onValueChange={(val) => handleSelectChange('dateFormat', val)}
+                    disabled={isSaving}
+                  >
+                    <SelectTrigger id="dateFormat" className="w-full h-10 bg-background border-input">
+                      <SelectValue placeholder="Choose a date format..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DATE_FORMATS.map((fmt) => (
+                        <SelectItem key={fmt} value={fmt}>
+                          {fmt} (e.g. {formatCustomDate(previewDate, fmt, settings.timezone)})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Choose the date display format that matches your country's standard. This format will be used across the entire website, client/provider dashboards, emails, and PDFs.
                   </p>
                 </div>
               </div>

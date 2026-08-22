@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 import { Loader2, CalendarIcon, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
-import { getTimestampMillis } from "@/lib/utils";
+import { getTimestampMillis, formatDateInTimezone } from "@/lib/utils";
 import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 
 const promoCodeFormSchemaBase = z.object({
@@ -143,7 +143,7 @@ export default function PromoCodeForm({
 
   const formatDateForInput = (date: Date | null | undefined): string => {
     if (!date) return "Pick a date";
-    return date.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return formatDateInTimezone(date, 'Asia/Kolkata');
   };
 
   return (

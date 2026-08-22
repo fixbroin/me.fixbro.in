@@ -21,7 +21,7 @@ import { uploadPdfToStorage, triggerPdfDownload, dataUriToBlob } from '@/lib/pdf
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useAuth } from '@/hooks/useAuth';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
 import { deleteObject } from '@/lib/mysqlStorage';
 
 interface ManageInvoicesTabProps {
@@ -134,6 +134,7 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
         contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
         currencySymbol: appConfig?.currencySymbol || "₹",
+        dateFormat: appConfig?.dateFormat,
       };
       const pdfDataUri = await generateInvoicePdf(invoice, companyInfo);
       const pdfBlob = dataUriToBlob(pdfDataUri);
@@ -172,6 +173,7 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
         contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
         currencySymbol: appConfig?.currencySymbol || "₹",
+        dateFormat: appConfig?.dateFormat,
       };
       const pdfDataUri = await generateInvoicePdf(invoice, companyInfo);
       triggerPdfDownload(pdfDataUri, `Invoice-${invoice.invoiceNumber}.pdf`);
@@ -185,7 +187,7 @@ export default function ManageInvoicesTab({ onEditInvoice }: ManageInvoicesTabPr
 
   const formatDate = (timestamp?: any) => {
     const millis = getTimestampMillis(timestamp);
-    return millis ? new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+    return millis ? formatDateInTimezone(new Date(millis), 'Asia/Kolkata') : 'N/A';
   };
 
   const getStatusBadgeVariant = (status: InvoicePaymentStatus) => {

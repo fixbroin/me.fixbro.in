@@ -26,7 +26,7 @@ import { logUserActivity } from '@/lib/activityLogger';
 import { getGuestId } from '@/lib/guestIdManager';
 import { sendWhatsAppFlow } from '@/ai/flows/sendWhatsAppFlow';
 import { triggerPushNotification } from '@/lib/fcmUtils';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
 import { incrementSystemStats } from '@/lib/systemStatsUtils';
 import { getHaversineDistance } from '@/lib/locationUtils';
@@ -116,11 +116,11 @@ const calculateIncrementalTotalPriceForItem = (service: FirestoreService, quanti
 };
 // --- END: Pricing Logic ---
 
-const formatDateForDisplay = (dateString: string | undefined): string => {
+const formatDateForDisplay = (dateString: string | undefined, appConfig?: any): string => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString.replace(/-/g, '/'));
-        return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        return formatDateInTimezone(date, appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
     } catch (e) {
         return dateString;
     }
@@ -535,10 +535,12 @@ export default function ThankYouPage() {
             servicesSummary, 
             createdAt: (() => {
                 const millis = getTimestampMillis(newBookingData.createdAt);
-                return millis ? new Date(millis).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+                if (!millis) return 'N/A';
+                const d = new Date(millis);
+                return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
             })(),
  
-            scheduledDateDisplay: formatDateForDisplay(newBookingData.scheduledDate),
+            scheduledDateDisplay: formatDateForDisplay(newBookingData.scheduledDate, appConfig),
             latitude: newBookingData.latitude === undefined ? null : newBookingData.latitude, 
             longitude: newBookingData.longitude === undefined ? null : newBookingData.longitude, 
             visitingChargeDisplayed: baseVisitingChargeForBooking, 
@@ -705,7 +707,7 @@ export default function ThankYouPage() {
                         icon={Activity} 
                         label="Estimated Completion" 
                         valueClassName="text-emerald-600"
-                        value={`${new Date(bookingDetailsForDisplay.estimatedEndTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} at ${new Date(bookingDetailsForDisplay.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}`} 
+                        value={`${formatDateInTimezone(new Date(bookingDetailsForDisplay.estimatedEndTime), 'Asia/Kolkata')} ${formatTimeInTimezone(new Date(bookingDetailsForDisplay.estimatedEndTime), 'Asia/Kolkata')}`} 
                     />
                     <Separator className="opacity-40" />
                   </>

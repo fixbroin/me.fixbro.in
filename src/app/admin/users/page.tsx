@@ -26,7 +26,8 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getArchivedUsers } from '@/lib/adminDashboardUtils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { toggleUserStatusAction } from '@/app/actions/userStatusActions';
 
 import { initializeUserNumbers } from '@/lib/systemStatsUtils';
@@ -38,10 +39,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 
-const formatUserTimestamp = (timestamp?: unknown): string => {
+const formatUserTimestamp = (timestamp?: unknown, appConfig?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
-  return new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formatDateInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
 };
 
 const StatusBadge = ({ isActive, isLoading }: { isActive: boolean, isLoading: boolean }) => (
@@ -73,6 +74,7 @@ const availableFields: { key: SelectableUserField; label: string }[] = [
 const PAGE_SIZE = 20;
 
 export default function AdminUsersPage() {
+  const { config: appConfig } = useApplicationConfig();
   const { stats } = useAdminStats();
   const { adminPermissions } = useAuth();
   const [users, setUsers] = useState<FirestoreUser[]>([]);
@@ -345,7 +347,7 @@ export default function AdminUsersPage() {
         }
         if (key === 'createdAt' || key === 'lastLoginAt') {
           const timestamp = user[key];
-          return timestamp ? formatUserTimestamp(timestamp) : "N/A";
+          return timestamp ? formatUserTimestamp(timestamp, appConfig) : "N/A";
         }
         if (key === 'isActive') return user.isActive ? "Active" : "Disabled";
         return user[key as keyof FirestoreUser] ?? 'N/A';
@@ -430,7 +432,7 @@ export default function AdminUsersPage() {
         </div>
         <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           <Calendar className="h-3.5 w-3.5 text-primary/60" />
-          <span>Joined {formatUserTimestamp(user.createdAt)}</span>
+          <span>Joined {formatUserTimestamp(user.createdAt, appConfig)}</span>
         </div>
       </div>
 
@@ -595,7 +597,7 @@ export default function AdminUsersPage() {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="text-xs font-black text-muted-foreground uppercase tracking-tighter">{formatUserTimestamp(user.createdAt)}</TableCell>
+                          <TableCell className="text-xs font-black text-muted-foreground uppercase tracking-tighter">{formatUserTimestamp(user.createdAt, appConfig)}</TableCell>
                           <TableCell className="text-center">
                             <PermissionGuard moduleId="users" action="write" fallback={<StatusBadge isActive={user.isActive} isLoading={false} />}>
                               <button onClick={() => handleToggleUserStatus(user.id, user.isActive)} className="focus:outline-none" disabled={isUpdatingStatus === user.id}>

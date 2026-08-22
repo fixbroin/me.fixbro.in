@@ -46,12 +46,12 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
 
-const formatDate = (timestamp?: any) => {
+const formatDate = (timestamp?: any, appConfig?: any) => {
     const millis = getTimestampMillis(timestamp);
     if (!millis) return 'N/A';
-    return new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    return formatDateInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
 };
 
 const getStatusBadgeVariant = (status: WithdrawalStatus) => {

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { CustomServiceRequest } from '@/types/firestore';
 import AppImage from '@/components/ui/AppImage';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 
 interface CustomRequestDetailsModalProps {
@@ -18,7 +18,8 @@ interface CustomRequestDetailsModalProps {
 const formatDate = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
-  return new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const d = new Date(millis);
+  return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
 };
 
 const DetailItem = ({ label, value }: { label: string; value?: string | number | null }) => (

@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable'; 
 import type { UserOptions, CellWidthType } from 'jspdf-autotable';
 import { FirestoreQuotation, CompanyDetailsForPdf, Timestamp } from '@/types/firestore'; // Added Timestamp
+import { formatDateInTimezone } from './utils';
 
 interface ExtendedHeadCellDef { 
     cellWidth?: CellWidthType;
@@ -20,11 +21,11 @@ declare module 'jspdf' {
 
 import { robotoFontBase64 } from './pdfFonts';
 
-const formatDateForIndiaDisplay = (timestamp?: Timestamp): string => {
+const formatDateForIndiaDisplay = (timestamp?: Timestamp, dateFormat?: string): string => {
     if (!timestamp) return 'N/A';
     try {
         const date = timestamp.toDate();
-        return date.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return formatDateInTimezone(date, 'Asia/Kolkata', dateFormat);
     } catch (e) {
         return 'Invalid Date'; 
     }
@@ -63,8 +64,9 @@ export const generateQuotationPdf = async (quotation: FirestoreQuotation, compan
   doc.setFont("Roboto", "normal");
 
   doc.setFontSize(10);
+  const dateFormat = companyDetails?.dateFormat || 'DD/MM/YYYY';
   doc.text(`Quotation #: ${quotation.quotationNumber}`, 196, 30, { align: "right" });
-  doc.text(`Date: ${formatDateForIndiaDisplay(quotation.quotationDate)}`, 196, 36, { align: "right" });
+  doc.text(`Date: ${formatDateForIndiaDisplay(quotation.quotationDate, dateFormat)}`, 196, 36, { align: "right" });
   
   // Customer Details Section
   let startYCustomer = 50;

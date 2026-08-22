@@ -42,7 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import Image from "next/image";
 import { nanoid } from "nanoid";
-import { cn } from "@/lib/utils";
+import { cn, formatDateInTimezone } from "@/lib/utils";
 import { sendNewCustomServiceRequestEmail, type NewCustomServiceRequestEmailInput } from "@/ai/flows/sendNewCustomServiceRequestEmailFlow";
 import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 import { getBaseUrl } from "@/lib/config";
@@ -417,7 +417,7 @@ export default function CustomServiceRequestForm({
             : undefined;
           
           const preferredStartDateText = data.preferredStartDate 
-            ? new Date(data.preferredStartDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) 
+            ? formatDateInTimezone(new Date(data.preferredStartDate), appConfig.timezone) 
             : undefined;
 
           const emailInput: NewCustomServiceRequestEmailInput = {
@@ -677,7 +677,7 @@ export default function CustomServiceRequestForm({
                       disabled={isSubmitting}
                     >
                       {field.value
-                        ? new Date(field.value).toLocaleDateString("en-IN")
+                        ? formatDateInTimezone(new Date(field.value), 'Asia/Kolkata')
                         : "Pick a date"}
                       <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                     </Button>

@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
 import { nanoid } from 'nanoid';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 
@@ -79,7 +79,7 @@ type WithdrawalFormData = z.infer<typeof withdrawalFormSchema>;
 const formatDate = (timestamp?: any) => {
     const millis = getTimestampMillis(timestamp);
     if (!millis) return 'N/A';
-    return new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    return formatDateInTimezone(new Date(millis), 'Asia/Kolkata');
 };
 
 const calculateProviderFee = (bookingAmount: number, feeType?: ProviderFeeType, feeValue?: number): number => {
@@ -388,7 +388,7 @@ function WithdrawalPageContent() {
   };
 
   return (
-    <div className="space-y-6 container mx-auto py-8">
+    <div className="space-y-3 container mx-auto py-2">
       <Card id="withdrawal-form-card">
         <CardHeader>
             <CardTitle>{editingRequest ? "Re-submit Withdrawal Request" : "Request a Withdrawal"}</CardTitle>             <CardDescription>{editingRequest ? "Please correct your details and re-submit the request." : `Transfer your available earnings. Minimum withdrawal is ${symbol}${withdrawalSettings?.minWithdrawalAmount || 0}.`}</CardDescription>

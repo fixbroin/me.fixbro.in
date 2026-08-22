@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { generateQuotationPdf } from '@/lib/quotationGenerator';
 import { uploadPdfToStorage, triggerPdfDownload, dataUriToBlob } from '@/lib/pdfUtils';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
 import { deleteObject } from '@/lib/mysqlStorage';
 import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 
@@ -112,6 +112,7 @@ export default function ManageQuotationsTab({ onEditQuotation }: ManageQuotation
         contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
         currencySymbol: appConfig?.currencySymbol || "₹",
+        dateFormat: appConfig?.dateFormat,
       };
 
       const pdfDataUri = await generateQuotationPdf(quotation, companyInfo);
@@ -153,6 +154,7 @@ export default function ManageQuotationsTab({ onEditQuotation }: ManageQuotation
         contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
         currencySymbol: appConfig?.currencySymbol || "₹",
+        dateFormat: appConfig?.dateFormat,
       };
       const pdfDataUri = await generateQuotationPdf(quotation, companyInfo);
       triggerPdfDownload(pdfDataUri, `Quotation-${quotation.quotationNumber}.pdf`);
@@ -167,7 +169,7 @@ export default function ManageQuotationsTab({ onEditQuotation }: ManageQuotation
   const formatDate = (timestamp?: any) => {
     const millis = getTimestampMillis(timestamp);
     if (!millis) return 'N/A';
-    return new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    return formatDateInTimezone(new Date(millis), 'Asia/Kolkata');
   };
   
   const getStatusBadgeVariant = (status: QuotationStatus) => {

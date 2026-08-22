@@ -9,6 +9,7 @@ import type { FirestoreBooking } from '@/types/firestore';
 import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/contexts/LoadingContext';
 import AppImage from '@/components/ui/AppImage';
+import { formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 
 interface ProviderJobCardProps {
   job: FirestoreBooking;
@@ -24,7 +25,7 @@ const formatDateForDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString.replace(/-/g, '/'));
-        return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        return formatDateInTimezone(date, 'Asia/Kolkata');
     } catch (e) { return dateString; }
 };
 
@@ -108,7 +109,7 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
         <p><strong>Date:</strong> {formatDateForDisplay(job.scheduledDate)} at {job.scheduledTimeSlot}</p>
         {job.estimatedEndTime && (
           <p className="text-green-600 font-medium">
-            <strong>Ends:</strong> {new Date(job.estimatedEndTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} {new Date(job.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+            <strong>Ends:</strong> {formatDateInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')} {formatTimeInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')}
           </p>
         )}
         <p><strong>Address:</strong> {isJobCompleted ? "[Hidden for Privacy]" : `${job.addressLine1}${job.addressLine2 ? `, ${job.addressLine2}` : ''}, ${job.city}`}</p>

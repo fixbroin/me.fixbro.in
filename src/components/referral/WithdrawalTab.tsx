@@ -22,7 +22,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from '@/components/ui/badge';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
 import { useApplicationConfig } from "@/hooks/useApplicationConfig";
 
 const withdrawalFormSchema = z.object({
@@ -43,7 +43,7 @@ type WithdrawalFormData = z.infer<typeof withdrawalFormSchema>;
 const formatDate = (timestamp?: any) => {
     const millis = getTimestampMillis(timestamp);
     if (!millis) return 'N/A';
-    return new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    return formatDateInTimezone(new Date(millis), 'Asia/Kolkata');
 };
 
 export default function WithdrawalTab({ settings }: WithdrawalTabProps) {

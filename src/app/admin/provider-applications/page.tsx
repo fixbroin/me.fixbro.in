@@ -26,16 +26,16 @@ import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { sendProviderApplicationStatusEmail } from '@/ai/flows/sendProviderApplicationStatusUpdateFlow'; 
 import { getBaseUrl } from '@/lib/config'; 
 import { Separator } from "@/components/ui/separator";
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 
 const PROVIDER_APPLICATION_COLLECTION = "providerApplications";
 const applicationStatusOptions: ProviderApplicationStatus[] = ['pending_review', 'pending_step_1', 'pending_step_2', 'pending_step_3', 'pending_step_4', 'approved', 'rejected', 'needs_update'];
 
-const formatApplicationTimestamp = (timestamp?: any): string => {
+const formatApplicationTimestamp = (timestamp?: any, appConfig?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
-  return new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+  return `${formatDateInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)} ${formatTimeInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata')}`;
 };
 
 export default function AdminProviderApplicationsPage() {
@@ -292,7 +292,7 @@ export default function AdminProviderApplicationsPage() {
         </div>
         <div className="flex justify-between text-xs">
           <span className="text-muted-foreground font-medium">Submitted:</span>
-          <span className="text-foreground">{formatApplicationTimestamp(app.submittedAt || app.createdAt)}</span>
+          <span className="text-foreground">{formatApplicationTimestamp(app.submittedAt || app.createdAt, appConfig)}</span>
         </div>
       </CardContent>
       <CardFooter className="p-4 pt-0 flex flex-wrap gap-2 justify-end border-t mt-2 pt-4">
@@ -479,7 +479,7 @@ export default function AdminProviderApplicationsPage() {
                           <div className="text-xs text-muted-foreground">{app.mobileNumber}</div>
                         </TableCell>
                         <TableCell className="text-sm">{app.workCategoryName || "N/A"}</TableCell>
-                        <TableCell className="text-xs whitespace-nowrap">{formatApplicationTimestamp(app.submittedAt || app.createdAt)}</TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">{formatApplicationTimestamp(app.submittedAt || app.createdAt, appConfig)}</TableCell>
                         <TableCell>
                           <Badge variant={getStatusBadgeVariant(app.status)} className={`text-[10px] capitalize ${app.status === 'approved' ? 'bg-green-500 text-white' : ''}`}>{app.status.replace(/_/g, ' ')}</Badge>
                         </TableCell>

@@ -7,7 +7,7 @@ import { ArrowRight, Calendar, Clock } from 'lucide-react';
 import type { FirestoreBlogPost, ClientBlogPost } from '@/types/firestore';
 import { useLoading } from '@/contexts/LoadingContext';
 import { useRouter } from 'next/navigation';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
 
 interface BlogPostCardProps {
   post: FirestoreBlogPost | ClientBlogPost;
@@ -29,7 +29,7 @@ export default function BlogPostCard({ post, priority = false }: BlogPostCardPro
   const getDisplayDate = (date: any): string => {
     const millis = getTimestampMillis(date);
     if (!millis) return '';
-    return new Date(millis).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+    return formatDateInTimezone(new Date(millis), 'Asia/Kolkata');
   };
 
   return (

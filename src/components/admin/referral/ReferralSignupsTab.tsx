@@ -10,7 +10,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, where, getDocs, doc, getDoc, collectionGroup, limit } from '@/lib/mysqlDb';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
 
 interface EnrichedReferral extends Referral {
     referrerName?: string;
@@ -24,7 +24,7 @@ interface EnrichedReferral extends Referral {
 const formatDate = (timestamp?: any): string => {
     const millis = getTimestampMillis(timestamp);
     if (!millis) return 'N/A';
-    return new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    return formatDateInTimezone(new Date(millis), 'Asia/Kolkata');
 };
 
 export default function ReferralSignupsTab() {

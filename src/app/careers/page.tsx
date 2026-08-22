@@ -9,7 +9,8 @@ import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config'; 
 import AppImage from '@/components/ui/AppImage';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
-import { getContentPageData } from '@/lib/webServerUtils';
+import { getContentPageData, getGlobalAppSettings } from '@/lib/webServerUtils';
+import { formatDateInTimezone } from '@/lib/utils';
 
 function getTimestampMillis(ts: any): number {
   if (!ts) return 0;
@@ -74,6 +75,7 @@ export async function generateMetadata(
 export default async function CareersPage() {
   try {
     const pageData = await getContentPageData(PAGE_SLUG);
+    const appConfig = await getGlobalAppSettings();
 
     const breadcrumbItems = [
         { label: "Home", href: "/" },
@@ -153,10 +155,10 @@ export default async function CareersPage() {
                 {pageData.updatedAt && (
                     <div className="mt-12 pt-6 border-t border-border/50 text-right">
                         <p className="text-xs text-muted-foreground">
-                            Last updated: {(() => {
-                                const millis = getTimestampMillis(pageData.updatedAt);
-                                return millis ? new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }) : 'N/A';
-                            })()}
+                             Last updated: {(() => {
+                                 const millis = getTimestampMillis(pageData.updatedAt);
+                                 return millis ? formatDateInTimezone(new Date(millis), 'Asia/Kolkata', appConfig?.dateFormat) : 'N/A';
+                             })()}
                         </p>
                     </div>
                 )}

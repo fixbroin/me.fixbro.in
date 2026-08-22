@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/contexts/LoadingContext';
 import AppImage from '@/components/ui/AppImage';
 import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
+import { cn, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import type { FirestoreNotification, UserActivityEventType } from '@/types/firestore';
@@ -27,7 +27,7 @@ const formatDateForDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString.replace(/-/g, '/'));
-        return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        return formatDateInTimezone(date, 'Asia/Kolkata');
     } catch (e) { return dateString; }
 };
 
@@ -109,7 +109,7 @@ const ProviderJobCard: React.FC<{
               <div className="text-[11px] leading-tight">
                 <p className="text-green-600/70 font-bold uppercase tracking-wider">Est. Completion</p>
                 <p className="text-green-700 dark:text-green-400 font-semibold">
-                  {new Date(job.estimatedEndTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} {new Date(job.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                  {formatDateInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')} {formatTimeInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')}
                 </p>
               </div>
             </div>

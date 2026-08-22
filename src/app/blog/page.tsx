@@ -7,7 +7,8 @@ import Link from 'next/link';
 import { Calendar, Clock, ArrowRight } from 'lucide-react';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import JsonLdScript from '@/components/shared/JsonLdScript';
-import { getPublishedPostsServer } from '@/lib/webServerUtils';
+import { getPublishedPostsServer, getGlobalAppSettings } from '@/lib/webServerUtils';
+import { formatDateInTimezone } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types/ui';
 
 export const revalidate = false; // Persistent Cache
@@ -41,6 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function BlogListPage() {
   const posts = await getPublishedPostsServer();
+  const appConfig = await getGlobalAppSettings();
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: 'Home', href: '/' },
     { label: 'Blog' },
@@ -128,7 +130,7 @@ export default async function BlogListPage() {
                       <div className="flex items-center gap-4 text-sm text-muted-foreground font-medium">
                         <span className="flex items-center gap-1.5">
                           <Calendar className="h-4 w-4 text-primary" />
-                          {new Date(featuredPost.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          {formatDateInTimezone(new Date(featuredPost.createdAt), 'Asia/Kolkata', appConfig?.dateFormat)}
                         </span>
                         {featuredPost.readingTime && (
                           <span className="flex items-center gap-1.5 border-l pl-4">

@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useLoading } from '@/contexts/LoadingContext';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { logUserActivity } from '@/lib/activityLogger';
@@ -25,17 +25,15 @@ import type { UserActivityEventType } from '@/types/firestore';
 const formatTimestampForDisplay = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
-  return new Date(millis).toLocaleString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', hour12: true
-  });
+  const d = new Date(millis);
+  return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
 };
 
 const formatDateForDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString.replace(/-/g, '/'));
-        return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        return formatDateInTimezone(date, 'Asia/Kolkata');
     } catch (e) { return dateString; }
 };
 
@@ -274,7 +272,7 @@ export default function ProviderBookingDetailsPage() {
               <p><strong>Time Slot:</strong> {booking.scheduledTimeSlot}</p>
               {booking.estimatedEndTime && (
                 <p className="text-green-600 font-bold sm:col-span-2 mt-2">
-                  <strong>Estimated Completion:</strong> {new Date(booking.estimatedEndTime).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })} at {new Date(booking.estimatedEndTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                  <strong>Estimated Completion:</strong> {formatDateInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')} at {formatTimeInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')}
                 </p>
               )}
             </div>

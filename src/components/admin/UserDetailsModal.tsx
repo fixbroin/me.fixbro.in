@@ -15,7 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { UserCircle, Mail, Phone, CalendarDays, CheckCircle, XCircle, Loader2, Edit3, Save, MapPin } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import AppImage from '@/components/ui/AppImage';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { openWhatsAppChooser } from '@/lib/whatsappUtils';
 
 interface UserDetailsModalProps {
@@ -73,7 +73,8 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
   const formatTimestampForIndia = (timestamp?: any): string => {
     const millis = getTimestampMillis(timestamp);
     if (!millis) return 'N/A';
-    return new Date(millis).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+    const d = new Date(millis);
+    return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
   };
   
   const handleWhatsAppClick = (e: React.MouseEvent, mobileNumber?: string | null) => {

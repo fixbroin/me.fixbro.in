@@ -16,6 +16,8 @@ import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import { generateBreadcrumbSchema } from '@/lib/seoAdvancedUtils';
+import { getGlobalAppSettings } from '@/lib/webServerUtils';
+import { formatDateInTimezone } from '@/lib/utils';
 
 export const revalidate = false; // Persistent Cache
 
@@ -153,6 +155,7 @@ export async function generateMetadata(
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const { slug } = await params;
   const post = await getBlogPost(slug);
+  const appConfig = await getGlobalAppSettings();
 
   if (!post) {
     notFound();
@@ -176,7 +179,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const getDisplayDate = (date: any): string => {
     const millis = getTimestampMillis(date);
     if (!millis) return 'N/A';
-    return format(new Date(millis), 'MMMM dd, yyyy');
+    return formatDateInTimezone(new Date(millis), 'Asia/Kolkata', appConfig?.dateFormat);
   };
 
   const getIsoDate = (date: any): string => {

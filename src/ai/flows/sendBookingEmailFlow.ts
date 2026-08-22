@@ -8,7 +8,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import nodemailer from 'nodemailer';
 import { getBaseUrl } from '@/lib/config';
-import { formatScheduledDate } from '@/lib/utils';
+import { formatScheduledDate as utilsFormatScheduledDate } from '@/lib/utils';
 
 // Define Zod schema for individual service items
 const EmailBookingServiceItemSchema = z.object({
@@ -68,6 +68,7 @@ const BookingConfirmationEmailInputSchema = z.object({
   currencySymbol: z.string().optional().describe("Currency symbol to use in email templates."),
   providerName: z.string().optional(),
   providerPhone: z.string().optional(),
+  dateFormat: z.string().optional(),
 });
 
 export type BookingConfirmationEmailInput = z.infer<typeof BookingConfirmationEmailInputSchema>;
@@ -179,8 +180,10 @@ const bookingEmailFlow = ai.defineFlow(
         logoUrl,
         currencySymbol = "Rs.",
         providerName,
-        
+        dateFormat,
       } = bookingDetails;
+
+      const formatScheduledDate = (dStr: string | undefined) => utilsFormatScheduledDate(dStr, dateFormat);
 
       const paymentSummaryHtml = `
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-family: 'Roboto', sans-serif; line-height: 1.6; font-size: 14px; color: #444444;">

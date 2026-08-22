@@ -95,6 +95,8 @@ export const defaultAppSettings: AppSettings = {
   // UI/UX
   loaderType: 'logo-pulse',
 
+  dateFormat: 'DD/MM/YYYY',
+
   updatedAt: undefined, // No default for updatedAt
 };
 

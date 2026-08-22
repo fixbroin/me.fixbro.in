@@ -12,6 +12,8 @@ import AppImage from '@/components/ui/AppImage';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
+import { getGlobalAppSettings } from '@/lib/webServerUtils';
+import { formatDateInTimezone } from '@/lib/utils';
 
 function getTimestampMillis(ts: any): number {
   if (!ts) return 0;
@@ -120,6 +122,7 @@ export async function generateMetadata(
 export default async function ServiceDisclaimerPage() {
   try {
     const pageData = await getPageData(PAGE_SLUG);
+    const appConfig = await getGlobalAppSettings();
 
     const breadcrumbItems = [
         { label: "Home", href: "/" },
@@ -178,7 +181,7 @@ export default async function ServiceDisclaimerPage() {
               <p className="text-sm text-muted-foreground">
                 Last updated: {(() => {
                     const millis = getTimestampMillis(pageData.updatedAt);
-                    return millis ? new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A';
+                    return millis ? formatDateInTimezone(new Date(millis), 'Asia/Kolkata', appConfig?.dateFormat) : 'N/A';
                 })()}
               </p>
             )}

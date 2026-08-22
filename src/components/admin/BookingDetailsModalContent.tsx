@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MapPin, ExternalLink, Tag, HandCoins, Plus, UserCheck, Loader2, Phone, UserCircle, Clock, AlertTriangle } from 'lucide-react'; 
 import AppImage from '@/components/ui/AppImage'; 
-import { getTimestampMillis, formatScheduledDate, formatCurrency } from '@/lib/utils';
+import { getTimestampMillis, formatScheduledDate, formatCurrency, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from '@/lib/mysqlDb';
@@ -24,7 +24,8 @@ interface BookingDetailsModalContentProps {
 const formatDetailTimestamp = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
-  return new Date(millis).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const d = new Date(millis);
+  return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
 };
 
 const getBasePriceForInvoice = (displayedPrice: number, isTaxInclusive?: boolean, taxPercent?: number): number => {
@@ -199,7 +200,7 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
             <p><strong>Scheduled Time:</strong> {booking.scheduledTimeSlot}</p>
             {booking.estimatedEndTime && (
               <p className="text-green-600 font-bold">
-                <strong>Estimated Completion:</strong> {new Date(booking.estimatedEndTime).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                <strong>Estimated Completion:</strong> {formatDateInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')} {formatTimeInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')}
               </p>
             )}
             <div className="flex items-center gap-2">

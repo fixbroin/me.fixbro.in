@@ -6,6 +6,7 @@ import { ArrowLeft, PackageSearch, Mail, Phone, MapPin, Clock, Calendar } from "
 import type { Metadata, ResolvingMetadata } from 'next';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config'; 
+import { formatDateInTimezone } from '@/lib/utils';
 
 import ContactUsForm from "@/components/forms/ContactUsForm";
 import AppImage from '@/components/ui/AppImage';
@@ -50,8 +51,9 @@ export default async function ContactUsPage() {
 
   // Load App Settings for working hours
   let timeSlotSettings: any = {};
+  let appConfig: any = null;
   try {
-    const appConfig = await getGlobalAppSettings();
+    appConfig = await getGlobalAppSettings();
     timeSlotSettings = appConfig?.timeSlotSettings || {};
   } catch (dbErr) {
     console.warn("ContactUsPage: Could not load applicationConfig from DB, using defaults:", dbErr);
@@ -275,8 +277,8 @@ export default async function ContactUsPage() {
                   {leaves.map((leave: any) => {
                     const isFullDay = leave.leaveType === 'full_day';
                     const dateDisplay = leave.startDate === leave.endDate 
-                      ? new Date(leave.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                      : `${new Date(leave.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} - ${new Date(leave.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                      ? formatDateInTimezone(new Date(leave.startDate), 'Asia/Kolkata', appConfig?.dateFormat)
+                      : `${formatDateInTimezone(new Date(leave.startDate), 'Asia/Kolkata', appConfig?.dateFormat)} - ${formatDateInTimezone(new Date(leave.endDate), 'Asia/Kolkata', appConfig?.dateFormat)}`;
 
                     return (
                       <div key={leave.id} className="p-4 rounded-2xl bg-muted/40 border border-border/40 space-y-2">

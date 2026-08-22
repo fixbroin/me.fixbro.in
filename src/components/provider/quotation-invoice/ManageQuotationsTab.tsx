@@ -20,7 +20,7 @@ import { generateQuotationPdf } from '@/lib/quotationGenerator';
 import { uploadPdfToStorage, triggerPdfDownload, dataUriToBlob } from '@/lib/pdfUtils';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { useAuth } from '@/hooks/useAuth';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
 import { deleteObject } from '@/lib/mysqlStorage';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
@@ -114,6 +114,7 @@ export default function ManageQuotationsTab({ onEditQuotation }: ManageQuotation
         contactEmail: companySettings?.contactEmail || "", contactMobile: companySettings?.contactMobile || "",
         logoUrl: companySettings?.logoUrl || undefined,
         currencySymbol: appConfig?.currencySymbol || "₹",
+        dateFormat: appConfig?.dateFormat,
       };
       const pdfDataUri = await generateQuotationPdf(quotation, companyInfo);
       if (actionType === 'download') {
@@ -134,7 +135,7 @@ export default function ManageQuotationsTab({ onEditQuotation }: ManageQuotation
 
   const formatDate = (timestamp?: any) => {
     const millis = getTimestampMillis(timestamp);
-    return millis ? new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+    return millis ? formatDateInTimezone(new Date(millis), 'Asia/Kolkata') : 'N/A';
   };
   const getStatusBadgeVariant = (status: QuotationStatus) => ({'Draft': 'secondary', 'Sent': 'outline', 'Accepted': 'default', 'Rejected': 'destructive', 'ConvertedToInvoice': 'default'})[status] || 'outline';
 
