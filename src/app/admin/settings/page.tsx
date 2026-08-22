@@ -797,6 +797,7 @@ export default function AdminSettingsPage() {
                     <Dialog open={isCurrencyDialogOpen} onOpenChange={setIsCurrencyDialogOpen}>
                       <DialogTrigger asChild>
                         <Button
+                          id="countryCurrency"
                           variant="outline"
                           role="combobox"
                           aria-expanded={isCurrencyDialogOpen}
