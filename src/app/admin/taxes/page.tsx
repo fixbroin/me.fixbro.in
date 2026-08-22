@@ -222,7 +222,7 @@ export default function AdminTaxesPage() {
       </Card>
 
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) { setIsFormOpen(open); if (!open) setEditingTax(null); } }}>
-        <DialogContent className="w-full max-w-md max-h-[85vh] overflow-y-auto p-0">
+        <DialogContent className="w-full max-w-md max-h-[90vh] overflow-y-auto p-0">
           <DialogHeader className="p-3 pb-4 border-b">
             <DialogTitle>{editingTax ? 'Edit Tax Configuration' : 'Add New Tax Configuration'}</DialogTitle>
             <DialogDescription>

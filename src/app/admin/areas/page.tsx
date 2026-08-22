@@ -800,7 +800,7 @@ export default function AdminAreasPage() {
       </Card>
 
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) { setIsFormOpen(open); if (!open) setEditingArea(null); } }}>
-        <DialogContent className="w-[calc(100%-6px)] sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[85vh] overflow-y-auto p-0">
+        <DialogContent className="w-[calc(100%-6px)] sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[90vh] overflow-y-auto p-0">
            <DialogHeader className="p-3 pb-4 border-b sticky top-0 bg-background z-10">
             <DialogTitle>{editingArea ? 'Edit Area' : 'Add New Area'}</DialogTitle>
             <DialogDescription>
@@ -944,7 +944,7 @@ export default function AdminAreasPage() {
       </Dialog>
 
       <Dialog open={isMapGenerateOpen} onOpenChange={(open) => { if (!isImporting && !isFetchingPlaces) { setIsMapGenerateOpen(open); } }}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto p-0">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0">
           <DialogHeader className="p-4 pb-2 border-b">
             <DialogTitle className="flex items-center"><Map className="mr-2 h-5 w-5 text-emerald-500" /> Generate Areas via Map</DialogTitle>
             <DialogDescription>

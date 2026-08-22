@@ -216,7 +216,7 @@ export default function AdminNewsletterPopupsPage() {
       </Card>
 
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!isSubmitting) { setIsFormOpen(open); if (!open) setEditingPopup(null); } }}>
-        <DialogContent className="w-[calc(100%-6px)] max-w-lg md:max-w-2xl lg:max-w-3xl max-h-[85vh] p-0 flex flex-col">
+        <DialogContent className="w-[calc(100%-6px)] max-w-lg md:max-w-2xl lg:max-w-3xl max-h-[90vh] p-0 flex flex-col">
           <DialogHeader className="p-3 pb-4 border-b sticky top-0 bg-background z-10">
             <DialogTitle>{editingPopup ? 'Edit Popup' : 'Add New Popup'}</DialogTitle>
             <DialogDescription>{editingPopup ? 'Update configuration for this popup.' : 'Fill in details to create a new website popup.'}</DialogDescription>

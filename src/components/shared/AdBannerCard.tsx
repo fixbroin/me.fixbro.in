@@ -92,6 +92,9 @@ export default function AdBannerCard({ ad, className }: AdBannerCardProps) {
   className="object-cover md:object-contain"
   data-ai-hint={aiHintValue}
 />
+        <div className="absolute top-3 left-3 z-30 bg-black/60 text-white text-[9px] md:text-[11px] font-bold px-2 py-0.5 rounded-sm select-none pointer-events-none tracking-wider uppercase">
+          Ad
+        </div>
       </div>
     </div>
   );
