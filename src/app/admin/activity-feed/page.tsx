@@ -650,18 +650,20 @@ export default function AdminActivityFeedPage() {
       </header>
 
       <Tabs defaultValue="customer-feed" className="w-full">
-        <TabsList className="bg-muted p-1 rounded-xl mb-6 flex w-fit gap-1">
-          <TabsTrigger value="customer-feed" className="font-bold text-xs uppercase px-5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-            Customer Feed ({customerActivities.length})
-          </TabsTrigger>
-          <TabsTrigger value="provider-feed" className="font-bold text-xs uppercase px-5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-            Provider Feed ({providerActivities.length})
-          </TabsTrigger>
-          <TabsTrigger value="out-of-coverage" className="font-bold text-xs uppercase px-5 py-2 rounded-lg flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-            Out-of-Coverage Requests ({outOfZoneRequests.length})
-          </TabsTrigger>
-        </TabsList>
+        <div className="w-full overflow-x-auto pb-1 mb-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <TabsList className="bg-muted p-1 rounded-xl flex w-max gap-1">
+            <TabsTrigger value="customer-feed" className="font-bold text-xs uppercase px-5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              Customer Feed ({customerActivities.length})
+            </TabsTrigger>
+            <TabsTrigger value="provider-feed" className="font-bold text-xs uppercase px-5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              Provider Feed ({providerActivities.length})
+            </TabsTrigger>
+            <TabsTrigger value="out-of-coverage" className="font-bold text-xs uppercase px-5 py-2 rounded-lg flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+              Out-of-Coverage Requests ({outOfZoneRequests.length})
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="customer-feed">
           <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
