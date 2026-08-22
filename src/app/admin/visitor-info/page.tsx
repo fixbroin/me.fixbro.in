@@ -37,9 +37,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import PermissionGuard from '@/components/admin/PermissionGuard';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -49,13 +50,10 @@ const formatLogTimestamp = (timestamp?: any): string => {
   return formatDistanceToNow(new Date(millis), { addSuffix: true });
 };
 
-const formatDateForDisplay = (timestamp?: any): string => {
+const formatDateForDisplay = (timestamp?: any, appConfig?: any): string => {
     const millis = getTimestampMillis(timestamp);
     if (!millis) return 'N/A';
-    return new Date(millis).toLocaleString('en-IN', {
-        day: '2-digit', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
-    });
+    return `${formatDateInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)} ${formatTimeInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata')}`;
 };
 
 
@@ -72,6 +70,7 @@ const getDeviceIcon = (ua: string) => {
 };
 
 export default function AdminVisitorInfoPage() {
+  const { config: appConfig } = useApplicationConfig();
   const [visitorLogs, setVisitorLogs] = useState<FirestoreVisitorInfoLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastVisible, setLastVisible] = useState<DocumentSnapshot | null>(null);

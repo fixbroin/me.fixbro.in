@@ -9,6 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, RefreshCw, CheckCircle2, AlertCircle, Play, Globe2, ListCollapse } from "lucide-react";
 import PermissionGuard from '@/components/admin/PermissionGuard';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { getIndexingStatus, triggerBulkIndexingBatch, updateIndexingConfig } from '@/lib/googleIndexing';
 
 interface SubmissionRecord {
@@ -19,6 +21,7 @@ interface SubmissionRecord {
 }
 
 export default function GoogleIndexingDashboard() {
+  const { config: appConfig } = useApplicationConfig();
   const [isMounted, setIsMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -296,7 +299,7 @@ export default function GoogleIndexingDashboard() {
                                 </span>
                               </TableCell>
                               <TableCell className="text-xs text-muted-foreground">
-                                {record.submittedAt ? new Date(record.submittedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A'}
+                                 {record.submittedAt ? `${formatDateInTimezone(new Date(record.submittedAt), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)} ${formatTimeInTimezone(new Date(record.submittedAt), appConfig?.timezone || 'Asia/Kolkata')}` : 'N/A'}
                               </TableCell>
                               <TableCell className="text-xs text-red-500 font-mono">
                                 {record.error || "-"}
@@ -327,7 +330,7 @@ export default function GoogleIndexingDashboard() {
                           <div className="flex flex-col gap-1.5 text-xs border-t pt-2 mt-2 text-muted-foreground">
                             <div className="flex justify-between">
                               <span className="font-medium">Processed Date:</span>
-                              <span>{record.submittedAt ? new Date(record.submittedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A'}</span>
+                               <span>{record.submittedAt ? `${formatDateInTimezone(new Date(record.submittedAt), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)} ${formatTimeInTimezone(new Date(record.submittedAt), appConfig?.timezone || 'Asia/Kolkata')}` : 'N/A'}</span>
                             </div>
                             {!record.success && record.error && (
                               <div className="mt-2 p-2.5 rounded bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-950/30 text-red-600 dark:text-red-400 font-mono text-[11px] leading-relaxed break-all">

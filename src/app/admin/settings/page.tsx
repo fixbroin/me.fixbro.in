@@ -90,6 +90,39 @@ const generateTimezones = (): TimezoneOption[] => {
   }
 };
 
+const getTimezoneOffsetString = (timezone: string): string => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'longOffset'
+    }).formatToParts(new Date());
+    const tzName = parts.find(p => p.type === 'timeZoneName')?.value || '';
+    if (tzName === 'GMT') return '+00:00';
+    const offset = tzName.replace('GMT', '');
+    const match = offset.match(/^([+-])(\d{1,2}):(\d{2})$/);
+    if (match) {
+      const [_, sign, hours, mins] = match;
+      return `${sign}${hours.padStart(2, '0')}:${mins}`;
+    }
+    return offset;
+  } catch (e) {
+    return '';
+  }
+};
+
+const getLiveTimeInTimezone = (timezone: string, date: Date): string => {
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }).format(date);
+  } catch (e) {
+    return '';
+  }
+};
+
 interface CurrencyOption {
   code: string;
   symbol: string;
@@ -129,6 +162,14 @@ const ALL_TIMEZONES = generateTimezones();
 export default function AdminSettingsPage() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<AppSettings>(defaultAppSettings);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
   const symbol = settings.currencySymbol || '₹';
   const previewDate = useMemo(() => new Date(), []);
   const [isSaving, setIsSaving] = useState(false);
@@ -137,6 +178,7 @@ export default function AdminSettingsPage() {
   const [isTimezoneDialogOpen, setIsTimezoneDialogOpen] = useState(false);
   const [currencySearch, setCurrencySearch] = useState("");
   const [isCurrencyDialogOpen, setIsCurrencyDialogOpen] = useState(false);
+  const [isDateFormatDialogOpen, setIsDateFormatDialogOpen] = useState(false);
   const [isVcTaxPickerOpen, setIsVcTaxPickerOpen] = useState(false);
   const [isCancelFeeTypePickerOpen, setIsCancelFeeTypePickerOpen] = useState(false);
 
@@ -155,16 +197,68 @@ export default function AdminSettingsPage() {
   const [editingLeaveId, setEditingLeaveId] = useState<string | null>(null);
 
   const filteredTimezones = useMemo(() => {
-    if (!timezoneSearch) return ALL_TIMEZONES;
-    const search = timezoneSearch.toLowerCase().replace(/\//g, ' ').trim();
-    return ALL_TIMEZONES.filter((tz: TimezoneOption) => tz.searchLabel.includes(search));
-  }, [timezoneSearch]);
+    let result = ALL_TIMEZONES;
+    if (timezoneSearch) {
+      const search = timezoneSearch.toLowerCase().replace(/\//g, ' ').trim();
+      result = ALL_TIMEZONES.filter((tz: TimezoneOption) => {
+        if (tz.searchLabel.includes(search)) return true;
+        const offsetStr = getTimezoneOffsetString(tz.value).toLowerCase();
+        if (offsetStr.includes(search) || offsetStr.replace(':', '').includes(search)) return true;
+        const liveTime = getLiveTimeInTimezone(tz.value, currentTime).toLowerCase();
+        if (liveTime.includes(search) || liveTime.replace(':', '').includes(search)) return true;
+        return false;
+      });
+    }
+    const kolkataIndex = result.findIndex(tz => tz.value === 'Asia/Kolkata' || tz.value === 'Asia/Calcutta');
+    if (kolkataIndex > -1) {
+      const kolkataTz = result[kolkataIndex];
+      const withoutKolkata = result.filter(tz => tz.value !== 'Asia/Kolkata' && tz.value !== 'Asia/Calcutta');
+      return [kolkataTz, ...withoutKolkata];
+    }
+    return result;
+  }, [timezoneSearch, currentTime]);
 
   const filteredCurrencies = useMemo(() => {
     if (!currencySearch) return currenciesList;
     const search = currencySearch.toLowerCase().trim();
     return currenciesList.filter(c => c.code.toLowerCase().includes(search) || c.name.toLowerCase().includes(search));
   }, [currencySearch]);
+
+  // Scroll selected timezone into view when dialog opens
+  useEffect(() => {
+    if (isTimezoneDialogOpen) {
+      setTimeout(() => {
+        const activeItem = document.querySelector('[data-timezone-active="true"]');
+        if (activeItem) {
+          activeItem.scrollIntoView({ block: 'nearest', behavior: 'instant' as any });
+        }
+      }, 100);
+    }
+  }, [isTimezoneDialogOpen]);
+
+  // Scroll selected date format into view when dialog opens
+  useEffect(() => {
+    if (isDateFormatDialogOpen) {
+      setTimeout(() => {
+        const activeItem = document.querySelector('[data-dateformat-active="true"]');
+        if (activeItem) {
+          activeItem.scrollIntoView({ block: 'nearest', behavior: 'instant' as any });
+        }
+      }, 100);
+    }
+  }, [isDateFormatDialogOpen]);
+
+  // Scroll selected currency into view when dialog opens
+  useEffect(() => {
+    if (isCurrencyDialogOpen) {
+      setTimeout(() => {
+        const activeItem = document.querySelector('[data-currency-active="true"]');
+        if (activeItem) {
+          activeItem.scrollIntoView({ block: 'nearest', behavior: 'instant' as any });
+        }
+      }, 100);
+    }
+  }, [isCurrencyDialogOpen]);
 
   const loadSettingsFromFirestore = useCallback(async () => {
     setIsLoadingSettings(true);
@@ -730,22 +824,28 @@ export default function AdminSettingsPage() {
                         variant="outline"
                         role="combobox"
                         aria-expanded={isTimezoneDialogOpen}
-                        className="w-full justify-between text-left font-normal h-10"
+                        className="w-full justify-between text-left font-normal h-auto min-h-10 py-2 border-border/60 hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground focus:ring-2 focus:ring-primary focus:border-primary group transition-all"
                         disabled={isSaving}
                         type="button"
                       >
                         {settings.timezone ? (
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-primary" />
-                            <span>{ALL_TIMEZONES.find((tz) => tz.value === settings.timezone)?.label || settings.timezone}</span>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 font-mono text-sm w-full pr-2">
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-4 w-4 text-primary shrink-0 group-hover:text-primary-foreground group-focus:text-primary-foreground" />
+                              <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary-foreground group-focus:text-primary-foreground">{getTimezoneOffsetString(settings.timezone)}</span>
+                              <span className="text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                              <span className="text-primary font-bold group-hover:text-primary-foreground group-focus:text-primary-foreground">{getLiveTimeInTimezone(settings.timezone, currentTime)}</span>
+                            </div>
+                            <span className="hidden sm:inline text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                            <span className="text-slate-600 dark:text-slate-400 truncate max-w-[200px] sm:max-w-none group-hover:text-primary-foreground/90 group-focus:text-primary-foreground/90">{settings.timezone}</span>
                           </div>
                         ) : (
                           "Select application timezone..."
                         )}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 group-hover:text-primary-foreground group-focus:text-primary-foreground" />
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="w-[calc(100%-2rem)] sm:max-w-[425px]">
+                    <DialogContent className="w-[calc(100%-2rem)] sm:max-w-[550px] md:max-w-[600px]">
                       <DialogHeader>
                         <DialogTitle>Select Application Timezone</DialogTitle>
                         <DialogDescription>
@@ -767,21 +867,27 @@ export default function AdminSettingsPage() {
                             {filteredTimezones.map((tz) => (
                               <Button
                                 key={tz.value}
-                                variant={settings.timezone === tz.value ? "secondary" : "ghost"}
-                                className="w-full justify-start text-left h-auto py-3 px-3 relative group whitespace-normal"
+                                variant={settings.timezone === tz.value ? "default" : "ghost"}
+                                className="w-full justify-start text-left h-auto py-2.5 px-3 relative group whitespace-normal hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground transition-all"
                                 onClick={() => {
                                   handleSelectChange('timezone', tz.value);
                                   setIsTimezoneDialogOpen(false);
                                   setTimezoneSearch("");
                                 }}
                                 type="button"
+                                data-timezone-active={settings.timezone === tz.value ? "true" : "false"}
                               >
-                                <div className="flex flex-col gap-0.5 pr-8">
-                                  <span className="font-semibold text-sm">{tz.label}</span>
-                                  <span className="text-xs text-muted-foreground font-mono">{tz.subLabel}</span>
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 font-mono text-sm w-full pr-8">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-primary-foreground group-focus:text-primary-foreground">{getTimezoneOffsetString(tz.value)}</span>
+                                    <span className="text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                                    <span className={settings.timezone === tz.value ? "text-primary-foreground font-bold" : "text-primary font-bold group-hover:text-primary-foreground group-focus:text-primary-foreground"}>{getLiveTimeInTimezone(tz.value, currentTime)}</span>
+                                  </div>
+                                  <span className="hidden sm:inline text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                                  <span className="text-slate-600 dark:text-slate-400 truncate max-w-[160px] xs:max-w-[220px] sm:max-w-none group-hover:text-primary-foreground/90 group-focus:text-primary-foreground/90">{tz.value}</span>
                                 </div>
                                 {settings.timezone === tz.value && (
-                                  <Check className="absolute right-3 top-4 h-4 w-4 text-green-500" />
+                                  <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary-foreground group-hover:text-primary-foreground group-focus:text-primary-foreground" />
                                 )}
                               </Button>
                             ))}
@@ -806,22 +912,69 @@ export default function AdminSettingsPage() {
                 </h3>
                 <div className="space-y-2">
                   <Label htmlFor="dateFormat">Select Date Format</Label>
-                  <Select
-                    value={settings.dateFormat || 'DD/MM/YYYY'}
-                    onValueChange={(val) => handleSelectChange('dateFormat', val)}
-                    disabled={isSaving}
-                  >
-                    <SelectTrigger id="dateFormat" className="w-full h-10 bg-background border-input">
-                      <SelectValue placeholder="Choose a date format..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DATE_FORMATS.map((fmt) => (
-                        <SelectItem key={fmt} value={fmt}>
-                          {fmt} (e.g. {formatCustomDate(previewDate, fmt, settings.timezone)})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Dialog open={isDateFormatDialogOpen} onOpenChange={setIsDateFormatDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        id="dateFormat"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={isDateFormatDialogOpen}
+                        className="w-full justify-between text-left font-normal h-auto min-h-10 py-2 border-border/60 hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground focus:ring-2 focus:ring-primary focus:border-primary group transition-all"
+                        disabled={isSaving}
+                        type="button"
+                      >
+                        {settings.dateFormat ? (
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm w-full pr-2">
+                            <div className="flex items-center gap-2">
+                              <CalendarDays className="h-4 w-4 text-primary shrink-0 group-hover:text-primary-foreground group-focus:text-primary-foreground" />
+                              <span className="font-semibold group-hover:text-primary-foreground group-focus:text-primary-foreground">{settings.dateFormat}</span>
+                            </div>
+                            <span className="hidden sm:inline text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                            <span className="text-xs text-muted-foreground truncate max-w-[200px] sm:max-w-none group-hover:text-primary-foreground/90 group-focus:text-primary-foreground/90">Example: {formatCustomDate(previewDate, settings.dateFormat, settings.timezone)}</span>
+                          </div>
+                        ) : (
+                          "Choose a date format..."
+                        )}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 group-hover:text-primary-foreground group-focus:text-primary-foreground" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="w-[calc(100%-2rem)] sm:max-w-[500px] md:max-w-[550px]">
+                      <DialogHeader>
+                        <DialogTitle>Select Application Date Format</DialogTitle>
+                        <DialogDescription>
+                          Choose the display format that matches your country's standard.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4">
+                        <ScrollArea className="h-[280px] rounded-md border p-2">
+                          <div className="space-y-1">
+                            {DATE_FORMATS.map((fmt) => (
+                              <Button
+                                key={fmt}
+                                variant={settings.dateFormat === fmt ? "default" : "ghost"}
+                                className="w-full justify-start text-left h-auto py-2.5 px-3 relative group whitespace-normal hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground transition-all"
+                                onClick={() => {
+                                  handleSelectChange('dateFormat', fmt);
+                                  setIsDateFormatDialogOpen(false);
+                                }}
+                                type="button"
+                                data-dateformat-active={settings.dateFormat === fmt ? "true" : "false"}
+                              >
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 text-sm w-full pr-8">
+                                  <span className="font-semibold group-hover:text-primary-foreground group-focus:text-primary-foreground">{fmt}</span>
+                                  <span className="hidden sm:inline text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                                  <span className="text-xs text-muted-foreground truncate max-w-[160px] xs:max-w-[220px] sm:max-w-none group-hover:text-primary-foreground/90 group-focus:text-primary-foreground/90">Example: {formatCustomDate(previewDate, fmt, settings.timezone)}</span>
+                                </div>
+                                {settings.dateFormat === fmt && (
+                                  <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary-foreground group-hover:text-primary-foreground group-focus:text-primary-foreground" />
+                                )}
+                              </Button>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                   <p className="text-xs text-muted-foreground">
                     Choose the date display format that matches your country's standard. This format will be used across the entire website, client/provider dashboards, emails, and PDFs.
                   </p>
@@ -845,16 +998,22 @@ export default function AdminSettingsPage() {
                           variant="outline"
                           role="combobox"
                           aria-expanded={isCurrencyDialogOpen}
-                          className="w-full justify-between h-10 border-border/60 hover:bg-muted/50"
+                          className="w-full justify-between h-auto min-h-10 py-2 border-border/60 hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground focus:ring-2 focus:ring-primary focus:border-primary group transition-all"
                         >
                           {(() => {
                             const cur = currenciesList.find(c => c.code === (settings.currencyCode || 'INR')) || currenciesList[0];
-                            return `${cur.code} - ${cur.name}`;
+                            return (
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm w-full pr-2 text-left">
+                                <span className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-primary-foreground group-focus:text-primary-foreground">{cur.code}</span>
+                                <span className="hidden sm:inline text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                                <span className="text-xs text-muted-foreground truncate max-w-[200px] sm:max-w-none group-hover:text-primary-foreground/90 group-focus:text-primary-foreground/90">{cur.name}</span>
+                              </div>
+                            );
                           })()}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50 group-hover:text-primary-foreground group-focus:text-primary-foreground" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
+                      <DialogContent className="w-[calc(100%-2rem)] sm:max-w-[500px] md:max-w-[550px]">
                         <DialogHeader>
                           <DialogTitle>Select Country Currency</DialogTitle>
                           <DialogDescription>Search and select your local business currency.</DialogDescription>
@@ -871,22 +1030,26 @@ export default function AdminSettingsPage() {
                           </div>
                           <ScrollArea className="h-[250px] rounded-md border p-2">
                             <div className="space-y-1">
-                              {filteredCurrencies.map((c) => (
+                               {filteredCurrencies.map((c) => (
                                 <Button
                                   key={c.code}
-                                  variant={settings.currencyCode === c.code ? "secondary" : "ghost"}
-                                  className="w-full justify-start text-left h-auto py-2.5 px-3 relative group"
+                                  variant={settings.currencyCode === c.code ? "default" : "ghost"}
+                                  className="w-full justify-start text-left h-auto py-2.5 px-3 relative group hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground transition-all"
                                   onClick={() => {
                                     handleSelectCurrency(c);
                                     setIsCurrencyDialogOpen(false);
                                     setCurrencySearch("");
                                   }}
                                   type="button"
+                                  data-currency-active={settings.currencyCode === c.code ? "true" : "false"}
                                 >
-                                  <span className="font-bold text-sm mr-2">{c.code}</span>
-                                  <span className="text-xs text-muted-foreground">{c.name}</span>
+                                  <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 text-sm w-full pr-8">
+                                    <span className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-primary-foreground group-focus:text-primary-foreground">{c.code}</span>
+                                    <span className="hidden sm:inline text-slate-400 group-hover:text-primary-foreground group-focus:text-primary-foreground">-</span>
+                                    <span className="text-xs text-muted-foreground truncate max-w-[160px] xs:max-w-[220px] sm:max-w-none group-hover:text-primary-foreground/90 group-focus:text-primary-foreground/90">{c.name}</span>
+                                  </div>
                                   {settings.currencyCode === c.code && (
-                                    <Check className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                                    <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary-foreground group-hover:text-primary-foreground group-focus:text-primary-foreground" />
                                   )}
                                 </Button>
                               ))}

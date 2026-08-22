@@ -407,7 +407,7 @@ export default function ProviderWithdrawalsPage() {
                               <Eye className="mr-1 h-4 w-4" /> View
                             </Button>
                           </TableCell>
-                          <TableCell className="text-xs">{formatDate(req.requestedAt)}</TableCell>
+                          <TableCell className="text-xs">{formatDate(req.requestedAt, appConfig)}</TableCell>
                           <TableCell><Badge variant={getStatusBadgeVariant(req.status)} className={`capitalize ${getStatusBadgeClass(req.status)}`}>{req.status.replace(/_/g, ' ')}</Badge></TableCell>
                           <TableCell className="text-right">
                               <div className="flex justify-end gap-2">

@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Loader2, Save, Send, Mail, Users, ShoppingCart, Repeat, Megaphone, Layers, Search, Tags, CheckCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+import { cn, formatDateInTimezone } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, Timestamp, collection, query, where, orderBy, limit, getDocs } from '@/lib/mysqlDb';
@@ -219,7 +219,7 @@ export default function MarketingAutomationPage() {
         
         const mergeData = {
           name: adminUser.displayName || 'Admin', email: adminUser.email, mobile: adminUser.phoneNumber || '',
-          signupDate: adminUser.metadata.creationTime ? new Date(adminUser.metadata.creationTime).toLocaleDateString('en-IN') : '',
+          signupDate: adminUser.metadata.creationTime ? formatDateInTimezone(new Date(adminUser.metadata.creationTime), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat) : '',
           websiteName: globalSettings.websiteName || 'Wecanfix', websiteUrl: baseUrl, supportEmail: globalSettings.contactEmail || 'support@example.com',
           companyAddress: globalSettings.address || 'Company Address', popular_services: popularServicesHtml, popular_categories: popularCategoriesHtml,
           all_services: allServicesHtml, all_categories: allCategoriesHtml, category_services: categoryServicesHtml, cart_items: cartContentHtml,

@@ -14,7 +14,7 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, orderBy, query, Timestamp, where } from '@/lib/mysqlDb';
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { getTimestampMillis, formatCurrency } from '@/lib/utils';
+import { getTimestampMillis, formatCurrency, formatDateInTimezone } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { getPromoCodeUsageHistory, type PromoCodeUsageRecord } from '@/lib/adminDashboardUtils';
 import { getCache, setCache } from '@/lib/client-cache';
@@ -212,7 +212,7 @@ export default function AdminPromoCodesPage() {
   const formatDateForIndia = (timestamp?: any) => {
     const millis = getTimestampMillis(timestamp);
     if (!millis) return "N/A";
-    return new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return formatDateInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
   };
 
   const getDiscountDisplay = (type: DiscountType, value: number) => {
@@ -451,7 +451,7 @@ export default function AdminPromoCodesPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center text-xs">
-                          {record.createdAt ? new Date(record.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                           {record.createdAt ? formatDateForIndia(record.createdAt) : 'N/A'}
                         </TableCell>
                         <TableCell className="text-right">
                           <AlertDialog>

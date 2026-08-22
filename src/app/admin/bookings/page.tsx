@@ -51,7 +51,7 @@ const formatDateForDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString.replace(/-/g, '/')); 
-        return date.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return formatDateInTimezone(date);
     } catch (e) { return dateString; }
 };
 

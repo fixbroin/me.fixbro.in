@@ -16,10 +16,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { triggerRefresh } from '@/lib/revalidateUtils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 
 const COLLECTION_NAME = "serviceZones";
 
 export default function AdminServiceZonesPage() {
+  const { config: appConfig } = useApplicationConfig();
   const [zones, setZones] = useState<ServiceZone[]>([]);
   const [categories, setCategories] = useState<Record<string, string>>({});
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -105,7 +108,7 @@ export default function AdminServiceZonesPage() {
   const formatRequestTimestamp = (timestamp?: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!timestamp) return 'N/A';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return `${formatDateInTimezone(date, appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)} ${formatTimeInTimezone(date, appConfig?.timezone || 'Asia/Kolkata')}`;
   };
 
   const handleAddZone = () => {

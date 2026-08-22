@@ -17,16 +17,16 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import AppImage from '@/components/ui/AppImage';
 import { Separator } from "@/components/ui/separator";
-import { getTimestampMillis, formatCurrency } from '@/lib/utils';
+import { getTimestampMillis, formatCurrency, formatDateInTimezone } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { hasActionPermission } from '@/config/rbac';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 
-const formatDate = (timestamp?: any): string => {
+const formatDate = (timestamp?: any, appConfig?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
-  return new Date(millis).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  return formatDateInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
 };
 
 const getStatusBadgeVariant = (status: CustomRequestStatus) => {
@@ -64,7 +64,7 @@ const CustomRequestDetailsModal = ({ isOpen, onClose, request }: { isOpen: boole
       <DialogContent className="max-w-2xl w-[90vw] max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="p-4 sm:p-3 border-b flex-shrink-0">
           <DialogTitle className="text-xl sm:text-2xl">{request.serviceTitle}</DialogTitle>
-          <DialogDescription>Submitted by {request.userName || "Guest"} on {formatDate(request.submittedAt)}</DialogDescription>
+          <DialogDescription>Submitted by {request.userName || "Guest"} on {formatDate(request.submittedAt, appConfig)}</DialogDescription>
         </DialogHeader>
         
         <div className="flex-grow overflow-y-auto min-h-0">
@@ -74,7 +74,7 @@ const CustomRequestDetailsModal = ({ isOpen, onClose, request }: { isOpen: boole
                 <DetailItem label="Category" value={request.categoryName || request.customCategory} />
                 <DetailItem label="Customer Email" value={request.userEmail} />
                 <DetailItem label="Customer Mobile" value={request.userMobile} />
-                <DetailItem label="Preferred Start Date" value={formatDate(request.preferredStartDate)} />
+                <DetailItem label="Preferred Start Date" value={formatDate(request.preferredStartDate, appConfig)} />
                 <DetailItem label="Budget" value={budgetDisplay} />
             </div>
             
@@ -163,6 +163,7 @@ const CustomRequestDetailsModal = ({ isOpen, onClose, request }: { isOpen: boole
 
 // --- Page Component Logic ---
 export default function CustomServiceAdminPage() {
+  const { config: appConfig } = useApplicationConfig();
   const [requests, setRequests] = useState<CustomServiceRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<CustomServiceRequest | null>(null);
@@ -284,7 +285,7 @@ export default function CustomServiceAdminPage() {
         </div>
         <div className="flex justify-between text-xs">
           <span className="text-muted-foreground font-medium">Submitted:</span>
-          <span className="text-foreground">{formatDate(req.submittedAt)}</span>
+           <span className="text-foreground">{formatDate(req.submittedAt, appConfig)}</span>
         </div>
         <p className="text-xs text-muted-foreground line-clamp-2 mt-2 italic">"{req.description}"</p>
       </CardContent>
@@ -391,7 +392,7 @@ export default function CustomServiceAdminPage() {
                             <div className="font-medium">{req.userName || "Guest"}</div>
                             <div className="text-xs text-muted-foreground">{req.userEmail || req.userMobile}</div>
                           </TableCell>
-                          <TableCell>{formatDate(req.submittedAt)}</TableCell>
+                          <TableCell>{formatDate(req.submittedAt, appConfig)}</TableCell>
                           <TableCell>
                             <Badge variant={getStatusBadgeVariant(req.status)} className="capitalize">{req.status}</Badge>
                           </TableCell>

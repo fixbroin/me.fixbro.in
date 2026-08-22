@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import type { FirestoreBooking } from '@/types/firestore';
 import { format } from 'date-fns';
-import { formatScheduledDate } from '@/lib/utils';
+import { formatScheduledDate, formatDateInTimezone } from '@/lib/utils';
 
 interface RescheduleBookingDialogProps {
     isOpen: boolean;
@@ -133,7 +133,7 @@ export default function RescheduleBookingDialog({ isOpen, onClose, booking, onRe
                                 2. Select Time Slot
                                 {selectedDate && (
                                     <Badge variant="outline" className="text-[10px] py-0 px-2">
-                                        {format(selectedDate, 'dd MMM yyyy')}
+                                        {formatDateInTimezone(selectedDate)}
                                     </Badge>
                                 )}
                             </h3>
@@ -189,7 +189,7 @@ export default function RescheduleBookingDialog({ isOpen, onClose, booking, onRe
                                     <CheckCircle2 className="h-5 w-5 text-green-600" />
                                     <div>
                                         <p className="text-[10px] font-bold text-green-700 uppercase">New Schedule Selected</p>
-                                        <p className="text-xs font-bold">{format(selectedDate, 'dd MMM yyyy')} | {selectedTimeSlot}</p>
+                                        <p className="text-xs font-bold">{formatDateInTimezone(selectedDate)} | {selectedTimeSlot}</p>
                                     </div>
                                 </div>
                             )}

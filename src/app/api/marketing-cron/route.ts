@@ -6,6 +6,7 @@ import { sendMarketingEmail } from '@/ai/flows/sendMarketingEmailFlow';
 import type { MarketingAutomationSettings, AppSettings, GlobalWebSettings, FirestoreUser, FirestoreService, UserCart, FirestoreCategory, FirestoreSubCategory } from '@/types/firestore';
 import { getBaseUrl } from '@/lib/config';
 import { getMarketingAutomationSettings, getGlobalAppSettings, getGlobalWebSettings } from '@/lib/webServerUtils';
+import { formatDateInTimezone } from '@/lib/utils';
 
 /**
  * Server-side helper to safely get milliseconds from various timestamp formats.
@@ -55,7 +56,7 @@ const replaceMergeTags = (
     body = body.replace(/\{\{mobile\}\}/g, user.mobileNumber || '');
     body = body.replace(/\{\{signupDate\}\}/g, (() => {
         const millis = getTimestampMillis(user.createdAt);
-        return millis ? new Date(millis).toLocaleDateString('en-IN') : '';
+        return millis ? formatDateInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat) : '';
     })());
     
     // Correctly sourced settings

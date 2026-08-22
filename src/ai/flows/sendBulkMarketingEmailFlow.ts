@@ -12,6 +12,7 @@ import { initFirebaseAdmin } from '@/lib/firebase-admin';
 import type { FirestoreUser, AppSettings, GlobalWebSettings, FirestoreService, FirestoreCategory } from '@/types/firestore';
 import { sendMarketingEmail } from './sendMarketingEmailFlow';
 import { getBaseUrl } from '@/lib/config';
+import { formatDateInTimezone } from '@/lib/utils';
 
 // Helper to safely get nested properties
 const get = (obj: any, path: string, defaultValue: any = ''): any => {
@@ -150,7 +151,7 @@ const bulkMarketingEmailFlow = ai.defineFlow(
           name: user.displayName || 'Valued Customer',
           email: user.email,
           mobile: user.mobileNumber || '',
-          signupDate: user.createdAt?.toDate().toLocaleDateString('en-IN') || '',
+          signupDate: user.createdAt?.toDate() ? formatDateInTimezone(user.createdAt.toDate(), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat) : '',
           websiteName: appDetails.websiteName,
           websiteUrl: appDetails.websiteUrl,
           supportEmail: appDetails.supportEmail,

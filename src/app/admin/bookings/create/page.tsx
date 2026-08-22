@@ -14,7 +14,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn, getTimestampMillis, formatCurrency } from "@/lib/utils";
+import { cn, getTimestampMillis, formatCurrency, formatDateInTimezone, formatTimeInTimezone } from "@/lib/utils";
 import { 
   Loader2, ArrowLeft, Search, User, MapPin, Phone, Mail, 
   CalendarDays, Clock, CheckCircle2, IndianRupee, Tag, 
@@ -776,11 +776,11 @@ export default function AdminCreateBookingPage() {
                         <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
                         <div>
                           <p className="text-[10px] font-bold text-green-700 uppercase">Selected Schedule</p>
-                          <p className="text-xs font-bold">{selectedDate.toLocaleDateString()} at {selectedSlot}</p>
+                          <p className="text-xs font-bold">{formatDateInTimezone(selectedDate, appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)} at {selectedSlot}</p>
                           {selectedEndDateTime && (
                             <p className="text-[10px] text-muted-foreground mt-0.5">
-                              Estimated Completion: {new Date(selectedEndDateTime).toLocaleTimeString('en-IN', { timeZone: appConfig?.timezone, hour: '2-digit', minute: '2-digit', hour12: true })}
-                              {new Date(selectedEndDateTime).toLocaleDateString() !== selectedDate.toLocaleDateString() && ` on ${new Date(selectedEndDateTime).toLocaleDateString()}`}
+                              Estimated Completion: {formatTimeInTimezone(new Date(selectedEndDateTime), appConfig?.timezone || 'Asia/Kolkata')}
+                              {formatDateInTimezone(new Date(selectedEndDateTime), appConfig?.timezone || 'Asia/Kolkata', 'YYYY-MM-DD') !== formatDateInTimezone(selectedDate, appConfig?.timezone || 'Asia/Kolkata', 'YYYY-MM-DD') && ` on ${formatDateInTimezone(new Date(selectedEndDateTime), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)}`}
                             </p>
                           )}
                         </div>
@@ -965,7 +965,7 @@ export default function AdminCreateBookingPage() {
           <div className="bg-muted p-4 rounded-lg space-y-2 mt-4 text-sm">
             <div className="flex justify-between"><span>Customer:</span><span className="font-bold">{customerDetails.name}</span></div>
             <div className="flex justify-between"><span>Service:</span><span className="font-bold truncate max-w-[200px]">{isCustomService ? customServiceName : selectedService?.name}</span></div>
-            <div className="flex justify-between"><span>Date:</span><span className="font-bold">{selectedDate?.toLocaleDateString()}</span></div>
+            <div className="flex justify-between"><span>Date:</span><span className="font-bold">{selectedDate ? formatDateInTimezone(selectedDate, appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat) : 'N/A'}</span></div>
             {summary.discountAmount > 0 && (
               <div className="flex justify-between text-green-600 font-semibold">
                 <span>Discount ({appliedPromo?.code}):</span>

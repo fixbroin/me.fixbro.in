@@ -28,7 +28,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { getTimestampMillis } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import PermissionGuard from '@/components/admin/PermissionGuard';
 
 const WEB_SETTINGS_DOC_ID = "global";
@@ -104,6 +105,7 @@ const pageDisplayNames: Record<string, string> = {
 
 
 export default function WebSettingsPage() {
+  const { config: appConfig } = useApplicationConfig();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -1330,7 +1332,7 @@ export default function WebSettingsPage() {
                                     </FormControl>
                                     <div className="flex justify-between items-center py-1">
                                         <FormDescription className="text-[10px]">
-                                            Last Saved: {contentPages.find(p => p.slug === selectedPageSlug)?.updatedAt ? formatTimestampToReadable(contentPages.find(p => p.slug === selectedPageSlug)?.updatedAt) : 'Never'}
+                                            Last Saved: {contentPages.find(p => p.slug === selectedPageSlug)?.updatedAt ? formatTimestampToReadable(contentPages.find(p => p.slug === selectedPageSlug)?.updatedAt, appConfig) : 'Never'}
                                         </FormDescription>
                                         <Link href={`/${selectedPageSlug}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary underline flex items-center">
                                             <ExternalLink className="h-2.5 w-2.5 mr-1"/>Preview Live Page
@@ -1453,8 +1455,8 @@ export default function WebSettingsPage() {
 }
 
 // Global timestamp helper local to this file for cleaner code
-const formatTimestampToReadable = (timestamp: any): string => {
+const formatTimestampToReadable = (timestamp: any, appConfig?: any): string => {
     const millis = getTimestampMillis(timestamp);
     if (!millis) return "N/A";
-    return new Date(millis).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+    return `${formatDateInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat)} ${formatTimeInTimezone(new Date(millis), appConfig?.timezone || 'Asia/Kolkata')}`;
 };
