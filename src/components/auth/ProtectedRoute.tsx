@@ -1,14 +1,13 @@
-
 "use client";
 
 import type { PropsWithChildren } from 'react';
-import { useEffect, useState } from 'react'; // Added useState
+import { useEffect, useState } from 'react'; 
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase'; // Import db
-import { doc, getDoc } from '@/lib/mysqlDb'; // Import Firestore functions
+import { db } from '@/lib/firebase'; 
+import { doc, getDoc } from '@/lib/mysqlDb'; 
 import { hasPathAccess, getFirstAccessiblePath } from '@/config/rbac';
 
 const PROVIDER_APPLICATION_COLLECTION = "providerApplications";
@@ -18,8 +17,17 @@ const ProtectedRoute: React.FC<PropsWithChildren> = ({ children }) => {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
-  const [isProviderApproved, setIsProviderApproved] = useState<boolean | null>(null); // null initially, true/false after check
+  const [isProviderApproved, setIsProviderApproved] = useState<boolean | null>(null); 
   const [isCheckingProviderStatus, setIsCheckingProviderStatus] = useState(false);
+  const [cachedRole, setCachedRole] = useState<string | null>(null);
+  const [cachedName, setCachedName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setCachedRole(localStorage.getItem('wecanfix_user_role'));
+      setCachedName(localStorage.getItem('wecanfix_user_name'));
+    }
+  }, []);
 
   useEffect(() => {
     if (authIsLoading || isAdminLoading) return;
@@ -44,7 +52,7 @@ const ProtectedRoute: React.FC<PropsWithChildren> = ({ children }) => {
           setIsProviderApproved(true);
         } else {
           setIsProviderApproved(false);
-          if (isProviderRoute && pathname !== '/provider-registration') { // Only toast/redirect if trying to access provider panel
+          if (isProviderRoute && pathname !== '/provider-registration') { 
              toast({ title: "Access Denied", description: "Your provider application is not approved or found.", variant: "destructive" });
              router.push('/');
           }
@@ -61,18 +69,18 @@ const ProtectedRoute: React.FC<PropsWithChildren> = ({ children }) => {
       }
     };
 
-    if (!user) { // User is not logged in
+    if (!user) { 
       if (isAdminRoute && !isAdminLoginPage) {
         triggerAuthRedirect(pathname);
-      } else if (isProviderRoute && pathname !== '/provider-registration') { // Provider registration is a public-ish page (needs login for steps > 0)
-        triggerAuthRedirect(pathname); // Redirect to login, then back to provider page
+      } else if (isProviderRoute && pathname !== '/provider-registration') { 
+        triggerAuthRedirect(pathname); 
       } else if (isExplicitlyProtectedClientRoute) {
         triggerAuthRedirect(pathname);
       }
-    } else { // User is logged in
+    } else { 
       if (isAdminRoute) {
         if (authIsLoading || isAdminLoading) {
-          return; // Wait for admin permissions to finish loading cleanly
+          return; 
         }
         if (!adminPermissions && !isAdminLoginPage) {
           toast({ title: "Access Denied", description: "You are not authorized for the admin panel.", variant: "destructive" });
@@ -83,36 +91,58 @@ const ProtectedRoute: React.FC<PropsWithChildren> = ({ children }) => {
           if (pathname !== safePath) {
              router.push(safePath);
           } else {
-             router.push('/admin/profile'); // Ultimate fallback to prevent infinite loops
+             router.push('/admin/profile'); 
           }
         }
       } else if (isAdminLoginPage && adminPermissions) {
         router.push('/admin');
       } else if (isProviderRoute) {
-        // If it's a provider route, check their application status
-        if (isProviderApproved === null && !isCheckingProviderStatus) { // Check only if not already checked or checking
+        if (isProviderApproved === null && !isCheckingProviderStatus) { 
             checkProviderApproval(user.uid);
         }
       }
     }
   }, [user, adminPermissions, authIsLoading, isAdminLoading, router, pathname, toast, triggerAuthRedirect, isProviderApproved, isCheckingProviderStatus]);
 
-  if (authIsLoading || isAdminLoading || (pathname.startsWith('/provider') && isCheckingProviderStatus && isProviderApproved === null)) {
-    return (
-      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   const isAdminRoute = pathname.startsWith('/admin');
   const isAdminLoginPage = pathname === '/admin/login';
   const isProviderRoute = pathname.startsWith('/provider');
 
-  // IMMEDIATE RENDER-PHASE REDIRECT CHECKS
-  // This prevents the "Flash of Content" before useEffect runs
+  // 1. INITIAL SYSTEM STATE LOADERS (Firebase initialization + Admin permission checks)
+  if (authIsLoading || isAdminLoading || (isProviderRoute && isCheckingProviderStatus && isProviderApproved === null)) {
+    let loadingText = "Loading Wecanfix...";
+    if (isAdminRoute) {
+      loadingText = cachedName ? `Welcome back, ${cachedName}. Loading Admin Panel...` : "Loading Admin Panel...";
+    } else if (isProviderRoute) {
+      loadingText = cachedName ? `Welcome back, ${cachedName}. Loading Provider Panel...` : "Loading Provider Panel...";
+    }
+
+    return (
+      <div className="flex flex-col justify-center items-center min-h-screen bg-background space-y-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-sm font-semibold text-muted-foreground animate-pulse">{loadingText}</p>
+      </div>
+    );
+  }
+
+  // 2. IMMEDIATE REDIRECTS (To prevent flash of content while useEffect prepares route change)
   if (!user) {
-    if (isAdminRoute && !isAdminLoginPage) return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-2">Redirecting to Login...</p></div>;
+    if (isAdminRoute && !isAdminLoginPage) {
+      return (
+        <div className="flex flex-col justify-center items-center min-h-screen bg-background space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-sm font-semibold text-muted-foreground">Redirecting to login...</p>
+        </div>
+      );
+    }
+    if (isProviderRoute && pathname !== '/provider-registration') {
+      return (
+        <div className="flex flex-col justify-center items-center min-h-screen bg-background space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-sm font-semibold text-muted-foreground">Redirecting to login...</p>
+        </div>
+      );
+    }
     
     const protectedClientRoutes = [
       '/profile', '/my-bookings', '/checkout/schedule', '/checkout/address',
@@ -120,41 +150,56 @@ const ProtectedRoute: React.FC<PropsWithChildren> = ({ children }) => {
       '/custom-service'
     ];
     if (protectedClientRoutes.some(route => pathname.startsWith(route))) {
-        return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
+      return (
+        <div className="flex flex-col justify-center items-center min-h-screen bg-background space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-sm font-semibold text-muted-foreground">Redirecting to login...</p>
+        </div>
+      );
     }
   } else {
     if (isAdminRoute && !adminPermissions && !isAdminLoginPage) {
-       return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-2 text-xs font-black uppercase tracking-widest">Verifying Admin Access...</p></div>;
+       return (
+         <div className="flex flex-col justify-center items-center min-h-screen bg-background space-y-4">
+           <Loader2 className="h-12 w-12 animate-spin text-primary" />
+           <p className="text-sm font-semibold text-muted-foreground animate-pulse">Verifying Admin Access...</p>
+         </div>
+       );
     }
     if (isAdminRoute && adminPermissions && !hasPathAccess(adminPermissions, pathname) && !isAdminLoginPage) {
-       return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-destructive" /><p className="ml-2 text-xs font-black uppercase tracking-widest text-destructive">Access Denied.</p></div>;
+       return (
+         <div className="flex flex-col justify-center items-center min-h-screen bg-background space-y-4">
+           <Loader2 className="h-12 w-12 animate-spin text-destructive" />
+           <p className="text-sm font-semibold text-destructive uppercase tracking-wider">Access Denied</p>
+         </div>
+       );
     }
   }
 
-  // Further checks after loading states are resolved
+  // 3. FALLBACK REDIRECTS (After async loads settle and authorization yields negative results)
   if (!user) {
-    const isAuthPage = pathname.startsWith('/auth/');
-    const publicPagesRequiringNoRedirect = [
-      '/', '/about-us', '/contact-us', '/categories', '/faq', 
-      '/privacy-policy', '/terms-and-conditions', '/cancellation-policy', '/service-disclaimer',
-      '/provider-registration' // Allow access to provider registration landing for guests
-    ];
-    const isDynamicPublicContent = pathname.startsWith('/category/') || pathname.startsWith('/service/') || (pathname.startsWith('/[city]') && pathname.split('/').length <= 3);
-
-
-    if (!isAuthPage && !publicPagesRequiringNoRedirect.includes(pathname) && !isDynamicPublicContent && !pathname.startsWith('/admin')) {
-      // This condition is now more specific. If it's a protected client route not handled by above,
-      // it might briefly show children before redirect. The primary redirect logic is in useEffect.
-      // For very sensitive pages, you might return a loader here too if `triggerAuthRedirect` is not instant.
-    }
+    // Guest accessing public pages
   } else if (!adminPermissions && pathname.startsWith('/admin') && pathname !== '/admin/login') {
-      return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-2">Unauthorized. Redirecting...</p></div>;
+      return (
+        <div className="flex flex-col justify-center items-center min-h-screen bg-background space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-sm font-semibold text-muted-foreground">Unauthorized. Redirecting...</p>
+        </div>
+      );
   } else if (adminPermissions && pathname.startsWith('/admin') && !hasPathAccess(adminPermissions, pathname) && pathname !== '/admin/login') {
-      return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-2">Access Denied. Redirecting...</p></div>;
+      return (
+        <div className="flex flex-col justify-center items-center min-h-screen bg-background space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-sm font-semibold text-muted-foreground">Access Denied. Redirecting...</p>
+        </div>
+      );
   } else if (pathname.startsWith('/provider') && pathname !== '/provider-registration' && !isProviderApproved) {
-      // If on a provider route (not registration) and not approved (and done checking)
-      // This also serves as a fallback if the useEffect redirect hasn't completed
-      return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-destructive" /><p className="ml-2">Access Denied to Provider Panel.</p></div>;
+      return (
+        <div className="flex flex-col justify-center items-center min-h-screen bg-background space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-destructive" />
+          <p className="text-sm font-semibold text-destructive">Access Denied to Provider Panel</p>
+        </div>
+      );
   }
 
   return <>{children}</>;

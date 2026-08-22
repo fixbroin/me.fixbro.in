@@ -245,6 +245,31 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
     }
   }, [user]);
 
+  // Sync user role and name to localStorage for immediate hydration/loading state check on direct reload
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (user?.uid) {
+      let role = 'customer';
+      if (adminRole) {
+        role = 'admin';
+      } else if (providerStatus === 'approved') {
+        role = 'provider';
+      }
+      localStorage.setItem('wecanfix_user_role', role);
+
+      const name = firestoreUser?.displayName || user.displayName || '';
+      if (name) {
+        localStorage.setItem('wecanfix_user_name', name);
+      }
+    } else {
+      if (isInitialAuthCheckComplete) {
+        localStorage.removeItem('wecanfix_user_role');
+        localStorage.removeItem('wecanfix_user_name');
+      }
+    }
+  }, [user, adminRole, providerStatus, firestoreUser, isInitialAuthCheckComplete]);
+
   const internalTriggerAuthRedirect = useCallback((intendedPath: string) => {
     setAuthActionRedirectPath(intendedPath);
     if (intendedPath.startsWith('/admin')) {
@@ -781,6 +806,10 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       await signOut(auth);
       setUser(null);
       setAuthActionRedirectPath(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('wecanfix_user_role');
+        localStorage.removeItem('wecanfix_user_name');
+      }
       toast({ title: "Logged Out", description: "You have been logged out." });
       router.push('/auth/login');
     } catch (error) {
