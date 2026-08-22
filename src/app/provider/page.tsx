@@ -19,8 +19,9 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
-import type { FirestoreNotification } from '@/types/firestore';
+import type { FirestoreNotification, UserActivityEventType } from '@/types/firestore';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
+import { logUserActivity } from '@/lib/activityLogger';
 
 const formatDateForDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
@@ -265,6 +266,35 @@ export default function ProviderDashboardPage() {
       }
 
       await updateDoc(bookingDocRef, updateData);
+
+      // Log provider activity
+      if (providerUser) {
+        let eventType: UserActivityEventType = 'providerAcceptJob';
+        if (newStatus === 'ProviderRejected') {
+          eventType = 'providerRejectJob';
+        } else if (newStatus === 'InProgressByProvider') {
+          eventType = 'providerStartWork';
+        } else if (newStatus === 'Completed') {
+          eventType = 'providerCompleteWork';
+        }
+
+        const targetJob = bookings.find(b => b.id === bookingId);
+        const bookingHumanId = targetJob?.bookingId || bookingId;
+
+        logUserActivity(
+          eventType,
+          { 
+            bookingId: bookingHumanId, 
+            bookingDocId: bookingId,
+            status: newStatus,
+            additionalCharges: additionalCharges || [],
+            paymentMethod: finalizedPaymentMethod || targetJob?.paymentMethod || 'N/A'
+          },
+          providerUser.uid,
+          null,
+          providerUser.displayName
+        ).catch(err => console.error("Error logging provider activity:", err));
+      }
       
       // TRIGGER POST-PROCESS (Invoice + Emails)
       fetch('/api/bookings/post-process', {

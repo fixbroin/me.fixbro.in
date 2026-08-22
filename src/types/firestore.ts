@@ -919,7 +919,11 @@ export type UserActivityEventType =
   | 'checkoutStep'
   | 'adminAction'
   | 'search' // Added search event type
-  | 'timeOnPage';
+  | 'timeOnPage'
+  | 'providerAcceptJob'
+  | 'providerRejectJob'
+  | 'providerStartWork'
+  | 'providerCompleteWork';
 
 export interface UserActivityEventData {
   pageUrl?: string;

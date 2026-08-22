@@ -6,7 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { 
   Loader2, Activity, UserCircle, Home, ShoppingCart, FileText, UserPlus, 
   Tag, Zap, CalendarCheck2, LogOut, Trash2 as TrashIcon, AlertTriangle, 
-  Clock, RefreshCcw, ChevronRight, ExternalLink, ShieldCheck, User, Map as MapIcon, PackageSearch
+  Clock, RefreshCcw, ChevronRight, ExternalLink, ShieldCheck, User, Map as MapIcon, PackageSearch,
+  CheckCircle, XCircle, PlayCircle
 } from "lucide-react";
 import type { UserActivity, FirestoreUser } from '@/types/firestore';
 import { db } from '@/lib/firebase';
@@ -57,6 +58,10 @@ const EventBadge = ({ eventType }: { eventType: UserActivity['eventType'] }) => 
     checkoutStep: { icon: Zap, color: 'text-purple-600', bg: 'bg-purple-500/10', label: 'Checkout' },
     adminAction: { icon: CalendarCheck2, color: 'text-slate-600', bg: 'bg-slate-500/10', label: 'Admin' },
     timeOnPage: { icon: Clock, color: 'text-slate-500', bg: 'bg-slate-500/5', label: 'Time Spent' },
+    providerAcceptJob: { icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-500/10', label: 'Provider Accept' },
+    providerRejectJob: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-500/10', label: 'Provider Reject' },
+    providerStartWork: { icon: PlayCircle, color: 'text-amber-600', bg: 'bg-amber-500/10', label: 'Work Started' },
+    providerCompleteWork: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-500/10', label: 'Work Completed' },
   };
 
   const config = configs[eventType] || { icon: Activity, color: 'text-gray-500', bg: 'bg-gray-500/10', label: eventType };
@@ -237,6 +242,25 @@ export default function AdminActivityFeedPage() {
     return result;
   }, [activities, userNames]);
 
+  // Separate activities into Customer and Provider activities
+  const customerActivities = useMemo(() => {
+    return displayActivities.filter(a => {
+      const isProvider = a.eventType.startsWith('provider') || 
+                         a.eventData?.pageUrl?.startsWith('/provider') || 
+                         a.eventData?.pageUrl?.includes('/provider');
+      return !isProvider;
+    });
+  }, [displayActivities]);
+
+  const providerActivities = useMemo(() => {
+    return displayActivities.filter(a => {
+      const isProvider = a.eventType.startsWith('provider') || 
+                         a.eventData?.pageUrl?.startsWith('/provider') || 
+                         a.eventData?.pageUrl?.includes('/provider');
+      return isProvider;
+    });
+  }, [displayActivities]);
+
   const handleClearAllActivities = async () => {
     setIsClearing(true);
     try {
@@ -372,9 +396,133 @@ export default function AdminActivityFeedPage() {
             )}
           </div>
         );
+      case 'providerAcceptJob':
+        return (
+          <span className="text-xs font-medium">
+            Accepted job{' '}
+            <Link href={`/admin/bookings/edit/${data.bookingId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline">
+              {data.bookingId}
+            </Link>
+          </span>
+        );
+      case 'providerRejectJob':
+        return (
+          <span className="text-xs font-medium text-destructive">
+            Rejected job{' '}
+            <Link href={`/admin/bookings/edit/${data.bookingId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline">
+              {data.bookingId}
+            </Link>
+          </span>
+        );
+      case 'providerStartWork':
+        return (
+          <span className="text-xs font-medium text-amber-600">
+            Started work on{' '}
+            <Link href={`/admin/bookings/edit/${data.bookingId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline">
+              {data.bookingId}
+            </Link>
+          </span>
+        );
+      case 'providerCompleteWork':
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-bold text-green-600">
+              Completed work on{' '}
+              <Link href={`/admin/bookings/edit/${data.bookingId || '#'}`} className="text-xs font-bold text-blue-600 hover:underline">
+                {data.bookingId}
+              </Link>
+            </span>
+            {data.paymentMethod && (
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Payment: <strong className="text-foreground">{data.paymentMethod}</strong>
+              </span>
+            )}
+            {data.additionalCharges && data.additionalCharges.length > 0 && (
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Extra: <strong className="text-foreground">+{data.additionalCharges.reduce((sum: number, c: any) => sum + c.amount, 0)}</strong>
+              </span>
+            )}
+          </div>
+        );
       default:
         return <code className="text-[10px] bg-muted/50 p-1 px-2 rounded font-mono text-muted-foreground break-all">{JSON.stringify(data)}</code>;
     }
+  };
+
+  const renderActivityList = (activitiesList: GroupedUserActivity[], typeLabel: string) => {
+    if (isLoading && activities.length === 0) {
+      return (
+        <div className="flex flex-col justify-center items-center h-[400px] space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary/40" />
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest animate-pulse">Syncing Cache...</p>
+        </div>
+      );
+    }
+
+    if (activitiesList.length === 0) {
+      return (
+        <div className="text-center py-32 bg-muted/5">
+          <Activity className="h-16 w-16 mx-auto text-muted-foreground/20 mb-6" />
+          <p className="text-xl font-bold tracking-tight">No {typeLabel} Captured</p>
+          <p className="text-muted-foreground text-sm mt-1">Activities will appear here after the next sync.</p>
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <div className="hidden md:block overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-muted/30">
+              <TableRow className="hover:bg-transparent border-none">
+                <TableHead className="w-[180px] pl-8 py-5 text-[10px] font-black uppercase tracking-widest">Type</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest">Interaction</TableHead>
+                <TableHead className="text-[10px] font-black uppercase tracking-widest">User Identity</TableHead>
+                <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest">Timestamp</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <AnimatePresence initial={false}>
+                {activitiesList.map((activity, idx) => (
+                  <motion.tr
+                    key={activity.id}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.3, delay: idx < 10 ? idx * 0.05 : 0 }}
+                    className="group border-b border-muted/40 transition-all hover:bg-primary/[0.02]"
+                  >
+                    <TableCell className="pl-8 py-4">
+                      <EventBadge eventType={activity.eventType} />
+                    </TableCell>
+                    <TableCell className="font-medium text-slate-700 dark:text-slate-300">
+                      {renderEventData(activity)}
+                    </TableCell>
+                    <TableCell>
+                      {renderUserCell(activity)}
+                    </TableCell>
+                    <TableCell className="text-right pr-8">
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
+                          {formatActivityTimestamp(activity.timestamp)}
+                        </span>
+                      </div>
+                    </TableCell>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Mobile View: Cards */}
+        <div className="md:hidden">
+          <AnimatePresence initial={false}>
+            {activitiesList.map((activity, idx) => renderMobileCard(activity, idx))}
+          </AnimatePresence>
+        </div>
+      </>
+    );
   };
 
   const renderUserCell = (activity: GroupedUserActivity) => {
@@ -501,10 +649,13 @@ export default function AdminActivityFeedPage() {
         </div>
       </header>
 
-      <Tabs defaultValue="live-feed" className="w-full">
+      <Tabs defaultValue="customer-feed" className="w-full">
         <TabsList className="bg-muted p-1 rounded-xl mb-6 flex w-fit gap-1">
-          <TabsTrigger value="live-feed" className="font-bold text-xs uppercase px-5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-            Live Feed
+          <TabsTrigger value="customer-feed" className="font-bold text-xs uppercase px-5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            Customer Feed ({customerActivities.length})
+          </TabsTrigger>
+          <TabsTrigger value="provider-feed" className="font-bold text-xs uppercase px-5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            Provider Feed ({providerActivities.length})
           </TabsTrigger>
           <TabsTrigger value="out-of-coverage" className="font-bold text-xs uppercase px-5 py-2 rounded-lg flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
             <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
@@ -512,74 +663,18 @@ export default function AdminActivityFeedPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="live-feed">
+        <TabsContent value="customer-feed">
           <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
             <CardContent className="p-0">
-              {isLoading && activities.length === 0 ? (
-                <div className="flex flex-col justify-center items-center h-[400px] space-y-4">
-                  <Loader2 className="h-12 w-12 animate-spin text-primary/40" />
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest animate-pulse">Syncing Cache...</p>
-                </div>
-              ) : activities.length === 0 ? (
-                <div className="text-center py-32 bg-muted/5">
-                  <Activity className="h-16 w-16 mx-auto text-muted-foreground/20 mb-6" />
-                  <p className="text-xl font-bold tracking-tight">No Events Detected</p>
-                  <p className="text-muted-foreground text-sm mt-1">Activities will appear here after the next sync.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="hidden md:block overflow-x-auto">
-                    <Table>
-                      <TableHeader className="bg-muted/30">
-                        <TableRow className="hover:bg-transparent border-none">
-                          <TableHead className="w-[180px] pl-8 py-5 text-[10px] font-black uppercase tracking-widest">Type</TableHead>
-                          <TableHead className="text-[10px] font-black uppercase tracking-widest">Interaction</TableHead>
-                          <TableHead className="text-[10px] font-black uppercase tracking-widest">User Identity</TableHead>
-                          <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest">Timestamp</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        <AnimatePresence initial={false}>
-                          {displayActivities.map((activity, idx) => (
-                            <motion.tr
-                              key={activity.id}
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.95 }}
-                              transition={{ duration: 0.3, delay: idx < 10 ? idx * 0.05 : 0 }}
-                              className="group border-b border-muted/40 transition-all hover:bg-primary/[0.02]"
-                            >
-                              <TableCell className="pl-8 py-4">
-                                <EventBadge eventType={activity.eventType} />
-                              </TableCell>
-                              <TableCell className="font-medium text-slate-700 dark:text-slate-300">
-                                {renderEventData(activity)}
-                              </TableCell>
-                              <TableCell>
-                                {renderUserCell(activity)}
-                              </TableCell>
-                              <TableCell className="text-right pr-8">
-                                <div className="flex flex-col items-end gap-0.5">
-                                  <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
-                                    {formatActivityTimestamp(activity.timestamp)}
-                                  </span>
-                                </div>
-                              </TableCell>
-                            </motion.tr>
-                          ))}
-                        </AnimatePresence>
-                      </TableBody>
-                    </Table>
-                  </div>
+              {renderActivityList(customerActivities, 'Customer Events')}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-                  {/* Mobile View: Cards */}
-                  <div className="md:hidden">
-                    <AnimatePresence initial={false}>
-                      {displayActivities.map((activity, idx) => renderMobileCard(activity, idx))}
-                    </AnimatePresence>
-                  </div>
-                </>
-              )}
+        <TabsContent value="provider-feed">
+          <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
+            <CardContent className="p-0">
+              {renderActivityList(providerActivities, 'Provider Events')}
             </CardContent>
           </Card>
         </TabsContent>

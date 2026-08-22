@@ -19,6 +19,8 @@ import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import { getTimestampMillis } from '@/lib/utils';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { logUserActivity } from '@/lib/activityLogger';
+import type { UserActivityEventType } from '@/types/firestore';
 
 const formatTimestampForDisplay = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
@@ -128,6 +130,33 @@ export default function ProviderBookingDetailsPage() {
       }
 
       await updateDoc(bookingDocRef, updateData);
+
+      // Log provider activity
+      if (providerUser) {
+        let eventType: UserActivityEventType = 'providerAcceptJob';
+        if (newStatus === 'ProviderRejected') {
+          eventType = 'providerRejectJob';
+        } else if (newStatus === 'InProgressByProvider') {
+          eventType = 'providerStartWork';
+        } else if (newStatus === 'Completed') {
+          eventType = 'providerCompleteWork';
+        }
+
+        logUserActivity(
+          eventType,
+          { 
+            bookingId: booking.bookingId || bookingId, 
+            bookingDocId: booking.id,
+            status: newStatus,
+            additionalCharges: additionalCharges || [],
+            paymentMethod: finalizedPaymentMethod || booking.paymentMethod || 'N/A'
+          },
+          providerUser.uid,
+          null,
+          providerUser.displayName
+        ).catch(err => console.error("Error logging provider activity:", err));
+      }
+
       toast({ title: "Success", description: `Job status updated to ${newStatus.replace(/([A-Z])/g, ' $1')}.` });
       setIsCompleteDialogOpen(false);
 
