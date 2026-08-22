@@ -353,7 +353,7 @@ export async function POST(request: Request) {
             const originalAmount = booking.totalAmount - extraCharges;
 
             if (isCashPayment(booking.paymentMethod)) {
-                balanceChange = -commission;
+                balanceChange = booking.commissionPaidFromWallet ? 0 : -commission;
                 stats.cashCollected += booking.totalAmount;
                 stats.cashCommission += commission;
             } else {
@@ -718,6 +718,7 @@ export async function POST(request: Request) {
         });
         tasks.push(referralTask);
     }
+
     tasks.push(triggerRefresh('bookings'));
 
     // --- CRITICAL: Wait for all parallel tasks to finish ---

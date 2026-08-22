@@ -17,6 +17,7 @@ import ProviderJobCard from '@/components/provider/ProviderJobCard';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
+import { updateBookingStatusByProviderAction } from '@/app/actions/providerWalletActions';
 
 export default function ProviderMyJobsPage() {
   const { user: providerUser, isLoading: authIsLoading } = useAuth();
@@ -89,7 +90,21 @@ export default function ProviderMyJobsPage() {
         if (finalizedPaymentMethod) updateData.paymentMethod = finalizedPaymentMethod;
       }
 
-      await updateDoc(bookingDocRef, updateData);
+      if (!providerUser?.uid) {
+        throw new Error("No authenticated provider session found.");
+      }
+
+      const result = await updateBookingStatusByProviderAction(
+        bookingId,
+        providerUser.uid,
+        newStatus,
+        additionalCharges,
+        finalizedPaymentMethod
+      );
+
+      if (!result.success) {
+        throw new Error(result.message);
+      }
       
       // TRIGGER POST-PROCESS
       fetch('/api/bookings/post-process', {

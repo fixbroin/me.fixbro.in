@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, ExternalLink, Tag, HandCoins, Plus, UserCheck, Loader2, Phone, UserCircle, Clock, AlertTriangle } from 'lucide-react'; 
+import { MapPin, ExternalLink, Tag, HandCoins, Plus, UserCheck, Loader2, Phone, UserCircle, Clock, AlertTriangle, Wallet } from 'lucide-react'; 
 import AppImage from '@/components/ui/AppImage'; 
 import { getTimestampMillis, formatScheduledDate, formatCurrency, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
@@ -16,6 +16,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc } from '@/lib/mysqlDb';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { openWhatsAppChooser } from '@/lib/whatsappUtils';
+import ProviderWalletAdjustmentModal from '@/components/admin/provider/ProviderWalletAdjustmentModal';
 
 interface BookingDetailsModalContentProps {
   booking: FirestoreBooking;
@@ -43,6 +44,7 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
   const code = appConfig?.currencyCode || 'INR';
   const [provider, setProvider] = useState<ProviderApplication | null>(null);
   const [isLoadingProvider, setIsLoadingProvider] = useState(false);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
 
   useEffect(() => {
     async function fetchProvider() {
@@ -168,9 +170,19 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
               <div className="space-y-1 flex-grow min-w-0">
                 <div className="flex items-center justify-between">
                   <p className="font-bold text-sm">{provider.fullName}</p>
-                  {booking.autoAssigned && (
-                    <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-bold uppercase tracking-tighter">Auto-Assigned</Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {booking.autoAssigned && (
+                      <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-bold uppercase tracking-tighter">Auto-Assigned</Badge>
+                    )}
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-7 text-xs flex items-center gap-1 hover:bg-primary/10 border-primary/20 text-primary"
+                      onClick={() => setIsWalletModalOpen(true)}
+                    >
+                      <Wallet className="h-3 w-3" /> Refund / Adjust Wallet
+                    </Button>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {provider.mobileNumber}</span>
@@ -362,6 +374,16 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{booking.notes}</p>
           </CardContent>
         </Card>
+      )}
+
+      {provider && (
+        <ProviderWalletAdjustmentModal 
+          isOpen={isWalletModalOpen} 
+          onClose={() => setIsWalletModalOpen(false)} 
+          providerId={booking.providerId!} 
+          providerName={provider.fullName || 'Provider'}
+          bookingId={booking.bookingId}
+        />
       )}
     </div>
   );

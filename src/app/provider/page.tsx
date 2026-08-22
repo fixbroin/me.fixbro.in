@@ -22,6 +22,7 @@ import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import type { FirestoreNotification, UserActivityEventType } from '@/types/firestore';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import { logUserActivity } from '@/lib/activityLogger';
+import { updateBookingStatusByProviderAction } from '@/app/actions/providerWalletActions';
 
 const formatDateForDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
@@ -265,7 +266,21 @@ export default function ProviderDashboardPage() {
         if (finalizedPaymentMethod) updateData.paymentMethod = finalizedPaymentMethod;
       }
 
-      await updateDoc(bookingDocRef, updateData);
+      if (!providerUser?.uid) {
+        throw new Error("No authenticated provider session found.");
+      }
+
+      const result = await updateBookingStatusByProviderAction(
+        bookingId,
+        providerUser.uid,
+        newStatus,
+        additionalCharges,
+        finalizedPaymentMethod
+      );
+
+      if (!result.success) {
+        throw new Error(result.message);
+      }
 
       // Log provider activity
       if (providerUser) {

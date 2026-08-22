@@ -12,9 +12,13 @@ import type { WithdrawalRequest, WithdrawalStatus, FirestoreNotification, Firest
 import { useToast } from "@/hooks/use-toast";
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Banknote, RefreshCw } from "lucide-react";
+import { Users, Banknote, RefreshCw, Wallet, History, Settings } from "lucide-react";
 import { cn, formatCurrency } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { getProviderWalletDetailsAction } from '@/app/actions/providerWalletActions';
+import WalletComplaintsTab from '@/components/admin/provider-controls/WalletComplaintsTab';
+import WalletSettingsTab from '@/components/admin/provider-controls/WalletSettingsTab';
+import ProviderWalletAdjustmentModal from '@/components/admin/provider/ProviderWalletAdjustmentModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +49,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Input } from "@/components/ui/input";
 import { Separator } from '@/components/ui/separator';
 import { getTimestampMillis, formatDateInTimezone } from '@/lib/utils';
 
@@ -110,6 +115,19 @@ export default function ProviderWithdrawalsPage() {
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedRequestForDetails, setSelectedRequestForDetails] = useState<WithdrawalRequest | null>(null);
 
+  // Provider Wallet Details Tab States
+  const [providerSearch, setProviderSearch] = useState('');
+  const [selectedProvider, setSelectedProvider] = useState<FirestoreUser | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [walletHistory, setWalletHistory] = useState<any[]>([]);
+  const [isLoadingWallet, setIsLoadingWallet] = useState(false);
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+
+  const filteredProvidersForSelect = providers.filter(p => 
+    (p.displayName || '').toLowerCase().includes(providerSearch.toLowerCase()) || 
+    (p.email || '').toLowerCase().includes(providerSearch.toLowerCase())
+  );
+
   const loadProviders = async () => {
     setIsLoadingProviders(true);
     try {
@@ -154,6 +172,21 @@ export default function ProviderWithdrawalsPage() {
         toast({ title: "Error", description: "Could not load provider balances.", variant: "destructive" });
     } finally {
         setIsLoadingProviders(false);
+    }
+  };
+
+  const fetchSelectedProviderWallet = async (provider: FirestoreUser) => {
+    setSelectedProvider(provider);
+    setIsLoadingWallet(true);
+    try {
+      const details = await getProviderWalletDetailsAction(provider.uid || provider.id!);
+      setWalletBalance(details.balance);
+      setWalletHistory(details.transactions);
+    } catch (error) {
+      console.error("Error loading wallet details:", error);
+      toast({ title: "Error", description: "Failed to load wallet details.", variant: "destructive" });
+    } finally {
+      setIsLoadingWallet(false);
     }
   };
 
@@ -354,18 +387,27 @@ export default function ProviderWithdrawalsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-            <h1 className="text-3xl font-bold tracking-tight">Withdrawal Management</h1>
-            <p className="text-muted-foreground text-sm mt-1">Manage payout requests and track provider earnings.</p>
+            <h1 className="text-3xl font-bold tracking-tight">Wallet Withdrawal Complaint</h1>
+            <p className="text-muted-foreground text-sm mt-1">Manage payouts, provider wallet disputes, and view detailed balance ledgers.</p>
         </div>
       </div>
 
       <Tabs defaultValue="requests" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md mb-6 h-12 p-1 bg-muted/50 rounded-xl">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-5 max-w-4xl mb-6 h-auto p-1 bg-muted/50 rounded-xl gap-1">
           <TabsTrigger value="requests" className="rounded-lg font-bold">
             <Banknote className="mr-2 h-4 w-4"/> Payout Requests
           </TabsTrigger>
           <TabsTrigger value="balances" onClick={loadProviders} className="rounded-lg font-bold">
             <Users className="mr-2 h-4 w-4"/> Provider Balances
+          </TabsTrigger>
+          <TabsTrigger value="wallet_complaints" className="rounded-lg font-bold">
+            <AlertTriangle className="mr-2 h-4 w-4"/> Wallet Complaints
+          </TabsTrigger>
+          <TabsTrigger value="wallet_details" onClick={loadProviders} className="rounded-lg font-bold">
+            <Wallet className="mr-2 h-4 w-4"/> Provider Wallet Details
+          </TabsTrigger>
+          <TabsTrigger value="wallet_settings" className="rounded-lg font-bold">
+            <Settings className="mr-2 h-4 w-4"/> Wallet Settings
           </TabsTrigger>
         </TabsList>
 
@@ -551,6 +593,144 @@ export default function ProviderWithdrawalsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="wallet_complaints">
+          <WalletComplaintsTab />
+        </TabsContent>
+
+        <TabsContent value="wallet_details">
+          <Card>
+            <CardHeader>
+              <CardTitle>Provider Wallet Details & Ledger</CardTitle>
+              <CardDescription>Select a service provider to inspect their prepaid wallet balance and transaction ledger.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2 max-w-md">
+                <Label htmlFor="provider-wallet-search">Search Provider Name or Email</Label>
+                <div className="relative">
+                  <Input 
+                    id="provider-wallet-search"
+                    placeholder="Type name or email..."
+                    value={providerSearch}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProviderSearch(e.target.value)}
+                  />
+                  {providerSearch && (
+                    <div className="absolute z-10 w-full mt-1 bg-popover text-popover-foreground border rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                      {filteredProvidersForSelect.length === 0 ? (
+                        <div className="p-3 text-xs text-muted-foreground text-center">No matching providers found.</div>
+                      ) : (
+                        filteredProvidersForSelect.map(p => (
+                          <div 
+                            key={p.uid}
+                            className="p-3 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors border-b last:border-b-0 text-left"
+                            onClick={() => {
+                              fetchSelectedProviderWallet(p);
+                              setProviderSearch('');
+                            }}
+                          >
+                            <div className="font-bold">{p.displayName}</div>
+                            <div className="text-xs text-muted-foreground font-mono">{p.email}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {selectedProvider ? (
+                <div className="space-y-6 border-t pt-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-muted/30 p-4 rounded-xl border">
+                    <div>
+                      <h3 className="font-bold text-lg text-left">{selectedProvider.displayName}</h3>
+                      <p className="text-sm text-muted-foreground font-mono text-left">{selectedProvider.email}</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider block">Prepaid Balance</span>
+                        <span className="font-mono text-3xl font-extrabold text-primary">{symbol}{walletBalance.toFixed(2)}</span>
+                      </div>
+                      <Button 
+                        onClick={() => setIsWalletModalOpen(true)}
+                        className="h-10 px-4 font-bold flex items-center gap-1.5"
+                      >
+                        <Wallet className="h-4 w-4" /> Adjust Wallet / Refund
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-bold text-base flex items-center gap-1.5 text-left">
+                      <History className="h-4 w-4 text-primary" />
+                      Transaction Ledger History
+                    </h4>
+
+                    {isLoadingWallet ? (
+                      <div className="flex items-center justify-center py-10">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    ) : walletHistory.length === 0 ? (
+                      <div className="text-center py-10 text-xs text-muted-foreground border border-dashed rounded-xl">
+                        No prepaid transactions found for this provider.
+                      </div>
+                    ) : (
+                      <div className="border rounded-xl overflow-hidden">
+                        <Table>
+                          <TableHeader className="bg-muted/40">
+                            <TableRow>
+                              <TableHead className="pl-6">Date</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead>Description</TableHead>
+                              <TableHead className="text-right pr-6">Amount</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {walletHistory.map(tx => {
+                              const isCredit = tx.amount >= 0;
+                              return (
+                                <TableRow key={tx.id}>
+                                  <TableCell className="pl-6 text-xs font-mono whitespace-nowrap text-left">
+                                    {new Date(tx.timestamp).toLocaleString('en-IN')}
+                                  </TableCell>
+                                  <TableCell className="text-left">
+                                    <Badge variant={tx.type === 'deposit' ? 'default' : tx.type === 'commission_deduction' ? 'destructive' : 'outline'} className="capitalize">
+                                      {tx.type.replace('_', ' ')}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-xs font-medium max-w-xs truncate text-left">
+                                    {tx.description}
+                                    {tx.bookingId && <span className="block text-[10px] text-muted-foreground font-mono">Ref: #{tx.bookingId}</span>}
+                                  </TableCell>
+                                  <TableCell className={cn(
+                                    "text-right pr-6 font-bold whitespace-nowrap font-mono",
+                                    isCredit ? "text-emerald-600" : "text-rose-600"
+                                  )}>
+                                    {isCredit ? '+' : ''}{symbol}{tx.amount.toFixed(2)}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-20 text-muted-foreground border border-dashed rounded-xl">
+                  <Wallet className="mx-auto h-12 w-12 text-muted-foreground/30 mb-3" />
+                  <p className="font-bold text-sm">No Provider Selected</p>
+                  <p className="text-xs max-w-xs mx-auto mt-1">Search and select a service provider from the search box above to load their prepaid balance details.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="wallet_settings">
+          <WalletSettingsTab />
+        </TabsContent>
       </Tabs>
       
       <AlertDialog open={showRejectionDialog} onOpenChange={setShowRejectionDialog}>
@@ -631,6 +811,15 @@ export default function ProviderWithdrawalsPage() {
         </DialogContent>
       </Dialog>
 
+      {selectedProvider && (
+        <ProviderWalletAdjustmentModal 
+          isOpen={isWalletModalOpen}
+          onClose={() => setIsWalletModalOpen(false)}
+          providerId={selectedProvider.uid || selectedProvider.id!}
+          providerName={selectedProvider.displayName || 'Provider'}
+          onSuccess={() => fetchSelectedProviderWallet(selectedProvider)}
+        />
+      )}
     </div>
   );
 }

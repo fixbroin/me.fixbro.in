@@ -102,6 +102,38 @@ const DEFAULT_PUSH_TEMPLATES: Record<string, Omit<PushTemplate, 'id'>> = {
     body: "Your friend {friendName} completed their first booking. {currencySymbol}{amount} has been added to your wallet.",
     isEnabled: true,
     placeholders: ["friendName", "amount", "currencySymbol"]
+  },
+  provider_wallet_deposit: {
+    title: "Provider Wallet Top-up",
+    description: "Push notification sent to provider when they successfully top up their prepaid wallet.",
+    subject: "Wallet Deposited!",
+    body: "Successfully added {currencySymbol}{amount} to your prepaid wallet. New balance: {currencySymbol}{balance}.",
+    isEnabled: true,
+    placeholders: ["amount", "balance", "currencySymbol"]
+  },
+  admin_provider_deposit_alert: {
+    title: "Admin: Provider Wallet Deposit Alert",
+    description: "Push notification alert sent to admins when a provider successfully tops up their wallet.",
+    subject: "Provider Wallet Deposit",
+    body: "Provider {providerName} added {currencySymbol}{amount} to their wallet. New balance: {currencySymbol}{balance}.",
+    isEnabled: true,
+    placeholders: ["providerName", "amount", "balance", "currencySymbol"]
+  },
+  provider_wallet_refund: {
+    title: "Provider Wallet Refund/Adjustment",
+    description: "Push notification sent to provider when the admin manually adjusts or refunds their prepaid wallet.",
+    subject: "Wallet Adjusted!",
+    body: "Your prepaid wallet has been adjusted by {currencySymbol}{amount}. Reason: {reason}.",
+    isEnabled: true,
+    placeholders: ["amount", "reason", "currencySymbol"]
+  },
+  admin_wallet_complaint_alert: {
+    title: "Admin: Provider Wallet Dispute Alert",
+    description: "Push notification alert sent to admins when a provider submits a wallet refund/dispute complaint.",
+    subject: "New Wallet Dispute Filed",
+    body: "Provider {providerName} filed a dispute for booking #{bookingHumanId} (Amount: {currencySymbol}{amount}).",
+    isEnabled: true,
+    placeholders: ["providerName", "bookingHumanId", "amount", "currencySymbol"]
   }
 };
 

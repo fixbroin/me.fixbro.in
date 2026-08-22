@@ -408,12 +408,10 @@ export function replacePlaceholders(
       ) {
         const value = extendedData[key];
 
-        result = result.replace(
-          new RegExp(`{{${key}}}`, 'g'),
-          value !== undefined && value !== null
-            ? String(value)
-            : ''
-        );
+        const replaceVal = value !== undefined && value !== null ? String(value) : '';
+        result = result
+          .replace(new RegExp(`{{${key}}}`, 'g'), replaceVal)
+          .replace(new RegExp(`{${key}}`, 'g'), replaceVal);
       }
     }
   } catch (error) {

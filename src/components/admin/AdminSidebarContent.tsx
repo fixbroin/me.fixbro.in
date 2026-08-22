@@ -36,7 +36,7 @@ const navItems = [
   { href: '/admin/custom-service', label: 'Custom Requests', icon: Construction },
   { type: 'separator', label: 'Provider Management' },
   { href: '/admin/provider-applications', label: 'Provider Applications', icon: Users2 },
-  { href: '/admin/provider-withdrawals', label: 'Provider Withdrawals', icon: Banknote },
+  { href: '/admin/provider-withdrawals', label: 'Wallet Withdrawal Complaint', icon: Banknote },
   { href: '/admin/provider-controls', label: 'Provider Controls', icon: Settings },
   { type: 'separator', label: 'Content Management' },
   { href: '/admin/categories', label: 'Categories', icon: List },
