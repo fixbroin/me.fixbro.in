@@ -168,21 +168,21 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
                 </AvatarFallback>
               </Avatar>
               <div className="space-y-1 flex-grow min-w-0">
-                <div className="flex items-center justify-between">
-                  <p className="font-bold text-sm">{provider.fullName}</p>
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-bold text-sm">{provider.fullName}</p>
                     {booking.autoAssigned && (
                       <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-bold uppercase tracking-tighter">Auto-Assigned</Badge>
                     )}
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-7 text-xs flex items-center gap-1 hover:bg-primary/10 border-primary/20 text-primary"
-                      onClick={() => setIsWalletModalOpen(true)}
-                    >
-                      <Wallet className="h-3 w-3" /> Refund / Adjust Wallet
-                    </Button>
                   </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-7 text-xs flex items-center gap-1 hover:bg-primary/10 border-primary/20 text-primary self-start sm:self-auto shrink-0"
+                    onClick={() => setIsWalletModalOpen(true)}
+                  >
+                    <Wallet className="h-3 w-3" /> Refund / Adjust Wallet
+                  </Button>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {provider.mobileNumber}</span>

@@ -340,7 +340,7 @@ export default function ThankYouPage() {
 
       try {
         const newBookingId = generateBookingId();
-        let customerEmail = "customer@example.com", scheduledDateStored = new Date().toLocaleDateString('en-CA'), scheduledTimeSlot = "10:00 AM";
+        let customerEmail = "", scheduledDateStored = new Date().toLocaleDateString('en-CA'), scheduledTimeSlot = "10:00 AM";
         let customerName = "Guest User", customerPhone = "N/A", addressLine1 = "N/A", addressLine2: string | undefined, city = "N/A", state = "N/A", pincode = "N/A";
         let latitude: number | undefined, longitude: number | undefined;
         let bookingDiscountCode: string | undefined, bookingDiscountAmount: number | undefined, appliedPromoCodeId: string | undefined;
@@ -352,7 +352,7 @@ export default function ThankYouPage() {
 
         if (typeof window !== 'undefined') {
           const storedEmail = localStorage.getItem('wecanfixCustomerEmail');
-          customerEmail = (storedEmail && storedEmail.trim()) ? storedEmail : (currentUser?.email || customerEmail);
+          customerEmail = (storedEmail && storedEmail.trim()) ? storedEmail : (currentUser?.email || "");
           currentCategoryId = localStorage.getItem('wecanfixActiveCheckoutCategory');
           scheduledDateStored = localStorage.getItem('wecanfixScheduledDate') || scheduledDateStored; 
           scheduledTimeSlot = localStorage.getItem('wecanfixScheduledTimeSlot') || scheduledTimeSlot;
@@ -368,7 +368,7 @@ export default function ThankYouPage() {
           const platformFeesStr = localStorage.getItem('wecanfixAppliedPlatformFees');
           if (platformFeesStr) { try { storedAppliedPlatformFees = JSON.parse(platformFeesStr); } catch (e) { console.error("Error parsing stored platform fees:", e); } }
           const addressDataString = localStorage.getItem('wecanfixCustomerAddress');
-          if (addressDataString) { const addressData = JSON.parse(addressDataString); customerName = addressData.fullName || customerName; customerPhone = addressData.phone || customerPhone; addressLine1 = addressData.addressLine1 || addressLine1; addressLine2 = addressData.addressLine2 || undefined; city = addressData.city || city; state = addressData.state || state; pincode = addressData.pincode || pincode; latitude = addressData.latitude === null ? undefined : addressData.latitude; longitude = addressData.longitude === null ? undefined : addressData.longitude; }
+          if (addressDataString) { const addressData = JSON.parse(addressDataString); customerName = addressData.fullName || customerName; customerPhone = addressData.phone || customerPhone; customerEmail = addressData.email || customerEmail; addressLine1 = addressData.addressLine1 || addressLine1; addressLine2 = addressData.addressLine2 || undefined; city = addressData.city || city; state = addressData.state || state; pincode = addressData.pincode || pincode; latitude = addressData.latitude === null ? undefined : addressData.latitude; longitude = addressData.longitude === null ? undefined : addressData.longitude; }
         }
 
         let sumOfDisplayedItemPrices = 0;
@@ -812,12 +812,14 @@ export default function ThankYouPage() {
                 <SummaryItem icon={Activity} label="Status" value={bookingDetailsForDisplay.status} />
             </div>
 
-            <div className="mt-8 p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-center gap-3">
-               <Mail className="h-5 w-5 text-primary shrink-0" />
-               <p className="text-sm text-muted-foreground text-center">
-                 Confirmation sent to <span className="font-bold text-foreground">{bookingDetailsForDisplay.customerEmail}</span>
-               </p>
-            </div>
+            {bookingDetailsForDisplay.customerEmail && (
+              <div className="mt-8 p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-center gap-3">
+                 <Mail className="h-5 w-5 text-primary shrink-0" />
+                 <p className="text-sm text-muted-foreground text-center">
+                   Confirmation sent to <span className="font-bold text-foreground">{bookingDetailsForDisplay.customerEmail}</span>
+                 </p>
+              </div>
+            )}
           </div>
         </CardContent>
 
