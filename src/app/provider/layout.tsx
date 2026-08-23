@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
-import { UserCircle, KeyRound, LogOut, Loader2, Bell, ChevronDown } from 'lucide-react';
+import { UserCircle, KeyRound, LogOut, Loader2, Bell, ChevronDown, Wallet } from 'lucide-react';
 import { auth, db } from '@/lib/firebase'; 
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -37,6 +37,7 @@ import { doc, getDoc, collection, query, where, onSnapshot, orderBy, limit, Time
 import type { ProviderApplication, FirestoreNotification } from '@/types/firestore';
 import { useUnreadNotificationsCount } from '@/hooks/useUnreadNotificationsCount'; 
 import { useGlobalSettings } from '@/hooks/useGlobalSettings'; 
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import ProviderBottomNavigationBar from '@/components/provider/ProviderBottomNavigationBar'; 
 import { useIsMobile } from '@/hooks/use-mobile'; 
 import { cn } from '@/lib/utils';
@@ -54,6 +55,9 @@ const PROCESSED_JOB_NOTIFICATIONS_KEY = 'wecanfix_processedJobNotifications';
 
 export default function ProviderLayout({ children }: PropsWithChildren) {
   const { user: providerUser, isLoading: authIsLoading, logOut: handleLogoutAuth } = useAuth();
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
+  const [walletBalance, setWalletBalance] = useState<number>(0);
   const { toast } = useToast();
   const pathname = usePathname();
   const router = useRouter();
@@ -103,6 +107,18 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
     } else {
       setIsProviderApproved(null);
     }
+  }, [providerUser?.uid]);
+
+  useEffect(() => {
+    if (!providerUser?.uid) return;
+    const appDocRef = doc(db, PROVIDER_APPLICATION_COLLECTION, providerUser.uid);
+    const unsubscribe = onSnapshot(appDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setWalletBalance(data?.providerWalletBalance || 0);
+      }
+    });
+    return () => unsubscribe();
   }, [providerUser?.uid]);
 
   useEffect(() => {
@@ -404,20 +420,34 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
                 <ThemeToggle />
                 
                 {providerUser && isProviderApproved && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="relative rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300"
-                    aria-label="Provider Notifications"
-                    onClick={navigateToProviderNotifications}
-                  >
-                    <Bell className="h-5 w-5" />
-                    {!isLoadingProviderNotifications && unreadProviderNotificationsCount > 0 && (
-                      <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white border-2 border-background">
-                        {unreadProviderNotificationsCount > 9 ? '9+' : unreadProviderNotificationsCount}
-                      </span>
-                    )}
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-1.5 h-10 px-3 rounded-full border border-border/40 bg-card hover:bg-muted/50 hover:border-primary/20 transition-all duration-300 shadow-sm"
+                      asChild
+                    >
+                      <Link href="/provider/wallet" className="flex items-center gap-1.5">
+                        <Wallet className="h-4 w-4 text-primary" />
+                        <span className="font-bold font-mono text-xs">{symbol}{walletBalance.toFixed(2)}</span>
+                      </Link>
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="relative rounded-full bg-muted/50 hover:bg-primary hover:text-primary-foreground shadow-none h-10 w-10 transition-all duration-300"
+                      aria-label="Provider Notifications"
+                      onClick={navigateToProviderNotifications}
+                    >
+                      <Bell className="h-5 w-5" />
+                      {!isLoadingProviderNotifications && unreadProviderNotificationsCount > 0 && (
+                        <span className="absolute top-0 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white border-2 border-background">
+                          {unreadProviderNotificationsCount > 9 ? '9+' : unreadProviderNotificationsCount}
+                        </span>
+                      )}
+                    </Button>
+                  </>
                 )}
 
                 {providerUser && (

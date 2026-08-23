@@ -12,6 +12,7 @@ import { getProviderBookingCountsAction } from '@/app/actions/dbActions';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/contexts/LoadingContext';
 import AppImage from '@/components/ui/AppImage';
@@ -45,6 +46,7 @@ const ProviderJobCard: React.FC<{
   minBalanceForJobs: number;
 }> = ({ job, type, onAccept, onReject, onStartWork, onCompleteWork, isProcessingAction, providerWalletBalance, minBalanceForJobs }) => {
   const { showLoading } = useLoading();
+  const router = useRouter();
   const isJobCompleted = job.status === 'Completed';
 
   const { config: appConfig } = useApplicationConfig();
@@ -61,8 +63,15 @@ const ProviderJobCard: React.FC<{
   const requiredCommission = isCash ? getCommission(job.totalAmount || 0, providerFeeType, providerFeeValue) : 0;
   const isLowBalance = type === 'new' && isCash && providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
 
-  const handleViewDetailsClick = () => {
-    showLoading();
+  const handleViewDetailsClick = async (e: React.MouseEvent) => {
+    if (type === 'new' && onAccept) {
+      e.preventDefault();
+      showLoading();
+      await onAccept(job.id!);
+      router.push(`/provider/booking/${job.id}`);
+    } else {
+      showLoading();
+    }
   };
 
   const getStatusVariant = (status: FirestoreBooking['status']) => {
@@ -80,8 +89,12 @@ const ProviderJobCard: React.FC<{
     return '';
   };
 
-  const handleWhatsAppClick = (e: React.MouseEvent, mobileNumber: string) => {
+  const handleWhatsAppClick = async (e: React.MouseEvent, mobileNumber: string) => {
     e.stopPropagation();
+    if (type === 'new' && onAccept) {
+      showLoading();
+      await onAccept(job.id!);
+    }
     const sanitizedPhone = mobileNumber.replace(/\D/g, '');
     const internationalPhone = sanitizedPhone.startsWith('91') ? sanitizedPhone : `91${sanitizedPhone}`;
     const message = encodeURIComponent(`Hi ${job.customerName}, I'm your Wecanfix provider for booking #${job.bookingId}.`);
@@ -190,7 +203,7 @@ const ProviderJobCard: React.FC<{
         
         {type === 'new' && onAccept && onReject && (
           <>
-            <Button size="sm" onClick={() => onReject(job.id!)} variant="destructive" disabled={isProcessingAction || isLowBalance} className="w-full sm:w-auto text-xs">
+            <Button size="sm" onClick={() => onAccept(job.id!)} variant="destructive" disabled={isProcessingAction || isLowBalance} className="w-full sm:w-auto text-xs">
               {isProcessingAction ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/> : <XCircle className="mr-1.5 h-3.5 w-3.5"/>} Reject
             </Button>
             <Button 

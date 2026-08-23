@@ -21,6 +21,7 @@ import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { logUserActivity } from '@/lib/activityLogger';
 import type { UserActivityEventType } from '@/types/firestore';
+import { updateBookingStatusByProviderAction } from '@/app/actions/providerWalletActions';
 
 const formatTimestampForDisplay = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
@@ -129,26 +130,17 @@ export default function ProviderBookingDetailsPage() {
     if (!booking?.id || !providerUser) return;
     setIsProcessingAction(true);
     try {
-      const bookingDocRef = doc(db, "bookings", booking.id);
-      const updateData: any = { status: newStatus, updatedAt: Timestamp.now() };
-      
-      let updatedTotal = booking.totalAmount;
-      if (newStatus === "Completed") {
-        if (booking.status !== "Completed") {
-          updateData.isReviewedByCustomer = false;
-        }
-        if (additionalCharges && additionalCharges.length > 0) {
-          updateData.additionalCharges = additionalCharges;
-          const extraTotal = additionalCharges.reduce((sum, c) => sum + c.amount, 0);
-          updatedTotal = (booking.totalAmount || 0) + extraTotal;
-          updateData.totalAmount = updatedTotal;
-        }
-        if (finalizedPaymentMethod) {
-          updateData.paymentMethod = finalizedPaymentMethod;
-        }
-      }
+      const result = await updateBookingStatusByProviderAction(
+        booking.id,
+        providerUser.uid,
+        newStatus,
+        additionalCharges,
+        finalizedPaymentMethod
+      );
 
-      await updateDoc(bookingDocRef, updateData);
+      if (!result.success) {
+        throw new Error(result.message);
+      }
 
       // Log provider activity
       if (providerUser) {
@@ -423,7 +415,7 @@ export default function ProviderBookingDetailsPage() {
                 <>
                     <Button 
                         variant="destructive" 
-                        onClick={() => updateBookingStatus('ProviderRejected')} 
+                        onClick={() => updateBookingStatus('ProviderAccepted')} 
                         disabled={isProcessingAction || isLowBalance}
                         className="w-full sm:w-auto"
                     >

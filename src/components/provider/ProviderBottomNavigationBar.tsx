@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { LayoutDashboard, Briefcase, UserCog, ReceiptText, Menu } from 'lucide-react';
+import { LayoutDashboard, Briefcase, ReceiptText, Menu, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useLoading } from '@/contexts/LoadingContext';
@@ -29,7 +29,7 @@ const ProviderBottomNavigationBar = () => {
     { href: '/provider', label: 'Dashboard', icon: LayoutDashboard, isProtected: true },
     { href: '/provider/my-jobs', label: 'My Jobs', icon: Briefcase, isProtected: true },
     { href: '/provider/quotation-invoice', label: 'Billing', icon: ReceiptText, isProtected: true },
-    { href: '/provider/profile', label: 'Profile', icon: UserCog, isProtected: true },
+    { href: '/provider/wallet', label: 'Wallet', icon: Wallet, isProtected: true },
     { href: '#', label: 'More', icon: Menu, isProtected: false, isButton: true },
   ];
 

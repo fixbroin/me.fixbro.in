@@ -3,6 +3,8 @@
 import { adminDb } from '@/lib/firebaseAdmin';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import * as admin from 'firebase-admin';
+import { getBaseUrl } from '@/lib/config';
+import { replacePlaceholders } from '@/lib/seoUtils';
 
 export interface PushTemplate {
   id: string;
@@ -432,5 +434,59 @@ export async function sendBulkPushNotificationAction(params: {
   } catch (err: any) {
     console.error("Bulk push failed:", err);
     return { success: false, message: err.message || "Failed to send notifications.", count: 0 };
+  }
+}
+
+export async function sendTestPushAction(id: string, adminUid: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const template = await getPushTemplate(id);
+    
+    const testVariables: any = {
+      bookingId: "FB-TEST12345",
+      customerName: "Test Customer Name",
+      providerName: "Test Provider Name",
+      scheduledDate: "24/08/2026",
+      scheduledTimeSlot: "10:00 AM",
+      totalAmount: "100.00",
+      amount: "100.00",
+      bonusAmount: "10.00",
+      description: "Test wallet topup/bonus",
+      complaintId: "CMP-776655",
+      status: "resolved"
+    };
+    
+    template.placeholders.forEach(p => {
+      if (!testVariables[p]) {
+        testVariables[p] = `[Test ${p}]`;
+      }
+    });
+
+    const finalTitle = replacePlaceholders(template.subject, testVariables);
+    const finalBody = replacePlaceholders(template.body, testVariables);
+
+    const response = await fetch(`${getBaseUrl()}/api/send-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: adminUid,
+        title: finalTitle,
+        body: finalBody,
+        href: '/admin/bookings',
+        customType: id,
+        variables: testVariables
+      }),
+    });
+
+    const result = await response.json();
+    if (result.error) {
+      return { success: false, message: result.error };
+    }
+    
+    return { success: true, message: `Test push sent successfully to admin user ID: ${adminUid}` };
+  } catch (error: any) {
+    console.error("Error sending test push:", error);
+    return { success: false, message: error.message || "Failed to send test push notification." };
   }
 }

@@ -8,9 +8,11 @@ import {
   resetPushTemplateAction,
   getMarketingUsersAction,
   sendBulkPushNotificationAction,
-  MarketingUser
+  MarketingUser,
+  sendTestPushAction
 } from '@/app/actions/pushSettingsActions';
 import { useToast } from '@/hooks/use-toast';
+import { auth } from '@/lib/firebase';
 import { 
   Card, 
   CardContent, 
@@ -49,6 +51,42 @@ export default function PushSettingsClient({ initialTemplates }: PushSettingsCli
   const [activeTab, setActiveTab] = useState('settings');
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  const [testingTemplateId, setTestingTemplateId] = useState<string | null>(null);
+
+  const handleTestPush = async (templateId: string) => {
+    let adminUid = auth.currentUser?.uid;
+    if (!adminUid) {
+      adminUid = prompt("Could not detect current user session. Enter target User ID manually:") || "";
+    }
+    if (!adminUid || !adminUid.trim()) return;
+
+    setTestingTemplateId(templateId);
+    try {
+      const result = await sendTestPushAction(templateId, adminUid.trim());
+      if (result.success) {
+        toast({
+          title: "Test Push Sent",
+          description: result.message,
+          className: "bg-green-100 border-green-300 text-green-700 font-medium"
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Test Push Failed",
+          description: result.message
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        variant: "destructive",
+        title: "Test Push Failed",
+        description: err.message || "An unexpected error occurred."
+      });
+    } finally {
+      setTestingTemplateId(null);
+    }
+  };
 
   // Template Editing State
   const [editingTemplate, setEditingTemplate] = useState<PushTemplate | null>(null);
@@ -292,6 +330,15 @@ export default function PushSettingsClient({ initialTemplates }: PushSettingsCli
                     </Label>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTestPush(template.id)}
+                      disabled={isPending || testingTemplateId === template.id}
+                      className="h-8 text-xs sm:text-sm border-primary/30 text-primary hover:bg-primary/5"
+                    >
+                      {testingTemplateId === template.id ? 'Sending...' : 'Test Push'}
+                    </Button>
                     <Button 
                       variant="outline" 
                       size="sm" 

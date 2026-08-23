@@ -453,15 +453,27 @@ export default function ProviderWalletPage() {
                               </TableCell>
                               <TableCell className="text-right pr-6">
                                 {!isCredit && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 text-[10px] text-amber-600 hover:text-amber-700 hover:bg-amber-50 font-bold border border-amber-200/50 rounded-lg px-2"
-                                    onClick={() => { setSelectedTxForComplaint(tx); setComplaintMessage(''); }}
-                                  >
-                                    Raise Complaint
-                                  </Button>
+                                  complaints.some(c => c.transactionId === tx.id) ? (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled
+                                      className="h-7 text-[10px] text-muted-foreground bg-slate-100 dark:bg-slate-800 font-bold border border-slate-200/50 rounded-lg px-2 cursor-not-allowed"
+                                    >
+                                      Dispute Filed
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 text-[10px] text-amber-600 hover:text-amber-700 hover:bg-amber-50 font-bold border border-amber-200/50 rounded-lg px-2"
+                                      onClick={() => { setSelectedTxForComplaint(tx); setComplaintMessage(''); }}
+                                    >
+                                      Raise Complaint
+                                    </Button>
+                                  )
                                 )}
                               </TableCell>
                             </TableRow>
@@ -506,15 +518,27 @@ export default function ProviderWalletPage() {
                             </span>
 
                             {!isCredit && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-[10px] text-amber-600 hover:text-amber-700 hover:bg-amber-50 font-bold border border-amber-200/50 rounded-lg px-2"
-                                onClick={() => { setSelectedTxForComplaint(tx); setComplaintMessage(''); }}
-                              >
-                                Raise Complaint
-                              </Button>
+                              complaints.some(c => c.transactionId === tx.id) ? (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled
+                                  className="h-7 text-[10px] text-muted-foreground bg-slate-100 dark:bg-slate-800 font-bold border border-slate-200/50 rounded-lg px-2 cursor-not-allowed"
+                                >
+                                  Dispute Filed
+                                </Button>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-[10px] text-amber-600 hover:text-amber-700 hover:bg-amber-50 font-bold border border-amber-200/50 rounded-lg px-2"
+                                  onClick={() => { setSelectedTxForComplaint(tx); setComplaintMessage(''); }}
+                                >
+                                  Raise Complaint
+                                </Button>
+                              )
                             )}
                           </div>
                         </Card>

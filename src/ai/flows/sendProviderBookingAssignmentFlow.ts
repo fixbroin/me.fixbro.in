@@ -25,6 +25,7 @@ const ProviderBookingAssignmentEmailInputSchema = z.object({
   scheduledTimeSlot: z.string().describe("The scheduled time slot of the booking."),
   customerName: z.string().describe("The name of the customer."),
   customerAddress: z.string().describe("The formatted address of the customer for the service."),
+  customerPhone: z.string().optional().describe("The phone number of the customer."),
   // SMTP Settings
   smtpHost: z.string().optional().describe("SMTP host for sending emails."),
   smtpPort: z.string().optional().describe("SMTP port (e.g., '587', '465')."),
@@ -122,7 +123,7 @@ const providerBookingAssignmentEmailFlow = ai.defineFlow(
       const {
         smtpHost, smtpPort, smtpUser, smtpPass, senderEmail,
         providerName, providerEmail, bookingId, bookingDocId, serviceName,
-        scheduledDate, scheduledTimeSlot, customerName, customerAddress,
+        scheduledDate, scheduledTimeSlot, customerName, customerAddress, customerPhone,
         siteName = "Wecanfix", logoUrl,
       } = details;
 
@@ -143,6 +144,7 @@ const providerBookingAssignmentEmailFlow = ai.defineFlow(
         scheduledTimeSlot,
         customerName,
         customerAddress,
+        customerPhone: customerPhone || "N/A",
         serviceName,
         providerDashboardUrl: jobDetailsUrl
       };

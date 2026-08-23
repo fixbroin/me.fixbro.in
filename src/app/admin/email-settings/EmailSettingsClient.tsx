@@ -4,7 +4,8 @@ import React, { useState, useTransition } from 'react';
 import { 
   EmailTemplate, 
   updateEmailTemplateAction, 
-  resetEmailTemplateAction 
+  resetEmailTemplateAction,
+  sendTestEmailAction
 } from '@/app/actions/emailSettingsActions';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -49,6 +50,39 @@ export default function EmailSettingsClient({ initialTemplates }: EmailSettingsC
   const [subjectInput, setSubjectInput] = useState('');
   const [bodyInput, setBodyInput] = useState('');
   const [isPending, startTransition] = useTransition();
+  const [testingTemplateId, setTestingTemplateId] = useState<string | null>(null);
+
+  const handleTestEmail = async (templateId: string) => {
+    const adminEmail = prompt("Enter email address to send test email to:", "admin@wecanfix.in");
+    if (!adminEmail || !adminEmail.trim()) return;
+    
+    setTestingTemplateId(templateId);
+    try {
+      const result = await sendTestEmailAction(templateId, adminEmail.trim());
+      if (result.success) {
+        toast({
+          title: "Test Email Sent",
+          description: result.message,
+          className: "bg-green-100 border-green-300 text-green-700 font-medium"
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Test Email Failed",
+          description: result.message
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        variant: "destructive",
+        title: "Test Email Failed",
+        description: err.message || "An unexpected error occurred."
+      });
+    } finally {
+      setTestingTemplateId(null);
+    }
+  };
 
   const handleToggle = async (template: EmailTemplate, checked: boolean) => {
     // Update local state first for instant response
@@ -174,6 +208,15 @@ export default function EmailSettingsClient({ initialTemplates }: EmailSettingsC
                   </Label>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleTestEmail(template.id)}
+                    disabled={isPending || testingTemplateId === template.id}
+                    className="h-8 text-xs sm:text-sm border-primary/30 text-primary hover:bg-primary/5"
+                  >
+                    {testingTemplateId === template.id ? 'Sending...' : 'Test Email'}
+                  </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 

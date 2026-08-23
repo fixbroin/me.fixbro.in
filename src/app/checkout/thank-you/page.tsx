@@ -351,7 +351,8 @@ export default function ThankYouPage() {
         let storedDailyTimeline: any[] = [];
 
         if (typeof window !== 'undefined') {
-          customerEmail = localStorage.getItem('wecanfixCustomerEmail') || customerEmail;
+          const storedEmail = localStorage.getItem('wecanfixCustomerEmail');
+          customerEmail = (storedEmail && storedEmail.trim()) ? storedEmail : (currentUser?.email || customerEmail);
           currentCategoryId = localStorage.getItem('wecanfixActiveCheckoutCategory');
           scheduledDateStored = localStorage.getItem('wecanfixScheduledDate') || scheduledDateStored; 
           scheduledTimeSlot = localStorage.getItem('wecanfixScheduledTimeSlot') || scheduledTimeSlot;

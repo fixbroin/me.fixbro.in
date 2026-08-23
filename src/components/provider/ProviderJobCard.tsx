@@ -2,6 +2,7 @@
 "use client";
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Loader2, CheckCircle, XCircle, PlayCircle, ExternalLink, Tag, Clock } from "lucide-react";
@@ -83,6 +84,7 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
   minBalanceForJobs = 50
 }) => {
   const { showLoading } = useLoading();
+  const router = useRouter();
   const isJobCompleted = job.status === 'Completed';
 
   const { config: appConfig } = useApplicationConfig();
@@ -101,12 +103,23 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
   const requiredCommission = isCash ? getCommission(job.totalAmount || 0, providerFeeType, providerFeeValue) : 0;
   const isLowBalance = type === 'new' && isCash && providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
 
-  const handleViewDetailsClick = () => {
-    showLoading();
+  const handleViewDetailsClick = async (e: React.MouseEvent) => {
+    if (type === 'new' && onAccept) {
+      e.preventDefault();
+      showLoading();
+      await onAccept(job.id!);
+      router.push(`/provider/booking/${job.id}`);
+    } else {
+      showLoading();
+    }
   };
   
-  const handleWhatsAppClick = (e: React.MouseEvent, mobileNumber: string) => {
+  const handleWhatsAppClick = async (e: React.MouseEvent, mobileNumber: string) => {
     e.stopPropagation();
+    if (type === 'new' && onAccept) {
+      showLoading();
+      await onAccept(job.id!);
+    }
     const sanitizedPhone = mobileNumber.replace(/\D/g, '');
     const internationalPhone = sanitizedPhone.startsWith('91') ? sanitizedPhone : `91${sanitizedPhone}`;
     const message = encodeURIComponent(`Hi ${job.customerName}, I'm your Wecanfix provider for booking #${job.bookingId}.`);
@@ -185,7 +198,7 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
         )}
         {type === 'new' && onAccept && onReject && (
           <>
-            <Button size="sm" onClick={() => onReject(job.id!)} variant="destructive" disabled={isProcessingAction || isLowBalance} className="w-full sm:w-auto text-xs">
+            <Button size="sm" onClick={() => onAccept(job.id!)} variant="destructive" disabled={isProcessingAction || isLowBalance} className="w-full sm:w-auto text-xs">
               {isProcessingAction && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin"/>} <XCircle className="mr-1 h-3.5 w-3.5"/> Reject
             </Button>
             <Button 

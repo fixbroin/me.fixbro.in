@@ -89,8 +89,8 @@ export default function ProviderProfileDetails({
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <h3 className="text-lg font-semibold flex items-center"><User className="mr-2 h-5 w-5 text-primary" /> Full Name</h3>
-              <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-md">
-                <p className="text-muted-foreground">{displayName || "Not set"}</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-secondary/30 rounded-md gap-2">
+                <p className="text-muted-foreground break-words">{displayName || "Not set"}</p>
                 {onEditName ? (
                     <Button variant="ghost" size="sm" onClick={onEditName}><Edit3 className="mr-1 h-4 w-4" /> Edit</Button>
                 ) : (
@@ -103,14 +103,14 @@ export default function ProviderProfileDetails({
 
             <div className="space-y-2">
               <h3 className="text-lg font-semibold flex items-center"><Mail className="mr-2 h-5 w-5 text-primary" /> Email Address</h3>
-              <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-md">
-                <p className="text-muted-foreground">{displayEmail || "Not set"}</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-secondary/30 rounded-md gap-2">
+                <p className="text-muted-foreground break-all">{displayEmail || "Not set"}</p>
                 {isEmailVerified ? (
                   <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
                     <ShieldCheck className="h-4 w-4" /> Verified
                   </div>
                 ) : displayEmail ? (
-                  <Button variant="outline" size="sm" onClick={handleSendVerificationEmail} disabled={isSendingVerification}>
+                  <Button variant="outline" size="sm" onClick={handleSendVerificationEmail} disabled={isSendingVerification} className="w-full sm:w-auto">
                     {isSendingVerification ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ShieldAlert className="mr-2 h-4 w-4" />}
                     Verify Email
                   </Button>
@@ -122,14 +122,14 @@ export default function ProviderProfileDetails({
 
             <div className="space-y-2">
               <h3 className="text-lg font-semibold flex items-center"><Phone className="mr-2 h-5 w-5 text-primary" /> Mobile Number</h3>
-              <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-md">
-                <p className="text-muted-foreground">{firestoreUser?.mobileNumber || user.phoneNumber || "Not set"}</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-secondary/30 rounded-md gap-2">
+                <p className="text-muted-foreground break-all">{firestoreUser?.mobileNumber || user.phoneNumber || "Not set"}</p>
                 {isPhoneVerified ? (
                     <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
                         <ShieldCheck className="h-4 w-4" /> Verified
                     </div>
                  ) : (firestoreUser?.mobileNumber || user.phoneNumber) ? (
-                    <Button variant="ghost" size="sm" onClick={onSendVerificationOtp} disabled={isSendingOtp}>
+                    <Button variant="ghost" size="sm" onClick={onSendVerificationOtp} disabled={isSendingOtp} className="w-full sm:w-auto">
                       {isSendingOtp && <Loader2 className="mr-1 h-3 w-3 animate-spin"/>} Verify
                     </Button>
                  ) : (

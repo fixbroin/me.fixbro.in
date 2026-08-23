@@ -40,9 +40,9 @@ export default function WalletComplaintsTab() {
   const [notes, setNotes] = useState('');
   const [isResolving, setIsResolving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [complaintToDelete, setComplaintToDelete] = useState<string | null>(null);
 
   const handleDeleteComplaint = async (complaintId: string) => {
-    if (!window.confirm("Are you sure you want to delete this complaint record? This action cannot be undone.")) return;
     setIsDeleting(complaintId);
     try {
       const result = await deleteWalletComplaintAction(complaintId);
@@ -240,7 +240,7 @@ export default function WalletComplaintsTab() {
                               size="icon" 
                               variant="ghost" 
                               className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50"
-                              onClick={() => handleDeleteComplaint(comp.id)}
+                              onClick={() => setComplaintToDelete(comp.id)}
                               disabled={isDeleting === comp.id}
                               title="Delete Dispute Record"
                             >
@@ -257,7 +257,7 @@ export default function WalletComplaintsTab() {
                               size="icon" 
                               variant="ghost" 
                               className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50 shrink-0"
-                              onClick={() => handleDeleteComplaint(comp.id)}
+                              onClick={() => setComplaintToDelete(comp.id)}
                               disabled={isDeleting === comp.id}
                               title="Delete Dispute Record"
                             >
@@ -341,6 +341,41 @@ export default function WalletComplaintsTab() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Custom Delete Confirmation Dialog */}
+      {complaintToDelete && (
+        <Dialog open={!!complaintToDelete} onOpenChange={(open) => !open && setComplaintToDelete(null)}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-rose-600">
+                <ShieldAlert className="h-5 w-5 text-rose-600 animate-pulse" />
+                Confirm Deletion
+              </DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this complaint record? This action cannot be undone and will permanently remove it from the database.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0 pt-2">
+              <Button type="button" variant="outline" onClick={() => setComplaintToDelete(null)} disabled={isDeleting !== null}>
+                Cancel
+              </Button>
+              <Button 
+                type="button" 
+                variant="destructive" 
+                onClick={async () => {
+                  const id = complaintToDelete;
+                  setComplaintToDelete(null);
+                  await handleDeleteComplaint(id);
+                }} 
+                disabled={isDeleting !== null}
+              >
+                {isDeleting !== null && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Delete Record
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}

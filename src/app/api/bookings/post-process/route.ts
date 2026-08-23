@@ -250,7 +250,10 @@ export async function POST(request: Request) {
                             userId: booking.providerId, 
                             title: "New Job Assigned!", 
                             body: `Booking ${booking.bookingId} is assigned to you. Check details now.`, 
-                            href: `/provider/booking/${bookingDocId}` 
+                            href: `/provider/booking/${bookingDocId}`,
+                            variables: {
+                                bookingId: booking.bookingId || ""
+                            }
                         }),
                     });
                 } catch (pushErr) {
@@ -270,6 +273,7 @@ export async function POST(request: Request) {
                         scheduledTimeSlot: booking.scheduledTimeSlot,
                         customerName: booking.customerName,
                         customerAddress: `${booking.addressLine1}, ${booking.addressLine2 ? booking.addressLine2 + ', ' : ''}${booking.city}`,
+                        customerPhone: booking.customerPhone || "N/A",
                         smtpHost: appConfig.smtpHost,
                         smtpPort: appConfig.smtpPort,
                         smtpUser: appConfig.smtpUser,
@@ -401,7 +405,20 @@ export async function POST(request: Request) {
             await fetch(`${getBaseUrl()}/api/send-push`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: pUserId, title: pTitle, body: pBody, href: pHref }),
+                body: JSON.stringify({ 
+                    userId: pUserId, 
+                    title: pTitle, 
+                    body: pBody, 
+                    href: pHref,
+                    variables: {
+                        bookingId: booking.bookingId || "",
+                        customerName: booking.customerName || "Customer",
+                        providerName: providerName || "Provider",
+                        scheduledDate: booking.scheduledDate ? formatScheduledDate(booking.scheduledDate) : "",
+                        scheduledTimeSlot: booking.scheduledTimeSlot || "",
+                        totalAmount: String(booking.totalAmount || 0)
+                    }
+                }),
             });
         } catch (e) {
             console.error(`Error triggering push for ${pUserId}:`, e);

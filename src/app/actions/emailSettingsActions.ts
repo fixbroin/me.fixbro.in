@@ -3,6 +3,9 @@
 import { adminDb } from '@/lib/firebaseAdmin';
 import { getGlobalAppSettings } from '@/lib/webServerUtils';
 import { triggerRefresh } from '@/lib/revalidateUtils';
+import nodemailer from 'nodemailer';
+import { replacePlaceholders } from '@/lib/seoUtils';
+import { getBaseUrl } from '@/lib/config';
 
 export interface EmailTemplate {
   id: string;
@@ -427,4 +430,93 @@ export async function getEmailTemplate(id: string): Promise<EmailTemplate> {
     id,
     ...def
   };
+}
+
+export async function sendTestEmailAction(id: string, adminEmail: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const template = await getEmailTemplate(id);
+    const configSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
+    const appConfig = configSnap.exists ? configSnap.data() as any : {};
+    
+    const smtpHost = appConfig.smtpHost;
+    const smtpPort = appConfig.smtpPort;
+    const smtpUser = appConfig.smtpUser;
+    const smtpPass = appConfig.smtpPass;
+    const senderEmail = appConfig.senderEmail;
+    
+    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !senderEmail) {
+      return { success: false, message: "SMTP configuration is incomplete in Web Settings." };
+    }
+    
+    const portNumber = parseInt(smtpPort, 10);
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: portNumber,
+      secure: portNumber === 465,
+      auth: { user: smtpUser, pass: smtpPass }
+    });
+    
+    // Create dummy/test values for placeholders
+    const testVariables: any = {
+      providerName: "Test Provider Name",
+      siteName: appConfig.siteName || "Wecanfix",
+      bookingId: "FB-TEST12345",
+      scheduledDate: "24/08/2026",
+      scheduledTimeSlot: "10:00 AM",
+      customerName: "Test Customer Name",
+      customerAddress: "123 Test Street, Area Name, City Name",
+      customerPhone: "+919876543210",
+      serviceName: "Test Cleaning & Service (x1)",
+      providerDashboardUrl: `${getBaseUrl()}/provider/booking/test-id`,
+      userName: "Test User",
+      categoriesUrl: `${getBaseUrl()}/categories`,
+      supportTicketId: "SUP-998877",
+      supportSubject: "Test Support Ticket Subject",
+      supportMessage: "This is a test message to support.",
+      replyContent: "This is a test reply from operations.",
+      amount: "100.00",
+      adminFee: "20.00"
+    };
+    
+    // Replaces other potential placeholders in other email templates
+    template.placeholders.forEach(p => {
+      if (!testVariables[p]) {
+        testVariables[p] = `[Test ${p}]`;
+      }
+    });
+
+    const emailSubject = "[TEST EMAIL] " + replacePlaceholders(template.subject, testVariables);
+    const emailBodyContent = replacePlaceholders(template.body, testVariables);
+    
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { margin: 0; padding: 20px; background-color: #F8F9FA; font-family: Arial, sans-serif; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 25px; border-radius: 10px; border: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>${emailSubject}</h2>
+        ${emailBodyContent}
+    </div>
+</body>
+</html>
+    `;
+    
+    await transporter.sendMail({
+      from: `${appConfig.siteName || "Wecanfix"} Operations <${senderEmail}>`,
+      to: adminEmail,
+      subject: emailSubject,
+      html: htmlBody
+    });
+    
+    return { success: true, message: `Test email sent successfully to ${adminEmail}` };
+  } catch (error: any) {
+    console.error("Error sending test email:", error);
+    return { success: false, message: error.message || "Failed to send test email." };
+  }
 }
