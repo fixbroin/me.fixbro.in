@@ -103,6 +103,7 @@ function WithdrawalPageContent() {
   const { config: appConfig, isLoading: isLoadingAppConfig } = useApplicationConfig();
   const symbol = appConfig?.currencySymbol || "₹";
   const { toast } = useToast();
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [withdrawalHistory, setWithdrawalHistory] = useState<WithdrawalRequest[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
@@ -226,7 +227,7 @@ function WithdrawalPageContent() {
     
     const effectiveBalance = editingRequest ? withdrawableBalance + editingRequest.amount : withdrawableBalance;
     if (data.amount > effectiveBalance) {
-      form.setError("amount", { message: `Amount exceeds your balance of ${symbol}${effectiveBalance.toFixed(2)}` });
+      form.setError("amount", { message: `Amount exceeds your balance of ${symbol}${effectiveBalance.toFixed(decimals)}` });
       setIsSubmitting(false); return;
     }
 
@@ -313,7 +314,7 @@ function WithdrawalPageContent() {
             const adminNotification: FirestoreNotification = {
                 userId: adminUid,
                 title: editingRequest ? "Withdrawal Request Re-submitted" : "New Withdrawal Request",
-                message: `${firestoreUser.displayName || 'A provider'} requested ${symbol}${data.amount.toFixed(2)}.`,
+                message: `${firestoreUser.displayName || 'A provider'} requested ${symbol}${data.amount.toFixed(decimals)}.`,
                 type: 'admin_alert', href: `/admin/provider-withdrawals`, read: false, createdAt: Timestamp.now(),
             };
             await addDoc(collection(db, "userNotifications"), adminNotification);
@@ -396,7 +397,7 @@ function WithdrawalPageContent() {
         <CardContent>
             <div className="p-4 bg-green-500/10 border-green-500/30 border rounded-lg text-center">
                 <p className="text-sm text-green-700 font-medium">Available to Withdraw</p>
-                <p className="text-3xl font-bold text-green-600">{symbol}{withdrawableBalance.toFixed(2)}</p>
+                <p className="text-3xl font-bold text-green-600">{symbol}{withdrawableBalance.toFixed(decimals)}</p>
             </div>
         </CardContent>
         {withdrawalSettings?.isWithdrawalEnabled ? (
@@ -404,7 +405,7 @@ function WithdrawalPageContent() {
                 <form onSubmit={form.handleSubmit(onSubmit)}>
                 <CardContent className="space-y-4">
                     {!editingRequest && firestoreUser?.withdrawalPending && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Request Already Pending</AlertTitle><AlertDescription>You have a withdrawal request being processed.</AlertDescription></Alert>}
-                    <FormField control={form.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount to Withdraw ({symbol})</FormLabel><FormControl><Input type="number" placeholder={`Available: ${symbol}${withdrawableBalance.toFixed(2)}`} {...field} value={field.value ?? ""} disabled={isSubmitting || (firestoreUser?.withdrawalPending && !editingRequest)} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount to Withdraw ({symbol})</FormLabel><FormControl><Input type="number" placeholder={`Available: ${symbol}${withdrawableBalance.toFixed(decimals)}`} {...field} value={field.value ?? ""} disabled={isSubmitting || (firestoreUser?.withdrawalPending && !editingRequest)} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name="method" render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel className="mb-2">Withdrawal Method</FormLabel>
@@ -524,7 +525,7 @@ function WithdrawalPageContent() {
       <Card>
           <CardHeader><CardTitle className="flex items-center"><History className="mr-2 h-5 w-5"/>Withdrawal History</CardTitle></CardHeader>
           <CardContent>{isLoadingHistory ? <div className="text-center py-4"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div> : withdrawalHistory.length === 0 ? <div className="text-center py-10"><PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" /><p className="text-muted-foreground">No withdrawal requests made yet.</p></div> : <Table><TableHeader><TableRow><TableHead>Amount</TableHead><TableHead>Method</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader><TableBody>{withdrawalHistory.map(req => (<TableRow key={req.id}>
-            <TableCell className="font-semibold">{symbol}{req.amount.toFixed(2)}</TableCell>
+            <TableCell className="font-semibold">{symbol}{req.amount.toFixed(decimals)}</TableCell>
             <TableCell className="capitalize">{req.method.replace('_', ' ')}</TableCell>
             <TableCell className="text-xs">{formatDate(req.requestedAt)}</TableCell>
             <TableCell>

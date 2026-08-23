@@ -54,6 +54,7 @@ export default function ProviderDashboardPage() {
   const { user: providerUser, isLoading: authIsLoading } = useAuth();
   const { config: appConfig } = useApplicationConfig();
   const { toast } = useToast();
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
   const [bookings, setBookings] = useState<FirestoreBooking[]>([]);
   const [isLoadingBookings, setIsLoadingBookings] = useState(true);
   const [processingBookingAction, setProcessingBookingAction] = useState<string | null>(null);
@@ -245,7 +246,7 @@ export default function ProviderDashboardPage() {
             <span className="p-2 rounded-xl bg-destructive/10 text-destructive">⚠️</span>
             <div>
               <p className="font-extrabold text-base">You don't have enough balance to accept jobs!</p>
-              <p className="text-xs font-semibold opacity-90 mt-0.5">Please add money to your wallet to unlock assigned bookings. Minimum required: {appConfig?.currencySymbol || "₹"}{minBalanceForJobs.toFixed(2)}</p>
+              <p className="text-xs font-semibold opacity-90 mt-0.5">Please add money to your wallet to unlock assigned bookings. Minimum required: {appConfig?.currencySymbol || "₹"}{minBalanceForJobs.toFixed(decimals)}</p>
             </div>
           </div>
           <Button size="sm" variant="destructive" className="font-bold shrink-0 w-full sm:w-auto" asChild>

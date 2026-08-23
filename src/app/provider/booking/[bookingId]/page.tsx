@@ -389,7 +389,7 @@ export default function ProviderBookingDetailsPage() {
             <h3 className="text-lg font-semibold mb-2 flex items-center"><ListOrdered className="mr-2 text-primary"/>Services Booked</h3>
             <ul className="space-y-1 text-sm list-disc list-inside">
               {booking.services.map(service => (
-                <li key={service.serviceId}>{service.name} (Qty: {service.quantity}) - {symbol}{service.pricePerUnit.toFixed(2)} each</li>
+                <li key={service.serviceId}>{service.name} (Qty: {service.quantity}) - {symbol}{service.pricePerUnit.toFixed(decimals)} each</li>
               ))}
             </ul>
           </section>
