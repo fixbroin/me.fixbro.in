@@ -17,7 +17,8 @@ import ProviderJobCard from '@/components/provider/ProviderJobCard';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
-import { updateBookingStatusByProviderAction } from '@/app/actions/providerWalletActions';
+import { updateBookingStatusByProviderAction, getProviderWalletSettingsAction } from '@/app/actions/providerWalletActions';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 export default function ProviderMyJobsPage() {
   const { user: providerUser, isLoading: authIsLoading } = useAuth();
@@ -46,10 +47,8 @@ export default function ProviderMyJobsPage() {
     }).catch(err => console.error("Error loading wallet balance:", err));
 
     // Fetch minimum balance setting
-    getDoc(doc(db, 'webSettings', 'walletSettings')).then(snap => {
-      if (snap.exists()) {
-        setMinBalanceForJobs(snap.data()?.minBalanceForJobs ?? 50);
-      }
+    getProviderWalletSettingsAction().then(settings => {
+      setMinBalanceForJobs(settings.minBalanceForJobs);
     }).catch(err => console.error("Error loading wallet settings:", err));
   }, [providerUser, authIsLoading]);
 

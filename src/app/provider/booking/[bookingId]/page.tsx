@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Loader2, ArrowLeft, MapPin, Phone, Mail, CalendarDays, Clock, UserCircle, ExternalLink, ListOrdered, AlertTriangle, DollarSign, PlayCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, MapPin, Phone, Mail, CalendarDays, Clock, UserCircle, ExternalLink, ListOrdered, AlertTriangle, DollarSign, PlayCircle, CheckCircle, XCircle, Wallet } from 'lucide-react';
 import type { FirestoreBooking, BookingStatus, FirestoreNotification } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, Timestamp, updateDoc, getDoc, collection, query, where, getDocs, limit, addDoc } from '@/lib/mysqlDb';
@@ -21,7 +21,7 @@ import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { logUserActivity } from '@/lib/activityLogger';
 import type { UserActivityEventType } from '@/types/firestore';
-import { updateBookingStatusByProviderAction } from '@/app/actions/providerWalletActions';
+import { updateBookingStatusByProviderAction, getProviderWalletSettingsAction } from '@/app/actions/providerWalletActions';
 
 const formatTimestampForDisplay = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
@@ -69,10 +69,8 @@ export default function ProviderBookingDetailsPage() {
     }).catch(err => console.error("Error loading wallet balance:", err));
 
     // Fetch minimum balance setting
-    getDoc(doc(db, 'webSettings', 'walletSettings')).then(snap => {
-      if (snap.exists()) {
-        setMinBalanceForJobs(snap.data()?.minBalanceForJobs ?? 50);
-      }
+    getProviderWalletSettingsAction().then(settings => {
+      setMinBalanceForJobs(settings.minBalanceForJobs);
     }).catch(err => console.error("Error loading wallet settings:", err));
   }, [providerUser, authIsLoading]);
 
@@ -230,8 +228,8 @@ export default function ProviderBookingDetailsPage() {
   const isCash = paymentMethod.toLowerCase() === 'cash';
   const requiredCommission = isCash ? getCommission(booking.totalAmount || 0, providerFeeType, providerFeeValue) : 0;
   const isLowBalance = (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && 
-    isCash && 
     providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -395,19 +393,17 @@ export default function ProviderBookingDetailsPage() {
            <div className="text-xs text-muted-foreground">
              <p>Booked On: {formatTimestampForDisplay(booking.createdAt)}</p>
              {booking.updatedAt && <p>Last Updated: {formatTimestampForDisplay(booking.updatedAt)}</p>}
-           </div>
-
-           {isLowBalance && (
-             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-4 rounded-xl font-bold flex flex-col gap-1.5 mt-4 text-left">
-               <div className="flex items-center gap-1.5">
-                 <span>⚠️</span>
-                 <span>Low Wallet Balance</span>
-               </div>
-               <p className="font-semibold text-xs leading-snug">
-                 You have a booking you need to accept, you need to add money.
-               </p>
-             </div>
-           )}
+           </div>            {isLowBalance && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-xl font-bold flex flex-col gap-1.5 mt-2">
+                <div className="flex items-center gap-1.5">
+                  <span>⚠️</span>
+                  <span>Low Wallet Balance</span>
+                </div>
+                <p className="font-semibold text-xs leading-snug">
+                  Add money to accept this booking. Minimum balance required: {symbol}{Math.max(minBalanceForJobs, requiredCommission).toFixed(decimals)}
+                </p>
+              </div>
+            )}
         </CardContent>
         {/* Action Buttons Footer */}
         <CardFooter className="flex flex-col sm:flex-row justify-end gap-3 bg-muted/20 border-t p-3">
@@ -415,27 +411,30 @@ export default function ProviderBookingDetailsPage() {
                 <>
                     <Button 
                         variant="destructive" 
-                        onClick={() => updateBookingStatus('ProviderAccepted')} 
+                        onClick={() => updateBookingStatus('ProviderRejected')} 
                         disabled={isProcessingAction || isLowBalance}
                         className="w-full sm:w-auto"
                     >
                         {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
                         Reject Booking
                     </Button>
-                    <Button 
-                        onClick={() => {
-                          if (isLowBalance) {
-                            alert("You have a booking you need to accept, you need to add money.");
-                            return;
-                          }
-                          updateBookingStatus('ProviderAccepted');
-                        }} 
-                        disabled={isProcessingAction}
-                        className={`w-full sm:w-auto ${isLowBalance ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                        {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                        Accept Booking
-                    </Button>
+                    {isLowBalance ? (
+                      <Button className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold" asChild>
+                        <Link href="/provider/wallet">
+                          <Wallet className="mr-2 h-4 w-4" />
+                          Top Up Wallet
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button 
+                          onClick={() => updateBookingStatus('ProviderAccepted')} 
+                          disabled={isProcessingAction}
+                          className="w-full sm:w-auto"
+                      >
+                          {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                          Accept Booking
+                      </Button>
+                    )}
                 </>
             )}
 

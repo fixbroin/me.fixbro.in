@@ -51,7 +51,7 @@ const withPWA = withPWAInit({
   reloadOnOnline: true,
   swcMinify: true,
   fallbacks: {
-    document: '/404',
+    document: '/offline',
   },
 
   workboxOptions: {

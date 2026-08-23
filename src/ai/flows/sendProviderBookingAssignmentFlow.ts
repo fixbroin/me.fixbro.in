@@ -144,7 +144,7 @@ const providerBookingAssignmentEmailFlow = ai.defineFlow(
         scheduledTimeSlot,
         customerName,
         customerAddress,
-        customerPhone: customerPhone || "N/A",
+        customerPhone: "[Locked - Accept Booking to View]",
         serviceName,
         providerDashboardUrl: jobDetailsUrl
       };

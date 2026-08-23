@@ -633,12 +633,18 @@ export default function MyBookingsPage() {
                             </div>
                         </div>
                         {booking.providerDetails.mobileNumber && (
+                           booking.status === 'AssignedToProvider' ? (
+                             <Button variant="outline" size="sm" disabled title="Awaiting provider acceptance">
+                               <Phone className="mr-2 h-4 w-4" /> Call (Awaiting Accept)
+                             </Button>
+                           ) : (
                              <a href={`tel:${booking.providerDetails.mobileNumber}`}>
                                 <Button variant="outline" size="sm">
                                     <Phone className="mr-2 h-4 w-4" /> Call
                                 </Button>
                              </a>
-                        )}
+                           )
+                         )}
                       </div>
                     </div>
                   )}

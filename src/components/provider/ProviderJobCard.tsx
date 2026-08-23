@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Loader2, CheckCircle, XCircle, PlayCircle, ExternalLink, Tag, Clock } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, PlayCircle, ExternalLink, Tag, Clock, Wallet } from "lucide-react";
 import type { FirestoreBooking } from '@/types/firestore';
 import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/contexts/LoadingContext';
@@ -101,7 +101,9 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
   const paymentMethod = job.paymentMethod || 'Cash';
   const isCash = paymentMethod.toLowerCase() === 'cash';
   const requiredCommission = isCash ? getCommission(job.totalAmount || 0, providerFeeType, providerFeeValue) : 0;
-  const isLowBalance = type === 'new' && isCash && providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
+  const isLowBalance = (type === 'new' || job.status === 'AssignedToProvider') && 
+    providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
 
   const handleViewDetailsClick = async (e: React.MouseEvent) => {
     if (type === 'new' && onAccept) {
@@ -179,42 +181,48 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
               <span>Low Wallet Balance</span>
             </div>
             <p className="font-semibold text-[11px] leading-snug">
-              Your account balance is low. Please add money to accept this booking.
+              Add money to accept this booking. Minimum balance required: {appConfig?.currencySymbol || "₹"}{Math.max(minBalanceForJobs, requiredCommission).toFixed(decimals)}
             </p>
           </div>
         )}
       </CardContent>
       <CardFooter className="flex flex-col sm:flex-row justify-end gap-2 pt-3">
         {isLowBalance ? (
-          <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs" disabled>
-            <ExternalLink className="mr-1 h-3.5 w-3.5"/>View Details
-          </Button>
-        ) : (
-          <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs" asChild>
-            <Link href={`/provider/booking/${job.id}`} onClick={handleViewDetailsClick}>
-              <ExternalLink className="mr-1 h-3.5 w-3.5"/>View Details
-            </Link>
-          </Button>
-        )}
-        {type === 'new' && onAccept && onReject && (
           <>
-            <Button size="sm" onClick={() => onAccept(job.id!)} variant="destructive" disabled={isProcessingAction || isLowBalance} className="w-full sm:w-auto text-xs">
-              {isProcessingAction && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin"/>} <XCircle className="mr-1 h-3.5 w-3.5"/> Reject
+            <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs" disabled>
+              <ExternalLink className="mr-1 h-3.5 w-3.5"/>View Details
             </Button>
-            <Button 
-              size="sm" 
-              onClick={() => {
-                if (isLowBalance) {
-                  alert("Your account balance is low. Please add money.");
-                  return;
-                }
-                onAccept(job.id!);
-              }} 
-              disabled={isProcessingAction || isLowBalance} 
-              className={cn("w-full sm:w-auto text-xs", isLowBalance && "opacity-50 cursor-not-allowed")}
-            >
-              {isProcessingAction && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin"/>} <CheckCircle className="mr-1 h-3.5 w-3.5"/> Accept
+            <Button size="sm" variant="destructive" className="w-full sm:w-auto text-xs" disabled>
+              <XCircle className="mr-1 h-3.5 w-3.5"/>Reject
             </Button>
+            <Button size="sm" className="w-full sm:w-auto text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold" asChild>
+              <Link href="/provider/wallet">
+                <Wallet className="mr-1 h-3.5 w-3.5"/>Top Up Wallet
+              </Link>
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs" asChild>
+              <Link href={`/provider/booking/${job.id}`} onClick={handleViewDetailsClick}>
+                <ExternalLink className="mr-1 h-3.5 w-3.5"/>View Details
+              </Link>
+            </Button>
+            {type === 'new' && onAccept && onReject && (
+              <>
+                <Button size="sm" onClick={() => onReject(job.id!)} variant="destructive" disabled={isProcessingAction} className="w-full sm:w-auto text-xs">
+                  {isProcessingAction && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin"/>} <XCircle className="mr-1 h-3.5 w-3.5"/> Reject
+                </Button>
+                <Button 
+                  size="sm" 
+                  onClick={() => onAccept(job.id!)} 
+                  disabled={isProcessingAction} 
+                  className="w-full sm:w-auto text-xs"
+                >
+                  {isProcessingAction && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin"/>} <CheckCircle className="mr-1 h-3.5 w-3.5"/> Accept
+                </Button>
+              </>
+            )}
           </>
         )}
         {type === 'ongoing' && job.status === 'ProviderAccepted' && onStartWork && (

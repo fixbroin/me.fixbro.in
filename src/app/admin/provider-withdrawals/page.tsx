@@ -94,7 +94,7 @@ const DetailItem = ({ label, value }: { label: string, value?: string | null }) 
 export default function ProviderWithdrawalsPage() {
   const { config: appConfig } = useApplicationConfig();
   const symbol = appConfig?.currencySymbol || '₹';
-  const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
   const code = appConfig?.currencyCode || 'INR';
   const [requests, setRequests] = useState<WithdrawalRequest[]>([]);
   const [providers, setProviders] = useState<FirestoreUser[]>([]);
@@ -959,7 +959,7 @@ export default function ProviderWithdrawalsPage() {
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto md:justify-end">
                           <div className="text-left sm:text-right">
                             <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider block">Prepaid Balance</span>
-                            <span className="font-mono text-3xl font-extrabold text-primary">{symbol}{walletBalance.toFixed(2)}</span>
+                            <span className="font-mono text-3xl font-extrabold text-primary">{symbol}{walletBalance.toFixed(decimals)}</span>
                           </div>
                           <Button 
                             onClick={() => setIsWalletModalOpen(true)}
@@ -1021,7 +1021,7 @@ export default function ProviderWithdrawalsPage() {
                                         "text-right pr-6 font-bold whitespace-nowrap font-mono",
                                         isCredit ? "text-emerald-600" : "text-rose-600"
                                       )}>
-                                        {isCredit ? '+' : ''}{symbol}{tx.amount.toFixed(2)}
+                                        {isCredit ? '+' : ''}{symbol}{tx.amount.toFixed(decimals)}
                                       </TableCell>
                                     </TableRow>
                                   );
