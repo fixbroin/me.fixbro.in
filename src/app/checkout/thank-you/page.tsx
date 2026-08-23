@@ -444,7 +444,7 @@ export default function ThankYouPage() {
         let coverageType: 'provider_match' | 'admin_only' = 'admin_only';
         let suggestedProviderIds: string[] = [];
         let autoAssignedProviderId: string | undefined = undefined;
-        let bookingStatus: FirestoreBooking['status'] = (paymentMethod === 'later' || paymentMethod === 'Pay After Service') ? "Pending Payment" : "Confirmed";
+        let bookingStatus: FirestoreBooking['status'] = (paymentMethod === 'Pay After Service') ? "Pending Payment" : "Confirmed";
 
         // Assign Sequential Booking Number
         const nextBookingNumber = await assignNewBookingNumber();
@@ -464,11 +464,12 @@ export default function ThankYouPage() {
           subTotal: baseSubTotalForBooking,
           ...(baseVisitingChargeForBooking > 0 && { visitingCharge: baseVisitingChargeForBooking }),
           taxAmount: totalTaxForBooking, totalAmount: totalAmountForBooking,
+          platformFeeTotal: totalBasePlatformFees + totalTaxOnPlatformFees,
           ...(bookingDiscountCode !== undefined && { discountCode: bookingDiscountCode }),
           ...(bookingDiscountAmount !== undefined && { discountAmount: bookingDiscountAmount }),
           ...(storedAppliedPlatformFees.length > 0 && { appliedPlatformFees: storedAppliedPlatformFees }),
           paymentMethod: paymentMethod || "Unknown",
-          status: (paymentMethod === 'later' || paymentMethod === 'Pay After Service') ? "Pending Payment" : "Confirmed",
+          status: (paymentMethod === 'Pay After Service') ? "Pending Payment" : "Confirmed",
           ...(razorpayPaymentId && { razorpayPaymentId }),
           ...(razorpayOrderId && { razorpayOrderId }),
           ...(razorpaySignature && { razorpaySignature }),

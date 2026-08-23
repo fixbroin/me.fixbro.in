@@ -60,7 +60,7 @@ export default function PaymentMethods({ selectedMethod, onSelect }: PaymentMeth
 
   const paymentOptions = useMemo(() => [
     { value: 'online', label: 'Pay Online (UPI, Card, or More)', icon: CreditCard, available: onlinePaymentEnabled },
-    { value: 'later', label: 'Pay After Service', icon: HandCoins, available: canOfferPayLater },
+    { value: 'Pay After Service', label: 'Pay After Service', icon: HandCoins, available: canOfferPayLater },
   ].filter(opt => opt.available), [onlinePaymentEnabled, canOfferPayLater]);
 
   if (isLoading || isLoadingAppSettings) return <div className="animate-pulse space-y-3"><div className="h-12 bg-muted rounded-md"/><div className="h-12 bg-muted rounded-md"/></div>;

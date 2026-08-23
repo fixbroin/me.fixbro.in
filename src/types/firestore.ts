@@ -302,6 +302,7 @@ export interface FirestoreUser {
     withdrawals: number;
     onlineNet: number;
     cashCommission: number;
+    cashNet?: number;
   };
   totalEarnings?: number; // Lifetime gross earnings
   totalCommissionPaid?: number; // Lifetime commission paid to admin

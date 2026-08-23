@@ -65,7 +65,7 @@ export default function ProviderBookingDetailsPage() {
     return feeVal;
   };
   const paymentMethod = booking?.paymentMethod || 'Cash';
-  const isCash = paymentMethod.toLowerCase() === 'cash';
+  const isCash = paymentMethod.toLowerCase() === 'pay after service';
   const providerGross = (booking?.totalAmount || 0) - (booking?.platformFeeTotal || 0);
   const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (booking?.platformFeeTotal || 0)) : 0;
   const isLowBalance = booking && providerWalletBalance !== null && minBalanceForJobs !== null ? (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && 

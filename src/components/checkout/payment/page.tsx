@@ -389,7 +389,7 @@ export default function PaymentPage() {
     if (!isLoadingCartDetails && !isLoadingAppSettings) {
       if (isCancellationFeeMode) { setPaymentMethod("online"); return; } 
       if (onlinePaymentEnabled) setPaymentMethod("online"); 
-      else if (payAfterServiceEnabled) setPaymentMethod("later"); 
+      else if (payAfterServiceEnabled) setPaymentMethod("Pay After Service"); 
       else setPaymentMethod("");
     }
   }, [isLoadingCartDetails, isLoadingAppSettings, onlinePaymentEnabled, payAfterServiceEnabled, isCancellationFeeMode]);
@@ -452,7 +452,7 @@ export default function PaymentPage() {
     if (!paymentMethod && !isCancellationFeeMode) { toast({ title: "Payment Method Required", description: "Please select a payment method.", variant: "destructive" }); return; }
     setIsProcessingPayment(true); showLoading();
 
-    if (paymentMethod === 'later' && !isCancellationFeeMode) {
+    if (paymentMethod === 'Pay After Service' && !isCancellationFeeMode) {
         localStorage.setItem('wecanfixPaymentMethod', 'Pay After Service');
         localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
         if (appliedPromoCode) {
@@ -592,7 +592,7 @@ export default function PaymentPage() {
 
   const basePaymentOptions = [
     { value: 'online', label: 'Pay Online (UPI, Cards, Net Banking, Wallets)', icon: CreditCard, online: true, available: onlinePaymentEnabled },
-    { value: 'later', label: 'Pay After Service', icon: HandCoins, online: false, available: payAfterServiceEnabled && !isCancellationFeeMode },
+    { value: 'Pay After Service', label: 'Pay After Service', icon: HandCoins, online: false, available: payAfterServiceEnabled && !isCancellationFeeMode },
   ];
   const currentAvailablePaymentOptions = basePaymentOptions.filter(option => option.available);
 
@@ -613,7 +613,7 @@ export default function PaymentPage() {
             </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {onlinePaymentEnabled && paymentMethod !== 'later' && !isCancellationFeeMode && cartEntries.length > 0 && (
+          {onlinePaymentEnabled && paymentMethod !== 'Pay After Service' && !isCancellationFeeMode && cartEntries.length > 0 && (
             <Alert className="bg-primary/10 border-primary/30"><Info className="h-5 w-5 text-primary" /><AlertTitle className="font-semibold text-primary">Online Payment via Razorpay</AlertTitle><AlertDescription className="text-primary/80">You will be redirected to Razorpay's secure gateway.</AlertDescription></Alert>
           )}
           {isCancellationFeeMode && (
@@ -669,7 +669,7 @@ export default function PaymentPage() {
                     )
                 )}
                  <div className="flex justify-between text-lg font-semibold pt-1 border-t mt-1"><span>Total Amount Due:</span><span className="text-primary">{symbol}{totalAmountDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                 {paymentMethod === 'later' && payAfterServiceEnabled && !isCancellationFeeMode && (<p className="text-sm text-muted-foreground mt-1 text-right">You will be charged after service.</p>)}
+                 {paymentMethod === 'Pay After Service' && payAfterServiceEnabled && !isCancellationFeeMode && (<p className="text-sm text-muted-foreground mt-1 text-right">You will be charged after service.</p>)}
               </div>
             </>
           )}
@@ -689,7 +689,7 @@ export default function PaymentPage() {
             className="w-full sm:w-auto"
           >
             {isProcessingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {isProcessingPayment ? 'Processing...' : (isCancellationFeeMode ? 'Pay Cancellation Fee' : (paymentMethod === 'later' ? 'Confirm Booking' : 'Confirm Booking & Pay'))}
+            {isProcessingPayment ? 'Processing...' : (isCancellationFeeMode ? 'Pay Cancellation Fee' : (paymentMethod === 'Pay After Service' ? 'Confirm Booking' : 'Confirm Booking & Pay'))}
             {!isProcessingPayment && <ArrowRight className="ml-2 h-4 w-4" />}
           </Button>
         </CardFooter>

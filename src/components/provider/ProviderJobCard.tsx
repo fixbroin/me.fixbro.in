@@ -99,12 +99,13 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
   };
 
   const paymentMethod = job.paymentMethod || 'Cash';
-  const isCash = paymentMethod.toLowerCase() === 'cash';
+  const isCash = paymentMethod.toLowerCase() === 'pay after service';
   const providerGross = (job.totalAmount || 0) - (job.platformFeeTotal || 0);
   const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (job.platformFeeTotal || 0)) : 0;
   const isLowBalance = (type === 'new' || job.status === 'AssignedToProvider') && 
     providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
+  const symbol = appConfig?.currencySymbol || "₹";
 
   const handleViewDetailsClick = async (e: React.MouseEvent) => {
     if (type === 'new' && onAccept) {
@@ -143,6 +144,16 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
         </CardDescription>
       </CardHeader>
       <CardContent className="text-sm space-y-1">
+        <div className="border-b pb-2 mb-2">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Services Included:</p>
+          <ul className="list-disc pl-4 text-xs space-y-1">
+            {job.services.map((service, idx) => (
+              <li key={idx}>
+                <span className="font-medium text-foreground">{service.name}</span> (x{service.quantity}) - {symbol}{((service.pricePerUnit || 0) * service.quantity).toFixed(decimals)}
+              </li>
+            ))}
+          </ul>
+        </div>
         <p><strong>Date:</strong> {formatDateForDisplay(job.scheduledDate)} at {job.scheduledTimeSlot}</p>
         {job.estimatedEndTime && (
           <p className="text-green-600 font-medium">
@@ -173,6 +184,29 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
                 )}
               </>
             )}
+        </div>
+
+        <div className="flex flex-col gap-1 pt-2 border-t mt-2">
+          <p className="text-xs text-muted-foreground flex justify-between">
+            <span>Service Charge:</span>
+            <span className="font-bold text-foreground">{symbol}{(job.subTotal || 0).toFixed(decimals)}</span>
+          </p>
+          {job.visitingCharge !== undefined && job.visitingCharge > 0 && (
+            <p className="text-xs text-muted-foreground flex justify-between">
+              <span>Visiting Charge:</span>
+              <span className="font-bold text-foreground">+{symbol}{(job.visitingCharge || 0).toFixed(decimals)}</span>
+            </p>
+          )}
+          {isCash && job.platformFeeTotal !== undefined && job.platformFeeTotal > 0 && (
+            <p className="text-xs text-muted-foreground flex justify-between text-amber-600">
+              <span>Platform Fee (Collect in Cash):</span>
+              <span className="font-bold">+{symbol}{(job.platformFeeTotal || 0).toFixed(decimals)}</span>
+            </p>
+          )}
+          <p className="text-xs font-black flex justify-between border-t border-dashed pt-1 text-primary">
+            <span>Total Customer Pays:</span>
+            <span>{symbol}{(job.totalAmount || 0).toFixed(decimals)}</span>
+          </p>
         </div>
 
         {isLowBalance && (

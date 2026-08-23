@@ -24,13 +24,9 @@ const calculateProviderFee = (bookingAmount: number, feeType?: ProviderFeeType, 
 };
 
 const isCashPayment = (method: string) => {
-    if (!method) return true;
+    if (!method) return false;
     const lower = method.toLowerCase();
-    return lower === 'cash' || 
-           lower === 'pay after service' || 
-           lower === 'cash on delivery' || 
-           lower === 'cod' || 
-           lower === 'offline';
+    return lower === 'pay after service';
 };
 
 export default function ProviderEarningsPage() {
@@ -49,7 +45,7 @@ export default function ProviderEarningsPage() {
     // Default to zero if stats don't exist yet
     const stats = (firestoreUser?.monthlyStats?.monthKey === monthKey) 
         ? firestoreUser.monthlyStats 
-        : { gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
+        : { gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0, cashNet: 0 };
 
     const currentBalance = firestoreUser?.withdrawableBalance || 0;
     
@@ -66,6 +62,7 @@ export default function ProviderEarningsPage() {
         monthlyWithdrawals: stats.withdrawals,
         monthlyCashCommission: stats.cashCommission,
         monthlyOnlineNet: stats.onlineNet,
+        monthlyCashNet: stats.cashNet || 0,
         balanceCarriedForward,
         lifetimePaidOut: firestoreUser?.totalPaidOut || 0,
         withdrawableBalance: currentBalance,
@@ -93,7 +90,7 @@ export default function ProviderEarningsPage() {
         const totalLifetimePaidOut = 0;
 
         // Stats for THIS month specifically
-        const mStats = { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
+        const mStats = { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0, cashNet: 0 };
         
         bookingsSnap.docs.forEach(d => {
             const b = d.data() as FirestoreBooking;
@@ -120,6 +117,7 @@ export default function ProviderEarningsPage() {
                 if (isCash) {
                     mStats.cashCollected += b.totalAmount;
                     mStats.cashCommission += commission;
+                    mStats.cashNet += (providerGross - commission);
                 } else {
                     mStats.cashCollected += extraCharges;
                     const extraCommission = calculateProviderFee(extraCharges, appConfig.providerFeeType, appConfig.providerFeeValue);
@@ -214,9 +212,9 @@ export default function ProviderEarningsPage() {
                 </h3>
                 
                 <div className="space-y-2 text-sm">
-                    <div className="flex justify-between items-center py-1 border-b border-dashed">
-                        <span>Balance Carried Forward <span className="text-[10px] text-muted-foreground ml-1">(Previous months)</span></span>
-                        <span className="font-semibold text-blue-600">{symbol}{earningsData.balanceCarriedForward.toFixed(2)}</span>
+                    <div className="flex justify-between items-center py-1 border-b border-dashed text-amber-600">
+                        <span>Cash Jobs Earnings <span className="text-[10px] text-muted-foreground ml-1">(Your share after fee)</span></span>
+                        <span className="font-semibold">+ {symbol}{earningsData.monthlyCashNet.toFixed(2)}</span>
                     </div>
 
                     <div className="flex justify-between items-center py-1 border-b border-dashed text-green-600">

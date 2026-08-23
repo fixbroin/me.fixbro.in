@@ -330,9 +330,9 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
     setIsProcessingPayment(true);
     showLoading();
 
-    const storageMethod = paymentMethod === 'later' ? 'Pay After Service' : 'Online';
+    const storageMethod = paymentMethod === 'Pay After Service' ? 'Pay After Service' : 'Online';
 
-    if (paymentMethod === 'later') {
+    if (paymentMethod === 'Pay After Service') {
         localStorage.setItem('wecanfixPaymentMethod', storageMethod);
         localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
         if (appliedPromo) {
@@ -477,7 +477,7 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
           onClick={handleBookNow}
         >
           {isProcessingPayment ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
-          {paymentMethod === 'later' ? 'Confirm Booking' : 'Book & Pay Now'}
+          {paymentMethod === 'Pay After Service' ? 'Confirm Booking' : 'Book & Pay Now'}
         </Button>
       </CardFooter>
 

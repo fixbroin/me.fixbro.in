@@ -274,7 +274,7 @@ const calculateProviderFee = (bookingAmount: number, feeType?: string, feeValue?
 // Check if payment method is cash
 const isCashPayment = (method?: string): boolean => {
   const m = (method || '').toLowerCase();
-  return m.includes('cash') || m.includes('cod') || m.includes('after service');
+  return m === 'pay after service';
 };
 
 // 6. Central server action to handle provider status updates with wallet validation (MySQL)
