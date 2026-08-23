@@ -51,14 +51,25 @@ export default function EmailSettingsClient({ initialTemplates }: EmailSettingsC
   const [bodyInput, setBodyInput] = useState('');
   const [isPending, startTransition] = useTransition();
   const [testingTemplateId, setTestingTemplateId] = useState<string | null>(null);
+  const [testEmailDialogOpen, setTestEmailDialogOpen] = useState(false);
+  const [testEmailAddress, setTestEmailAddress] = useState("wecanfix.in@gmail.com");
+  const [testEmailTemplateId, setTestEmailTemplateId] = useState<string | null>(null);
 
-  const handleTestEmail = async (templateId: string) => {
-    const adminEmail = prompt("Enter email address to send test email to:", "admin@wecanfix.in");
-    if (!adminEmail || !adminEmail.trim()) return;
-    
+  const handleTestEmailClick = (templateId: string) => {
+    setTestEmailTemplateId(templateId);
+    setTestEmailDialogOpen(true);
+  };
+
+  const handleSendTestEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testEmailTemplateId || !testEmailAddress.trim()) return;
+
+    const templateId = testEmailTemplateId;
     setTestingTemplateId(templateId);
+    setTestEmailDialogOpen(false);
+
     try {
-      const result = await sendTestEmailAction(templateId, adminEmail.trim());
+      const result = await sendTestEmailAction(templateId, testEmailAddress.trim());
       if (result.success) {
         toast({
           title: "Test Email Sent",
@@ -81,6 +92,7 @@ export default function EmailSettingsClient({ initialTemplates }: EmailSettingsC
       });
     } finally {
       setTestingTemplateId(null);
+      setTestEmailTemplateId(null);
     }
   };
 
@@ -211,7 +223,7 @@ export default function EmailSettingsClient({ initialTemplates }: EmailSettingsC
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleTestEmail(template.id)}
+                    onClick={() => handleTestEmailClick(template.id)}
                     disabled={isPending || testingTemplateId === template.id}
                     className="h-8 text-xs sm:text-sm border-primary/30 text-primary hover:bg-primary/5"
                   >
@@ -339,6 +351,42 @@ export default function EmailSettingsClient({ initialTemplates }: EmailSettingsC
               {isPending ? 'Saving...' : 'Save Template'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Test Email Dialog Modal */}
+      <Dialog open={testEmailDialogOpen} onOpenChange={setTestEmailDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-primary" />
+              Send Test Email
+            </DialogTitle>
+            <DialogDescription>
+              Enter the target email address where you would like to send a preview of this email template.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSendTestEmail} className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="test-email-input">Email Address</Label>
+              <Input
+                id="test-email-input"
+                type="email"
+                required
+                placeholder="wecanfix.in@gmail.com"
+                value={testEmailAddress}
+                onChange={(e) => setTestEmailAddress(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setTestEmailDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                Send Test
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

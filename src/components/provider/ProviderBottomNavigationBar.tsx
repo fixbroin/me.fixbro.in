@@ -2,12 +2,16 @@
 "use client";
 
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { LayoutDashboard, Briefcase, ReceiptText, Menu, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useLoading } from '@/contexts/LoadingContext';
-import { useSidebar } from '@/components/ui/sidebar'; // Import useSidebar
+import { useSidebar } from '@/components/ui/sidebar';
+import { db } from '@/lib/firebase';
+import { doc, onSnapshot } from '@/lib/mysqlDb';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import type { ElementType } from 'react';
 
 interface NavItem {
@@ -25,11 +29,27 @@ const ProviderBottomNavigationBar = () => {
   const { showLoading } = useLoading();
   const { setOpenMobile } = useSidebar(); // Get the function to open the mobile sidebar
 
+  const { config: appConfig } = useApplicationConfig();
+  const symbol = appConfig?.currencySymbol || "₹";
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const userDocRef = doc(db, "users", user.uid);
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setWalletBalance(data?.providerWalletBalance || 0);
+      }
+    });
+    return () => unsubscribe();
+  }, [user?.uid]);
+
   const navItems: NavItem[] = [
     { href: '/provider', label: 'Dashboard', icon: LayoutDashboard, isProtected: true },
     { href: '/provider/my-jobs', label: 'My Jobs', icon: Briefcase, isProtected: true },
     { href: '/provider/quotation-invoice', label: 'Billing', icon: ReceiptText, isProtected: true },
-    { href: '/provider/wallet', label: 'Wallet', icon: Wallet, isProtected: true },
+    { href: '/provider/wallet', label: `${symbol}${walletBalance.toFixed(appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2)}`, icon: Wallet, isProtected: true },
     { href: '#', label: 'More', icon: Menu, isProtected: false, isButton: true },
   ];
 

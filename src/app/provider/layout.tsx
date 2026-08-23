@@ -111,8 +111,8 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!providerUser?.uid) return;
-    const appDocRef = doc(db, PROVIDER_APPLICATION_COLLECTION, providerUser.uid);
-    const unsubscribe = onSnapshot(appDocRef, (docSnap) => {
+    const userDocRef = doc(db, "users", providerUser.uid);
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setWalletBalance(data?.providerWalletBalance || 0);
@@ -410,7 +410,6 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
               <div className="flex items-center gap-3">
                 <SidebarTrigger className="hidden md:inline-flex text-muted-foreground hover:text-primary transition-colors" />
                 <div className="md:hidden flex items-center">
-                   <SidebarTrigger className="mr-2 text-muted-foreground hover:text-primary" />
                    <Logo logoUrl={globalSettings?.logoUrl} websiteName={globalSettings?.websiteName} size="normal" />
                 </div>
                 <h1 className="hidden sm:block text-lg font-bold tracking-tight">Provider Panel</h1>
@@ -424,12 +423,12 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex items-center gap-1.5 h-10 px-3 rounded-full border border-border/40 bg-card hover:bg-muted/50 hover:border-primary/20 transition-all duration-300 shadow-sm"
+                      className="hidden md:inline-flex items-center gap-1.5 h-10 px-3 rounded-full border border-border/40 bg-card hover:bg-muted/50 hover:border-primary/20 transition-all duration-300 shadow-sm"
                       asChild
                     >
                       <Link href="/provider/wallet" className="flex items-center gap-1.5">
                         <Wallet className="h-4 w-4 text-primary" />
-                        <span className="font-bold font-mono text-xs">{symbol}{walletBalance.toFixed(2)}</span>
+                        <span className="font-bold font-mono text-xs">{symbol}{walletBalance.toFixed(appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2)}</span>
                       </Link>
                     </Button>
 
@@ -505,7 +504,7 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
                 )}
               </div>
             </header>
-            <main className={cn("p-2 sm:p-4 md:p-3 relative", { "pb-20": isMobile })}>
+            <main className="p-2 sm:p-4 md:p-3 pb-32 md:pb-6 relative">
               <Suspense fallback={<ProviderPageLoader />}>
                 {children}
               </Suspense>

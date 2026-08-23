@@ -43,6 +43,7 @@ export default function ProviderWalletPage() {
   const { config: appConfig, isLoading: isLoadingAppConfig } = useApplicationConfig();
   const { toast } = useToast();
   const symbol = appConfig?.currencySymbol || "₹";
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
 
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
@@ -275,7 +276,7 @@ export default function ProviderWalletPage() {
   const isLowBalance = walletSettings ? (walletBalance < walletSettings.minBalanceForJobs) : false;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-44">
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl flex items-center gap-2">
@@ -300,7 +301,7 @@ export default function ProviderWalletPage() {
             <CardHeader className="pb-2">
               <CardDescription className="text-white/80 font-bold uppercase tracking-wider text-[10px]">Prepaid Balance</CardDescription>
               <CardTitle className="text-4xl font-extrabold font-mono pt-1">
-                {symbol}{walletBalance.toFixed(2)}
+                {symbol}{walletBalance.toFixed(decimals)}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-2 pb-6">
@@ -449,7 +450,7 @@ export default function ProviderWalletPage() {
                                 "text-right font-bold whitespace-nowrap font-mono",
                                 isCredit ? "text-emerald-600" : "text-rose-600"
                               )}>
-                                {isCredit ? '+' : ''}{symbol}{tx.amount.toFixed(2)}
+                                {isCredit ? '+' : ''}{symbol}{tx.amount.toFixed(decimals)}
                               </TableCell>
                               <TableCell className="text-right pr-6">
                                 {!isCredit && (
@@ -514,7 +515,7 @@ export default function ProviderWalletPage() {
                               "font-bold font-mono text-sm",
                               isCredit ? "text-emerald-600" : "text-rose-600"
                             )}>
-                              {isCredit ? '+' : ''}{symbol}{tx.amount.toFixed(2)}
+                              {isCredit ? '+' : ''}{symbol}{tx.amount.toFixed(decimals)}
                             </span>
 
                             {!isCredit && (
@@ -595,7 +596,7 @@ export default function ProviderWalletPage() {
                               {comp.message}
                             </TableCell>
                             <TableCell className="text-xs font-bold text-rose-600 font-mono">
-                              {symbol}{Number(comp.amount).toFixed(2)}
+                              {symbol}{Number(comp.amount).toFixed(decimals)}
                             </TableCell>
                             <TableCell>
                               <Badge 
@@ -623,7 +624,7 @@ export default function ProviderWalletPage() {
                 </div>
 
                 {/* Mobile view */}
-                <div className="md:hidden divide-y divide-slate-100">
+                <div className="md:hidden divide-y divide-slate-100 pb-36">
                   {complaints.map((comp) => {
                     const formattedDate = formatDateInTimezone(new Date(comp.createdAt), appConfig?.timezone || 'Asia/Kolkata', appConfig?.dateFormat);
                     return (
@@ -655,7 +656,7 @@ export default function ProviderWalletPage() {
                           </div>
                           <div>
                             <span className="text-[10px] text-muted-foreground block">DISPUTED AMOUNT</span>
-                            <span className="font-bold text-rose-600 font-mono">{symbol}{Number(comp.amount).toFixed(2)}</span>
+                            <span className="font-bold text-rose-600 font-mono">{symbol}{Number(comp.amount).toFixed(decimals)}</span>
                           </div>
                         </div>
 
@@ -703,7 +704,7 @@ export default function ProviderWalletPage() {
                 <p><strong>Transaction ID:</strong> <span className="font-mono text-muted-foreground select-all">{selectedTxForComplaint.id}</span></p>
                 <p><strong>Booking ID:</strong> {selectedTxForComplaint.bookingId ? `#${selectedTxForComplaint.bookingId}` : <span className="text-muted-foreground italic">None</span>}</p>
                 <p><strong>Description:</strong> {selectedTxForComplaint.description}</p>
-                <p><strong>Transaction Amount:</strong> {selectedTxForComplaint.amount >= 0 ? '+' : '-'}{symbol}{Math.abs(selectedTxForComplaint.amount).toFixed(2)}</p>
+                <p><strong>Transaction Amount:</strong> {selectedTxForComplaint.amount >= 0 ? '+' : '-'}{symbol}{Math.abs(selectedTxForComplaint.amount).toFixed(decimals)}</p>
               </div>
 
               <div className="space-y-2">
@@ -732,6 +733,7 @@ export default function ProviderWalletPage() {
           </DialogContent>
         </Dialog>
       )}
+      <div className="h-32 w-full" />
     </div>
   );
 }

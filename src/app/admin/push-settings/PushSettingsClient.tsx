@@ -52,17 +52,27 @@ export default function PushSettingsClient({ initialTemplates }: PushSettingsCli
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const [testingTemplateId, setTestingTemplateId] = useState<string | null>(null);
+  const [testPushDialogOpen, setTestPushDialogOpen] = useState(false);
+  const [testPushUid, setTestPushUid] = useState('');
+  const [testPushTemplateId, setTestPushTemplateId] = useState<string | null>(null);
 
-  const handleTestPush = async (templateId: string) => {
-    let adminUid = auth.currentUser?.uid;
-    if (!adminUid) {
-      adminUid = prompt("Could not detect current user session. Enter target User ID manually:") || "";
-    }
-    if (!adminUid || !adminUid.trim()) return;
+  const handleTestPushClick = (templateId: string) => {
+    setTestPushTemplateId(templateId);
+    setTestPushUid(auth.currentUser?.uid || '');
+    setTestPushDialogOpen(true);
+  };
 
+  const handleSendTestPush = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testPushTemplateId || !testPushUid.trim()) return;
+
+    const templateId = testPushTemplateId;
+    const adminUid = testPushUid.trim();
     setTestingTemplateId(templateId);
+    setTestPushDialogOpen(false);
+
     try {
-      const result = await sendTestPushAction(templateId, adminUid.trim());
+      const result = await sendTestPushAction(templateId, adminUid);
       if (result.success) {
         toast({
           title: "Test Push Sent",
@@ -85,6 +95,7 @@ export default function PushSettingsClient({ initialTemplates }: PushSettingsCli
       });
     } finally {
       setTestingTemplateId(null);
+      setTestPushTemplateId(null);
     }
   };
 
@@ -333,7 +344,7 @@ export default function PushSettingsClient({ initialTemplates }: PushSettingsCli
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleTestPush(template.id)}
+                      onClick={() => handleTestPushClick(template.id)}
                       disabled={isPending || testingTemplateId === template.id}
                       className="h-8 text-xs sm:text-sm border-primary/30 text-primary hover:bg-primary/5"
                     >
@@ -611,6 +622,42 @@ export default function PushSettingsClient({ initialTemplates }: PushSettingsCli
               Save Changes
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Test Push Dialog Modal */}
+      <Dialog open={testPushDialogOpen} onOpenChange={setTestPushDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5 text-primary" />
+              Send Test Push Notification
+            </DialogTitle>
+            <DialogDescription>
+              Enter the target Admin User ID (UID) to dispatch a test FCM push notification preview.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSendTestPush} className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="test-push-input">User ID (UID)</Label>
+              <Input
+                id="test-push-input"
+                type="text"
+                required
+                placeholder="Enter target Admin UID"
+                value={testPushUid}
+                onChange={(e) => setTestPushUid(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setTestPushDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                Send Test
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </Tabs>

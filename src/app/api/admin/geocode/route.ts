@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Wecanfix-Admin-App/1.0 (contact: admin@wecanfix.in)'
+        'User-Agent': 'Wecanfix-Admin-App/1.0 (contact: wecanfix.in@gmail.com)'
       }
     });
 

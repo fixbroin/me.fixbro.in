@@ -36,7 +36,7 @@ export default function WalletComplaintsTab() {
 
   // Resolution Dialog State
   const [selectedComplaint, setSelectedComplaint] = useState<WalletComplaint | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<'accepted' | 'rejected' | 'processed' | 'solved'>('accepted');
+  const [selectedStatus, setSelectedStatus] = useState<'accepted' | 'rejected'>('accepted');
   const [notes, setNotes] = useState('');
   const [isResolving, setIsResolving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -281,7 +281,7 @@ export default function WalletComplaintsTab() {
           <DialogContent className="sm:max-w-[450px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <ShieldAlert className={(selectedStatus === 'accepted' || selectedStatus === 'solved') ? "text-emerald-500 h-5 w-5" : "text-rose-500 h-5 w-5"} />
+                <ShieldAlert className={(selectedStatus === 'accepted') ? "text-emerald-500 h-5 w-5" : "text-rose-500 h-5 w-5"} />
                 Resolve Provider Dispute
               </DialogTitle>
               <DialogDescription>
@@ -298,7 +298,7 @@ export default function WalletComplaintsTab() {
                   onChange={(e) => {
                     const val = e.target.value as any;
                     setSelectedStatus(val);
-                    setNotes(val === 'accepted' || val === 'solved'
+                    setNotes(val === 'accepted'
                       ? `Refund of ${symbol}${Number(selectedComplaint.amount).toFixed(2)} approved for transaction ${selectedComplaint.transactionId || selectedComplaint.id}.${selectedComplaint.bookingHumanId ? ` (Booking #${selectedComplaint.bookingHumanId})` : ''}`
                       : `Dispute closed (${val}). Transaction charge stands for transaction ${selectedComplaint.transactionId || selectedComplaint.id}.${selectedComplaint.bookingHumanId ? ` (Booking #${selectedComplaint.bookingHumanId})` : ''}`
                     );
@@ -307,13 +307,11 @@ export default function WalletComplaintsTab() {
                   disabled={isResolving}
                 >
                   <option value="accepted">Accepted (Approve Refund)</option>
-                  <option value="solved">Solved (Approve Refund)</option>
                   <option value="rejected">Rejected (No Refund)</option>
-                  <option value="processed">Processed (No Refund)</option>
                 </select>
               </div>
 
-              {(selectedStatus === 'accepted' || selectedStatus === 'solved') && (
+              {(selectedStatus === 'accepted') && (
                 <div className="bg-emerald-50 text-emerald-800 text-xs p-3 rounded-xl border border-emerald-200 font-medium">
                   Saving this resolution will credit <strong>{symbol}{Number(selectedComplaint.amount).toFixed(2)}</strong> back to the provider's wallet balance.
                 </div>
@@ -335,7 +333,7 @@ export default function WalletComplaintsTab() {
                 <Button type="button" variant="outline" onClick={() => setSelectedComplaint(null)} disabled={isResolving}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isResolving} variant={(selectedStatus === 'accepted' || selectedStatus === 'solved') ? 'default' : 'destructive'}>
+                <Button type="submit" disabled={isResolving} variant={(selectedStatus === 'accepted') ? 'default' : 'destructive'}>
                   {isResolving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Submit Resolution
                 </Button>
