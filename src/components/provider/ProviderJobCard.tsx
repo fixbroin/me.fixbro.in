@@ -100,7 +100,8 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
 
   const paymentMethod = job.paymentMethod || 'Cash';
   const isCash = paymentMethod.toLowerCase() === 'cash';
-  const requiredCommission = isCash ? getCommission(job.totalAmount || 0, providerFeeType, providerFeeValue) : 0;
+  const providerGross = (job.totalAmount || 0) - (job.platformFeeTotal || 0);
+  const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (job.platformFeeTotal || 0)) : 0;
   const isLowBalance = (type === 'new' || job.status === 'AssignedToProvider') && 
     providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;

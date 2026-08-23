@@ -54,8 +54,8 @@ export default function ProviderEarningsPage() {
     const currentBalance = firestoreUser?.withdrawableBalance || 0;
     
     // Carry Forward = Current Balance - (This month's net activity)
-    // Net Activity = (Online Net) - (Cash Commission) - (Withdrawals)
-    const netActivityThisMonth = stats.onlineNet - stats.cashCommission - stats.withdrawals;
+    // Net Activity = (Online Net) - (Withdrawals)
+    const netActivityThisMonth = stats.onlineNet - stats.withdrawals;
     const balanceCarriedForward = currentBalance - netActivityThisMonth;
 
     return {
@@ -97,15 +97,16 @@ export default function ProviderEarningsPage() {
         
         bookingsSnap.docs.forEach(d => {
             const b = d.data() as FirestoreBooking;
-            const commission = calculateProviderFee(b.totalAmount, appConfig.providerFeeType, appConfig.providerFeeValue);
+            const providerGross = (b.totalAmount || 0) - (b.platformFeeTotal || 0);
+            const commission = calculateProviderFee(providerGross, appConfig.providerFeeType, appConfig.providerFeeValue);
             const isCash = isCashPayment(b.paymentMethod);
             const bDate = b.scheduledDate || "";
 
             const extraCharges = (b.additionalCharges || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-            const originalAmount = b.totalAmount - extraCharges;
+            const originalAmount = providerGross - extraCharges;
 
             // All-time calculation
-            totalNetEarnings += (b.totalAmount - commission);
+            totalNetEarnings += (providerGross - commission);
             if (isCash) {
                 totalCashCollected += b.totalAmount;
             } else {
@@ -114,7 +115,7 @@ export default function ProviderEarningsPage() {
 
             // Monthly calculation (if date is this month)
             if (bDate >= startOfMonthStr) {
-                mStats.gross += b.totalAmount;
+                mStats.gross += providerGross;
                 mStats.commission += commission;
                 if (isCash) {
                     mStats.cashCollected += b.totalAmount;
@@ -209,7 +210,7 @@ export default function ProviderEarningsPage() {
         <CardContent className="pt-6">
             <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
                 <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <HandCoins className="h-4 w-4" /> Monthly Wallet Breakdown
+                    <HandCoins className="h-4 w-4" /> Monthly Earnings Breakdown
                 </h3>
                 
                 <div className="space-y-2 text-sm">
@@ -224,17 +225,12 @@ export default function ProviderEarningsPage() {
                     </div>
 
                     <div className="flex justify-between items-center py-1 border-b border-dashed text-destructive">
-                        <span>Admin Fees for Cash Jobs <span className="text-[10px] text-muted-foreground ml-1">(Deducted from wallet)</span></span>
-                        <span className="font-semibold">- {symbol}{earningsData.monthlyCashCommission.toFixed(2)}</span>
-                    </div>
-
-                    <div className="flex justify-between items-center py-1 border-b border-dashed text-destructive">
                         <span>Payouts requested this month</span>
                         <span className="font-semibold">- {symbol}{earningsData.monthlyWithdrawals.toFixed(2)}</span>
                     </div>
 
                     <div className="flex justify-between items-center pt-2 font-bold text-base">
-                        <span>Total Available in Wallet</span>
+                        <span>Total Withdrawable Balance</span>
                         <span className="text-blue-600">{symbol}{earningsData.withdrawableBalance.toFixed(2)}</span>
                     </div>
                 </div>

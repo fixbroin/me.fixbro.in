@@ -323,26 +323,29 @@ export async function updateBookingStatusByProviderAction(
         // Calculate commission
         const configSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
         const appConfig = configSnap.exists() ? configSnap.data() as any : {};
-        const commission = calculateProviderFee(bookingData.totalAmount || 0, appConfig.providerFeeType, appConfig.providerFeeValue);
+        const commissionBase = (bookingData.totalAmount || 0) - (bookingData.platformFeeTotal || 0);
+        const commission = calculateProviderFee(commissionBase, appConfig.providerFeeType, appConfig.providerFeeValue);
+        const platformFeeVal = bookingData.platformFeeTotal || 0;
+        const totalDeduction = commission + platformFeeVal;
 
-        if (commission > 0) {
+        if (totalDeduction > 0) {
           // Deduct from wallet in MySQL
           await updateDoc(providerUserRef, { 
-            providerWalletBalance: currentWalletBalance - commission 
+            providerWalletBalance: currentWalletBalance - totalDeduction 
           });
 
           // Write deduction ledger log in MySQL
           await addDoc(collection(db, 'providerWalletTransactions'), {
             providerId,
-            amount: -commission,
+            amount: -totalDeduction,
             type: 'commission_deduction',
             bookingId,
-            description: `Commission auto-deducted for accepting cash booking (ID: ${bookingData.bookingId || bookingId})`,
+            description: `Commission (${appConfig.currencySymbol || "₹"}${commission.toFixed(2)}) + Platform Fee (${appConfig.currencySymbol || "₹"}${platformFeeVal.toFixed(2)}) auto-deducted for Cash Booking #${bookingData.bookingId}`,
             timestamp: Timestamp.now(),
           });
 
           updateData.commissionPaidFromWallet = true;
-          updateData.walletCommissionAmount = commission;
+          updateData.walletCommissionAmount = totalDeduction;
         }
       }
     }

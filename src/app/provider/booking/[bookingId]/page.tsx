@@ -54,75 +54,24 @@ export default function ProviderBookingDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
-  const [providerWalletBalance, setProviderWalletBalance] = useState<number>(0);
-  const [minBalanceForJobs, setMinBalanceForJobs] = useState<number>(50);
+  const [providerWalletBalance, setProviderWalletBalance] = useState<number | null>(null);
+  const [minBalanceForJobs, setMinBalanceForJobs] = useState<number | null>(null);
+  const [isWalletLoaded, setIsWalletLoaded] = useState(false);
 
-  useEffect(() => {
-    if (!providerUser || authIsLoading) return;
-    
-    // Fetch provider wallet balance
-    const userDocRef = doc(db, 'users', providerUser.uid);
-    getDoc(userDocRef).then(snap => {
-      if (snap.exists()) {
-        setProviderWalletBalance(snap.data()?.providerWalletBalance || 0);
-      }
-    }).catch(err => console.error("Error loading wallet balance:", err));
-
-    // Fetch minimum balance setting
-    getProviderWalletSettingsAction().then(settings => {
-      setMinBalanceForJobs(settings.minBalanceForJobs);
-    }).catch(err => console.error("Error loading wallet settings:", err));
-  }, [providerUser, authIsLoading]);
-
-  useEffect(() => {
-    if (!bookingId || !providerUser) {
-      if(!authIsLoading && !providerUser) router.push('/auth/login');
-      setIsLoadingBooking(false);
-      return;
-    }
-
-    setIsLoadingBooking(true);
-    const bookingDocRef = doc(db, "bookings", bookingId);
-
-    const unsubscribe = onSnapshot(bookingDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as FirestoreBooking;
-        if (data.providerId === providerUser.uid) {
-          setBooking({ ...data, id: docSnap.id });
-          setError(null);
-        } else {
-          setError("You are not authorized to view this booking.");
-          setBooking(null);
-          toast({ title: "Access Denied", description: "This booking is not assigned to you.", variant: "destructive" });
-        }
-      } else {
-        setError("Booking not found.");
-        setBooking(null);
-        toast({ title: "Not Found", description: `Booking with ID ${bookingId} not found.`, variant: "destructive" });
-      }
-      setIsLoadingBooking(false);
-    }, (err) => {
-      console.error("Error fetching booking details:", err);
-      setError("Failed to load booking details.");
-      setIsLoadingBooking(false);
-      toast({ title: "Error", description: "Could not fetch booking details.", variant: "destructive" });
-    });
-
-    return () => unsubscribe();
-
-  }, [bookingId, providerUser, authIsLoading, router, toast]);
-  
-  const handleViewOnMap = () => {
-    if (booking?.latitude && booking?.longitude) {
-      const url = `https://www.google.com/maps?q=${booking.latitude},${booking.longitude}`;
-      window.open(url, '_blank');
-    }
+  const providerFeeType = appConfig?.providerFeeType || 'percentage';
+  const providerFeeValue = Number(appConfig?.providerFeeValue || 0);
+  const getCommission = (amount: number, feeType: string, feeVal: number) => {
+    if (feeType === 'percentage') return (amount * feeVal) / 100;
+    return feeVal;
   };
-  
-  const handleNavigateBack = () => {
-    showLoading();
-    router.back();
-  }
+  const paymentMethod = booking?.paymentMethod || 'Cash';
+  const isCash = paymentMethod.toLowerCase() === 'cash';
+  const providerGross = (booking?.totalAmount || 0) - (booking?.platformFeeTotal || 0);
+  const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (booking?.platformFeeTotal || 0)) : 0;
+  const isLowBalance = booking && providerWalletBalance !== null && minBalanceForJobs !== null ? (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && 
+    providerWalletBalance < Math.max(minBalanceForJobs || 0, requiredCommission) : false;
+  const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
+
 
   const updateBookingStatus = async (newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
     if (!booking?.id || !providerUser) return;
@@ -184,6 +133,111 @@ export default function ProviderBookingDetailsPage() {
     }
   };
 
+  useEffect(() => {
+    if (!providerUser || authIsLoading) return;
+    
+    // Fetch provider wallet balance
+    const userDocRef = doc(db, 'users', providerUser.uid);
+    const balancePromise = getDoc(userDocRef).then(snap => {
+      if (snap.exists()) {
+        setProviderWalletBalance(snap.data()?.providerWalletBalance || 0);
+      } else {
+        setProviderWalletBalance(0);
+      }
+    }).catch(err => {
+      console.error("Error loading wallet balance:", err);
+      setProviderWalletBalance(0);
+    });
+
+    // Fetch minimum balance setting
+    const settingsPromise = getProviderWalletSettingsAction().then(settings => {
+      setMinBalanceForJobs(settings.minBalanceForJobs);
+    }).catch(err => {
+      console.error("Error loading wallet settings:", err);
+      setMinBalanceForJobs(50);
+    });
+
+    Promise.all([balancePromise, settingsPromise]).finally(() => {
+      setIsWalletLoaded(true);
+    });
+  }, [providerUser, authIsLoading]);
+
+  // Auto-Accept or Redirect based on balance when booking loads
+  useEffect(() => {
+    if (!booking || isLoadingBooking || isProcessingAction) return;
+    if (!isWalletLoaded || providerWalletBalance === null || minBalanceForJobs === null) return;
+
+    const isAssigned = booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled';
+    if (isAssigned) {
+      const requiredAmount = Math.max(minBalanceForJobs, requiredCommission);
+
+      if (providerWalletBalance < requiredAmount) {
+        // Redirect provider back to dashboard with error toast
+        toast({
+          title: "Prepaid Balance Low",
+          description: `You need a minimum balance of ${symbol}${requiredAmount.toFixed(decimals)} to accept/view this job.`,
+          variant: "destructive"
+        });
+        router.replace('/provider');
+      } else {
+        // Auto-accept immediately and deduct commission
+        updateBookingStatus('ProviderAccepted');
+      }
+    }
+  }, [booking, isLoadingBooking, isWalletLoaded, providerWalletBalance, minBalanceForJobs, requiredCommission, decimals, symbol, router, toast]);
+
+  useEffect(() => {
+    if (!bookingId || !providerUser) {
+      if(!authIsLoading && !providerUser) router.push('/auth/login');
+      setIsLoadingBooking(false);
+      return;
+    }
+
+    setIsLoadingBooking(true);
+    const bookingDocRef = doc(db, "bookings", bookingId);
+
+    const unsubscribe = onSnapshot(bookingDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as FirestoreBooking;
+        if (data.providerId === providerUser.uid) {
+          setBooking({ ...data, id: docSnap.id });
+          setError(null);
+        } else {
+          setError("You are not authorized to view this booking.");
+          setBooking(null);
+          toast({ title: "Access Denied", description: "This booking is not assigned to you.", variant: "destructive" });
+        }
+      } else {
+        setError("Booking not found.");
+        setBooking(null);
+        toast({ title: "Not Found", description: `Booking with ID ${bookingId} not found.`, variant: "destructive" });
+      }
+      setIsLoadingBooking(false);
+    }, (err) => {
+      console.error("Error fetching booking details:", err);
+      setError("Failed to load booking details.");
+      setIsLoadingBooking(false);
+      toast({ title: "Error", description: "Could not fetch booking details.", variant: "destructive" });
+    });
+
+    return () => unsubscribe();
+
+  }, [bookingId, providerUser, authIsLoading, router, toast]);
+  
+  const handleViewOnMap = () => {
+    if (booking?.latitude && booking?.longitude) {
+      const url = `https://www.google.com/maps?q=${booking.latitude},${booking.longitude}`;
+      window.open(url, '_blank');
+    }
+  };
+  
+  const handleNavigateBack = () => {
+    showLoading();
+    router.back();
+  }
+
+
+
 
   if (isLoadingBooking || authIsLoading) {
     return (
@@ -218,18 +272,7 @@ export default function ProviderBookingDetailsPage() {
 
   const isJobCompleted = booking.status === 'Completed';
 
-  const providerFeeType = appConfig?.providerFeeType || 'percentage';
-  const providerFeeValue = Number(appConfig?.providerFeeValue || 0);
-  const getCommission = (amount: number, feeType: string, feeVal: number) => {
-    if (feeType === 'percentage') return (amount * feeVal) / 100;
-    return feeVal;
-  };
-  const paymentMethod = booking.paymentMethod || 'Cash';
-  const isCash = paymentMethod.toLowerCase() === 'cash';
-  const requiredCommission = isCash ? getCommission(booking.totalAmount || 0, providerFeeType, providerFeeValue) : 0;
-  const isLowBalance = (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && 
-    providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
-  const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
+
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -356,11 +399,12 @@ export default function ProviderBookingDetailsPage() {
              <div className="text-sm space-y-1">
                 <p><strong>Subtotal:</strong> {symbol}{booking.subTotal.toFixed(2)}</p>
                 {booking.discountAmount && booking.discountAmount > 0 && <p><strong>Discount:</strong> - {symbol}{booking.discountAmount.toFixed(2)} ({booking.discountCode})</p>}
+                {isCash && booking.appliedPlatformFees && booking.appliedPlatformFees.length > 0 && booking.appliedPlatformFees.map((fee, idx) => (
+                   <p key={idx}><strong>{fee.name}:</strong> + {symbol}{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}</p>
+                 ))}
                 {booking.visitingCharge && booking.visitingCharge > 0 && <p><strong>Visiting Charge:</strong> + {symbol}{booking.visitingCharge.toFixed(2)}</p>}
                 
-                {booking.appliedPlatformFees && booking.appliedPlatformFees.length > 0 && booking.appliedPlatformFees.map((fee, idx) => (
-                  <p key={idx}><strong>{fee.name}:</strong> + {symbol}{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}</p>
-                ))}
+
 
                 {booking.additionalCharges && booking.additionalCharges.length > 0 && (
                   <div className="bg-amber-50 p-2 rounded-md border border-amber-100 my-2">
@@ -400,7 +444,7 @@ export default function ProviderBookingDetailsPage() {
                   <span>Low Wallet Balance</span>
                 </div>
                 <p className="font-semibold text-xs leading-snug">
-                  Add money to accept this booking. Minimum balance required: {symbol}{Math.max(minBalanceForJobs, requiredCommission).toFixed(decimals)}
+                  Add money to accept this booking. Minimum balance required: {symbol}{Math.max(minBalanceForJobs || 0, requiredCommission).toFixed(decimals)}
                 </p>
               </div>
             )}

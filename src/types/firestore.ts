@@ -210,6 +210,7 @@ export interface FirestoreBooking {
   discountCode?: string;
   discountAmount?: number; // Discount applied to the sum of BASE prices + BASE visiting charge
   appliedPlatformFees?: AppliedPlatformFeeItem[]; // Store applied platform fees
+  platformFeeTotal?: number; // Total amount of platform fees including tax
   additionalCharges?: { name: string; amount: number }[]; // Extra costs added during service
   paymentMethod: string;
   paymentId?: string; // If online payment
