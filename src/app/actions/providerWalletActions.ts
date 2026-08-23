@@ -421,6 +421,11 @@ export async function submitWalletComplaintAction(
   bookingId?: string | null
 ) {
   try {
+    const configSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
+    const appConfig = configSnap.exists() ? configSnap.data() as any : {};
+    const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
+    const symbol = appConfig?.currencySymbol || "₹";
+
     const providerSnap = await getDoc(doc(db, 'users', providerId));
     const providerName = providerSnap.exists() ? (providerSnap.data()?.displayName || 'Provider') : 'Provider';
 
@@ -489,8 +494,8 @@ export async function submitWalletComplaintAction(
             variables: {
               providerName,
               bookingHumanId: bookingHumanId || 'None',
-              amount: amount.toFixed(2),
-              currencySymbol: '₹'
+              amount: amount.toFixed(decimals),
+              currencySymbol: symbol
             }
           })
         );
@@ -585,6 +590,11 @@ export async function resolveWalletComplaintAction(
   resolutionNotes: string
 ) {
   try {
+    const configSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
+    const appConfig = configSnap.exists() ? configSnap.data() as any : {};
+    const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
+    const symbol = appConfig?.currencySymbol || "₹";
+
     const complaintRef = doc(db, 'providerComplaints', complaintId);
     const compSnap = await getDoc(complaintRef);
     if (!compSnap.exists()) {
@@ -632,7 +642,7 @@ export async function resolveWalletComplaintAction(
       await addDoc(collection(db, 'userNotifications'), {
         userId: providerId,
         title: `Dispute ${resolutionStatus === 'accepted' ? 'Accepted' : 'Solved'}`,
-        message: `Your dispute (ID: ${compData.complaintId || compSnap.id}) was marked as ${resolutionStatus}. ₹${refundAmount.toFixed(2)} refunded. Notes: ${resolutionNotes}`,
+        message: `Your dispute (ID: ${compData.complaintId || compSnap.id}) was marked as ${resolutionStatus}. ${symbol}${refundAmount.toFixed(decimals)} refunded. Notes: ${resolutionNotes}`,
         type: 'success',
         href: '/provider/wallet',
         read: false,
@@ -664,13 +674,13 @@ export async function resolveWalletComplaintAction(
         await sendServerPushNotification({
           userId: providerId,
           title: `Dispute ${resolutionStatus === 'accepted' ? 'Accepted' : 'Solved'}!`,
-          body: `Your prepaid wallet has been credited with ₹${refundAmount.toFixed(2)}. Status: ${resolutionStatus}`,
+          body: `Your prepaid wallet has been credited with ${symbol}${refundAmount.toFixed(decimals)}. Status: ${resolutionStatus}`,
           href: '/provider/wallet',
           type: 'provider_wallet_refund',
           variables: {
-            amount: refundAmount.toFixed(2),
+            amount: refundAmount.toFixed(decimals),
             reason: `Dispute ${resolutionStatus}: ${resolutionNotes}`,
-            currencySymbol: '₹'
+            currencySymbol: symbol
           }
         });
       } else {
@@ -682,7 +692,7 @@ export async function resolveWalletComplaintAction(
           type: 'withdrawal_status',
           variables: {
             status: resolutionStatus,
-            amount: refundAmount.toFixed(2)
+            amount: refundAmount.toFixed(decimals)
           }
         });
       }
