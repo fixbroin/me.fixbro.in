@@ -126,11 +126,20 @@ export default function ProviderWalletPage() {
       }
 
       // 1. Create Razorpay order on server
-      const amountInPaise = Math.round(amount * 100);
+      const currencyCode = appConfig?.currencyCode || 'INR';
+      const getCurrencySubunitDecimals = (cc: string): number => {
+        const c = cc.toUpperCase();
+        if (['JPY', 'KRW', 'CLP', 'VND', 'UGX'].includes(c)) return 0;
+        if (['BHD', 'JOD', 'KWD', 'OMR', 'TND'].includes(c)) return 3;
+        return 2;
+      };
+      const currencyDecimals = getCurrencySubunitDecimals(currencyCode);
+      const amountInSubunit = Math.round(amount * Math.pow(10, currencyDecimals));
+
       const res = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: amountInPaise, currency: appConfig?.currencyCode || 'INR' }),
+        body: JSON.stringify({ amount: amountInSubunit, currency: currencyCode }),
       });
 
       const orderData = await res.json();
