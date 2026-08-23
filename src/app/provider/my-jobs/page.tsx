@@ -27,10 +27,31 @@ export default function ProviderMyJobsPage() {
   const [processingBookingAction, setProcessingBookingAction] = useState<string | null>(null);
   const [displayLimit, setDisplayLimit] = useState(50);
   const [bookingCounts, setBookingCounts] = useState({ completed: 0, newRequests: 0, ongoing: 0, other: 0, total: 0 });
+  const [providerWalletBalance, setProviderWalletBalance] = useState<number>(0);
+  const [minBalanceForJobs, setMinBalanceForJobs] = useState<number>(50);
 
   // Completion Dialog State
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [bookingToComplete, setBookingToComplete] = useState<FirestoreBooking | null>(null);
+
+  useEffect(() => {
+    if (!providerUser || authIsLoading) return;
+    
+    // Fetch provider wallet balance
+    const userDocRef = doc(db, 'users', providerUser.uid);
+    getDoc(userDocRef).then(snap => {
+      if (snap.exists()) {
+        setProviderWalletBalance(snap.data()?.providerWalletBalance || 0);
+      }
+    }).catch(err => console.error("Error loading wallet balance:", err));
+
+    // Fetch minimum balance setting
+    getDoc(doc(db, 'webSettings', 'walletSettings')).then(snap => {
+      if (snap.exists()) {
+        setMinBalanceForJobs(snap.data()?.minBalanceForJobs ?? 50);
+      }
+    }).catch(err => console.error("Error loading wallet settings:", err));
+  }, [providerUser, authIsLoading]);
 
   useEffect(() => {
     if (!providerUser || authIsLoading) {
@@ -181,6 +202,8 @@ export default function ProviderMyJobsPage() {
                   onAccept={(id) => updateBookingStatus(id, 'ProviderAccepted')}
                   onReject={(id) => updateBookingStatus(id, 'ProviderRejected')}
                   isProcessingAction={processingBookingAction === job.id}
+                  providerWalletBalance={providerWalletBalance}
+                  minBalanceForJobs={minBalanceForJobs}
                 />
               ))}
             </div>
@@ -195,6 +218,8 @@ export default function ProviderMyJobsPage() {
                   onStartWork={(id) => updateBookingStatus(id, 'InProgressByProvider')}
                   onCompleteWork={(id) => updateBookingStatus(id, 'Completed')}
                   isProcessingAction={processingBookingAction === job.id}
+                  providerWalletBalance={providerWalletBalance}
+                  minBalanceForJobs={minBalanceForJobs}
                 />
               ))}
             </div>
@@ -204,7 +229,12 @@ export default function ProviderMyJobsPage() {
         <TabsContent value="completed">
           {completedJobs.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
-              {completedJobs.map(job => <ProviderJobCard key={job.id} job={job} type="completed" />)}
+              {completedJobs.map(job => (
+                <ProviderJobCard key={job.id} job={job} type="completed"
+                  providerWalletBalance={providerWalletBalance}
+                  minBalanceForJobs={minBalanceForJobs}
+                />
+              ))}
             </div>
           ) : <p className="text-muted-foreground text-center py-6">No completed jobs yet.</p>}
         </TabsContent>
@@ -212,7 +242,12 @@ export default function ProviderMyJobsPage() {
         <TabsContent value="other">
           {otherJobs.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
-              {otherJobs.map(job => <ProviderJobCard key={job.id} job={job} type="completed" />)}
+              {otherJobs.map(job => (
+                <ProviderJobCard key={job.id} job={job} type="completed"
+                  providerWalletBalance={providerWalletBalance}
+                  minBalanceForJobs={minBalanceForJobs}
+                />
+              ))}
             </div>
           ) : <p className="text-muted-foreground text-center py-6">No jobs with other statuses.</p>}
         </TabsContent>

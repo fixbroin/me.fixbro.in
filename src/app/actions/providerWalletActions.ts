@@ -356,6 +356,27 @@ export async function updateBookingStatusByProviderAction(
         updateData.additionalCharges = additionalCharges;
         const totalCharges = additionalCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
         updateData.totalAmount = (bookingData.totalAmount || 0) + totalCharges;
+
+        // Calculate and deduct commission for additional charges
+        const configSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
+        const appConfig = configSnap.exists() ? configSnap.data() as any : {};
+        const extraCommission = calculateProviderFee(totalCharges, appConfig.providerFeeType, appConfig.providerFeeValue);
+
+        if (extraCommission > 0) {
+          const currentWalletBalance = providerData.providerWalletBalance || 0;
+          await updateDoc(providerUserRef, { 
+            providerWalletBalance: currentWalletBalance - extraCommission 
+          });
+
+          await addDoc(collection(db, 'providerWalletTransactions'), {
+            providerId,
+            amount: -extraCommission,
+            type: 'commission_deduction',
+            bookingId,
+            description: `Commission auto-deducted for extra work/charges on booking (ID: ${bookingData.bookingId || bookingId})`,
+            timestamp: Timestamp.now(),
+          });
+        }
       }
       if (finalizedPaymentMethod) {
         updateData.paymentMethod = finalizedPaymentMethod;

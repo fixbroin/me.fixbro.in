@@ -111,6 +111,7 @@ export default function ProviderWithdrawalsPage() {
 
   const [showClearWalletDialog, setShowClearWalletDialog] = useState(false);
   const [providerToClear, setProviderToClear] = useState<FirestoreUser | null>(null);
+  const [clearMode, setClearMode] = useState<'balance' | 'all'>('balance');
 
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedRequestForDetails, setSelectedRequestForDetails] = useState<WithdrawalRequest | null>(null);
@@ -193,16 +194,52 @@ export default function ProviderWithdrawalsPage() {
   const handleClearWalletExecute = async (uid: string, displayName: string) => {
     setIsClearingWallet(uid);
     try {
-      const userDocRef = doc(db, "users", uid);
-      await updateDoc(userDocRef, {
-        withdrawableBalance: 0
-      });
+      if (clearMode === 'all') {
+        const userDocRef = doc(db, "users", uid);
+        await updateDoc(userDocRef, {
+          withdrawableBalance: 0,
+          providerWalletBalance: 0,
+          totalPaidOut: 0,
+          monthlyStats: {
+            monthKey: "",
+            gross: 0,
+            commission: 0,
+            cashCollected: 0,
+            withdrawals: 0,
+            onlineNet: 0,
+            cashCommission: 0
+          }
+        });
 
-      toast({
-        title: "Wallet Cleared",
-        description: `Successfully reset wallet balance to 0 for ${displayName}.`,
-        className: "bg-green-100 border-green-300 text-green-700 font-medium"
-      });
+        const txsQuery = query(collection(db, "providerWalletTransactions"), where("providerId", "==", uid));
+        const txsSnap = await getDocs(txsQuery);
+        for (const d of txsSnap.docs) {
+          await deleteDoc(doc(db, "providerWalletTransactions", d.id));
+        }
+
+        const reqsQuery = query(collection(db, "withdrawalRequests"), where("providerId", "==", uid));
+        const reqsSnap = await getDocs(reqsQuery);
+        for (const d of reqsSnap.docs) {
+          await deleteDoc(doc(db, "withdrawalRequests", d.id));
+        }
+
+        toast({
+          title: "Wallet & History Cleared",
+          description: `Successfully cleared all wallet, transactions, and withdrawal records for ${displayName}.`,
+          className: "bg-green-100 border-green-300 text-green-700 font-medium"
+        });
+      } else {
+        const userDocRef = doc(db, "users", uid);
+        await updateDoc(userDocRef, {
+          withdrawableBalance: 0
+        });
+
+        toast({
+          title: "Wallet Cleared",
+          description: `Successfully reset wallet balance to 0 for ${displayName}.`,
+          className: "bg-green-100 border-green-300 text-green-700 font-medium"
+        });
+      }
 
       await loadProviders();
     } catch (err) {
@@ -719,23 +756,45 @@ export default function ProviderWithdrawalsPage() {
                               </TableCell>
                               <TableCell className="text-right">
                                 <PermissionGuard moduleId="provider_withdrawals" action="write">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setProviderToClear(p);
-                                      setShowClearWalletDialog(true);
-                                    }}
-                                    disabled={(p.withdrawableBalance || 0) === 0 || isClearingWallet === p.uid}
-                                    className="h-8 px-2 text-xs border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive rounded-lg font-medium"
-                                  >
-                                    {isClearingWallet === p.uid ? (
-                                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                    ) : (
-                                      <Trash2 className="h-3 w-3 mr-1" />
-                                    )}
-                                    Clear Wallet
-                                  </Button>
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setProviderToClear(p);
+                                        setClearMode('balance');
+                                        setShowClearWalletDialog(true);
+                                      }}
+                                      disabled={(p.withdrawableBalance || 0) === 0 || isClearingWallet === p.uid}
+                                      className="h-8 px-2 text-xs border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive rounded-lg font-medium"
+                                    >
+                                      {isClearingWallet === p.uid && clearMode === 'balance' ? (
+                                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                      ) : (
+                                        <Trash2 className="h-3 w-3 mr-1" />
+                                      )}
+                                      Clear Wallet
+                                    </Button>
+
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => {
+                                        setProviderToClear(p);
+                                        setClearMode('all');
+                                        setShowClearWalletDialog(true);
+                                      }}
+                                      disabled={isClearingWallet === p.uid}
+                                      className="h-8 px-2 text-xs rounded-lg font-medium bg-destructive hover:bg-destructive/90"
+                                    >
+                                      {isClearingWallet === p.uid && clearMode === 'all' ? (
+                                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                      ) : (
+                                        <Trash2 className="h-3 w-3 mr-1" />
+                                      )}
+                                      Clear All
+                                    </Button>
+                                  </div>
                                 </PermissionGuard>
                               </TableCell>
                            </TableRow>
@@ -789,27 +848,47 @@ export default function ProviderWithdrawalsPage() {
                             </div>
                           </div>
 
-                          <div className="flex justify-end border-t pt-2">
-                            <PermissionGuard moduleId="provider_withdrawals" action="write">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setProviderToClear(p);
-                                  setShowClearWalletDialog(true);
-                                }}
-                                disabled={balance === 0 || isClearingWallet === p.uid}
-                                className="w-full h-8 text-xs border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive rounded-lg font-medium"
-                              >
-                                {isClearingWallet === p.uid ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-                                ) : (
-                                  <Trash2 className="h-3.5 w-3.5 mr-1" />
-                                )}
-                                Clear Wallet
-                              </Button>
-                            </PermissionGuard>
-                          </div>
+                           <div className="flex gap-2 border-t pt-2 w-full">
+                             <PermissionGuard moduleId="provider_withdrawals" action="write">
+                               <Button
+                                 variant="outline"
+                                 size="sm"
+                                 onClick={() => {
+                                   setProviderToClear(p);
+                                   setClearMode('balance');
+                                   setShowClearWalletDialog(true);
+                                 }}
+                                 disabled={balance === 0 || isClearingWallet === p.uid}
+                                 className="w-1/2 h-8 text-xs border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive rounded-lg font-medium"
+                               >
+                                 {isClearingWallet === p.uid && clearMode === 'balance' ? (
+                                   <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                                 ) : (
+                                   <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                 )}
+                                 Clear Wallet
+                               </Button>
+
+                               <Button
+                                 variant="destructive"
+                                 size="sm"
+                                 onClick={() => {
+                                   setProviderToClear(p);
+                                   setClearMode('all');
+                                   setShowClearWalletDialog(true);
+                                 }}
+                                 disabled={isClearingWallet === p.uid}
+                                 className="w-1/2 h-8 text-xs rounded-lg font-medium bg-destructive hover:bg-destructive/90 text-white"
+                               >
+                                 {isClearingWallet === p.uid && clearMode === 'all' ? (
+                                   <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                                 ) : (
+                                   <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                 )}
+                                 Clear All
+                               </Button>
+                             </PermissionGuard>
+                           </div>
                         </Card>
                       );
                     })}
@@ -991,9 +1070,19 @@ export default function ProviderWithdrawalsPage() {
       <AlertDialog open={showClearWalletDialog} onOpenChange={setShowClearWalletDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear Wallet Balance</AlertDialogTitle>
+            <AlertDialogTitle>
+              {clearMode === 'all' ? 'Clear All Wallet & History Logs' : 'Clear Wallet Balance'}
+            </AlertDialogTitle>
             <AlertDialogDescriptionComponent>
-              Are you sure you want to clear/reset the wallet balance for <span className="font-semibold text-foreground">{providerToClear?.displayName}</span>? This will set their withdrawable balance to {formatCurrency(0, symbol, decimals, code)} permanently.
+              {clearMode === 'all' ? (
+                <span>
+                  Are you sure you want to delete all transaction ledgers, withdrawal requests, and reset wallet balances to 0 for <span className="font-semibold text-foreground">{providerToClear?.displayName}</span>? This action is permanent and cannot be undone.
+                </span>
+              ) : (
+                <span>
+                  Are you sure you want to clear/reset the withdrawable balance for <span className="font-semibold text-foreground">{providerToClear?.displayName}</span>? This will set their withdrawable balance to {formatCurrency(0, symbol, decimals, code)} permanently.
+                </span>
+              )}
             </AlertDialogDescriptionComponent>
           </AlertDialogHeader>
           <AlertDialogFooter>

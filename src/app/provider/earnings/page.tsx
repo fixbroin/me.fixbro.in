@@ -188,16 +188,16 @@ export default function ProviderEarningsPage() {
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Month Gross</CardTitle></CardHeader>
             <CardContent><p className="text-2xl font-bold">{symbol}{earningsData.monthlyGrossEarnings.toFixed(2)}</p></CardContent>
           </Card>
-          <Card className="bg-destructive/5 border-destructive/20">
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Month Admin Fee</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold">{symbol}{earningsData.monthlyAdminCommission.toFixed(2)}</p></CardContent>
+          <Card className="bg-amber-500/5 border-amber-500/20">
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Cash Collected (Taken by You)</CardTitle></CardHeader>
+            <CardContent><p className="text-2xl font-bold text-amber-600">{symbol}{earningsData.monthlyCashCollected.toFixed(2)}</p></CardContent>
           </Card>
           <Card className="bg-green-500/5 border-green-500/20">
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Month Net Earnings</CardTitle></CardHeader>
-            <CardContent><p className="text-2xl font-bold text-green-600">{symbol}{earningsData.monthlyNetEarnings.toFixed(2)}</p></CardContent>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Online Received (Your Net Share)</CardTitle></CardHeader>
+            <CardContent><p className="text-2xl font-bold text-green-600">{symbol}{earningsData.monthlyOnlineNet.toFixed(2)}</p></CardContent>
           </Card>
           <Card className="bg-blue-500/5 border-blue-500/20">
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Wallet Balance</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Withdrawable Balance</CardTitle></CardHeader>
             <CardContent>
                 <p className="text-2xl font-bold text-blue-600">{symbol}{earningsData.withdrawableBalance.toFixed(2)}</p>
                 <p className="text-[10px] text-muted-foreground mt-1">Available to Withdraw</p>

@@ -9,7 +9,8 @@ import type { FirestoreBooking } from '@/types/firestore';
 import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/contexts/LoadingContext';
 import AppImage from '@/components/ui/AppImage';
-import { formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
+import { formatDateInTimezone, formatTimeInTimezone, cn } from '@/lib/utils';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 interface ProviderJobCardProps {
   job: FirestoreBooking;
@@ -19,6 +20,8 @@ interface ProviderJobCardProps {
   onStartWork?: (bookingId: string) => void;
   onCompleteWork?: (bookingId: string) => void;
   isProcessingAction?: boolean;
+  providerWalletBalance?: number;
+  minBalanceForJobs?: number;
 }
 
 const formatDateForDisplay = (dateString: string | undefined): string => {
@@ -75,10 +78,28 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
   onReject,
   onStartWork,
   onCompleteWork,
-  isProcessingAction
+  isProcessingAction,
+  providerWalletBalance = 0,
+  minBalanceForJobs = 50
 }) => {
   const { showLoading } = useLoading();
   const isJobCompleted = job.status === 'Completed';
+
+  const { config: appConfig } = useApplicationConfig();
+  const providerFeeType = appConfig?.providerFeeType || 'percentage';
+  const providerFeeValue = Number(appConfig?.providerFeeValue || 0);
+
+  const getCommission = (amount: number, feeType: string, feeVal: number) => {
+    if (feeType === 'percentage') {
+      return (amount * feeVal) / 100;
+    }
+    return feeVal;
+  };
+
+  const paymentMethod = job.paymentMethod || 'Cash';
+  const isCash = paymentMethod.toLowerCase() === 'cash';
+  const requiredCommission = isCash ? getCommission(job.totalAmount || 0, providerFeeType, providerFeeValue) : 0;
+  const isLowBalance = type === 'new' && isCash && providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
 
   const handleViewDetailsClick = () => {
     showLoading();
@@ -102,7 +123,7 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
           </Badge>
         </div>
         <CardDescription className="text-xs">
-          ID: {job.bookingId} | Customer: {isJobCompleted ? "[Hidden for Privacy]" : job.customerName}
+          ID: {job.bookingId} | Customer: {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked - Add Money to Reveal]" : job.customerName}
         </CardDescription>
       </CardHeader>
       <CardContent className="text-sm space-y-1">
@@ -112,11 +133,13 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
             <strong>Ends:</strong> {formatDateInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')} {formatTimeInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')}
           </p>
         )}
-        <p><strong>Address:</strong> {isJobCompleted ? "[Hidden for Privacy]" : `${job.addressLine1}${job.addressLine2 ? `, ${job.addressLine2}` : ''}, ${job.city}`}</p>
+        <p><strong>Address:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked - Add Money to Reveal]" : `${job.addressLine1}${job.addressLine2 ? `, ${job.addressLine2}` : ''}, ${job.city}`}</p>
         <div className="flex items-center gap-2">
             <strong>Contact:</strong>
             {isJobCompleted ? (
               <span>[Hidden for Privacy]</span>
+            ) : isLowBalance ? (
+              <span>[Locked]</span>
             ) : (
               <>
                 <a href={`tel:${job.customerPhone}`} className="text-primary hover:underline font-medium">{job.customerPhone}</a>
@@ -135,19 +158,48 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
               </>
             )}
         </div>
+
+        {isLowBalance && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-xl font-bold flex flex-col gap-1 mt-2 text-left">
+            <div className="flex items-center gap-1">
+              <span>⚠️</span>
+              <span>Low Wallet Balance</span>
+            </div>
+            <p className="font-semibold text-[11px] leading-snug">
+              Your account balance is low. Please add money to accept this booking.
+            </p>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex flex-col sm:flex-row justify-end gap-2 pt-3">
-        <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs" asChild>
-          <Link href={`/provider/booking/${job.id}`} onClick={handleViewDetailsClick}>
+        {isLowBalance ? (
+          <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs" disabled>
             <ExternalLink className="mr-1 h-3.5 w-3.5"/>View Details
-          </Link>
-        </Button>
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs" asChild>
+            <Link href={`/provider/booking/${job.id}`} onClick={handleViewDetailsClick}>
+              <ExternalLink className="mr-1 h-3.5 w-3.5"/>View Details
+            </Link>
+          </Button>
+        )}
         {type === 'new' && onAccept && onReject && (
           <>
-            <Button size="sm" onClick={() => onReject(job.id!)} variant="destructive" disabled={isProcessingAction} className="w-full sm:w-auto text-xs">
+            <Button size="sm" onClick={() => onReject(job.id!)} variant="destructive" disabled={isProcessingAction || isLowBalance} className="w-full sm:w-auto text-xs">
               {isProcessingAction && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin"/>} <XCircle className="mr-1 h-3.5 w-3.5"/> Reject
             </Button>
-            <Button size="sm" onClick={() => onAccept(job.id!)} disabled={isProcessingAction} className="w-full sm:w-auto text-xs">
+            <Button 
+              size="sm" 
+              onClick={() => {
+                if (isLowBalance) {
+                  alert("Your account balance is low. Please add money.");
+                  return;
+                }
+                onAccept(job.id!);
+              }} 
+              disabled={isProcessingAction || isLowBalance} 
+              className={cn("w-full sm:w-auto text-xs", isLowBalance && "opacity-50 cursor-not-allowed")}
+            >
               {isProcessingAction && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin"/>} <CheckCircle className="mr-1 h-3.5 w-3.5"/> Accept
             </Button>
           </>

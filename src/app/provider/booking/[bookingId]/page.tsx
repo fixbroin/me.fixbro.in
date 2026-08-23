@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useLoading } from '@/contexts/LoadingContext';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
-import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, cn } from '@/lib/utils';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { logUserActivity } from '@/lib/activityLogger';
@@ -227,7 +227,19 @@ export default function ProviderBookingDetailsPage() {
   }
 
   const isJobCompleted = booking.status === 'Completed';
-  const isLowBalance = (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && providerWalletBalance < minBalanceForJobs;
+
+  const providerFeeType = appConfig?.providerFeeType || 'percentage';
+  const providerFeeValue = Number(appConfig?.providerFeeValue || 0);
+  const getCommission = (amount: number, feeType: string, feeVal: number) => {
+    if (feeType === 'percentage') return (amount * feeVal) / 100;
+    return feeVal;
+  };
+  const paymentMethod = booking.paymentMethod || 'Cash';
+  const isCash = paymentMethod.toLowerCase() === 'cash';
+  const requiredCommission = isCash ? getCommission(booking.totalAmount || 0, providerFeeType, providerFeeValue) : 0;
+  const isLowBalance = (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && 
+    isCash && 
+    providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -272,6 +284,8 @@ export default function ProviderBookingDetailsPage() {
             <div className="text-sm space-y-0.5">
               {isJobCompleted ? (
                 <p className="text-muted-foreground italic">[Hidden for Privacy]</p>
+              ) : isLowBalance ? (
+                <p className="text-muted-foreground italic">[Locked - Add Money to Reveal]</p>
               ) : (
                 <>
                   <p>{booking.addressLine1}</p>
@@ -280,7 +294,7 @@ export default function ProviderBookingDetailsPage() {
                 </>
               )}
             </div>
-            {!isJobCompleted && booking.latitude && booking.longitude && (
+            {!isJobCompleted && !isLowBalance && booking.latitude && booking.longitude && (
                 <Button variant="link" size="sm" onClick={handleViewOnMap} className="px-0 text-xs mt-1">
                     View on Google Maps <ExternalLink className="ml-1 h-3 w-3"/>
                 </Button>
@@ -390,6 +404,18 @@ export default function ProviderBookingDetailsPage() {
              <p>Booked On: {formatTimestampForDisplay(booking.createdAt)}</p>
              {booking.updatedAt && <p>Last Updated: {formatTimestampForDisplay(booking.updatedAt)}</p>}
            </div>
+
+           {isLowBalance && (
+             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-4 rounded-xl font-bold flex flex-col gap-1.5 mt-4 text-left">
+               <div className="flex items-center gap-1.5">
+                 <span>⚠️</span>
+                 <span>Low Wallet Balance</span>
+               </div>
+               <p className="font-semibold text-xs leading-snug">
+                 You have a booking you need to accept, you need to add money.
+               </p>
+             </div>
+           )}
         </CardContent>
         {/* Action Buttons Footer */}
         <CardFooter className="flex flex-col sm:flex-row justify-end gap-3 bg-muted/20 border-t p-3">
@@ -398,16 +424,22 @@ export default function ProviderBookingDetailsPage() {
                     <Button 
                         variant="destructive" 
                         onClick={() => updateBookingStatus('ProviderRejected')} 
-                        disabled={isProcessingAction}
+                        disabled={isProcessingAction || isLowBalance}
                         className="w-full sm:w-auto"
                     >
                         {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
                         Reject Booking
                     </Button>
                     <Button 
-                        onClick={() => updateBookingStatus('ProviderAccepted')} 
+                        onClick={() => {
+                          if (isLowBalance) {
+                            alert("You have a booking you need to accept, you need to add money.");
+                            return;
+                          }
+                          updateBookingStatus('ProviderAccepted');
+                        }} 
                         disabled={isProcessingAction}
-                        className="w-full sm:w-auto"
+                        className={`w-full sm:w-auto ${isLowBalance ? "opacity-50 cursor-not-allowed" : ""}`}
                     >
                         {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                         Accept Booking

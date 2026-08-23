@@ -23,6 +23,7 @@ import type { FirestoreNotification, UserActivityEventType } from '@/types/fires
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import { logUserActivity } from '@/lib/activityLogger';
 import { updateBookingStatusByProviderAction } from '@/app/actions/providerWalletActions';
+import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 const formatDateForDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
@@ -45,7 +46,20 @@ const ProviderJobCard: React.FC<{
 }> = ({ job, type, onAccept, onReject, onStartWork, onCompleteWork, isProcessingAction, providerWalletBalance, minBalanceForJobs }) => {
   const { showLoading } = useLoading();
   const isJobCompleted = job.status === 'Completed';
-  const isLowBalance = type === 'new' && providerWalletBalance < minBalanceForJobs;
+
+  const { config: appConfig } = useApplicationConfig();
+  const providerFeeType = appConfig?.providerFeeType || 'percentage';
+  const providerFeeValue = Number(appConfig?.providerFeeValue || 0);
+
+  const getCommission = (amount: number, feeType: string, feeVal: number) => {
+    if (feeType === 'percentage') return (amount * feeVal) / 100;
+    return feeVal;
+  };
+
+  const paymentMethod = job.paymentMethod || 'Cash';
+  const isCash = paymentMethod.toLowerCase() === 'cash';
+  const requiredCommission = isCash ? getCommission(job.totalAmount || 0, providerFeeType, providerFeeValue) : 0;
+  const isLowBalance = type === 'new' && isCash && providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
 
   const handleViewDetailsClick = () => {
     showLoading();
@@ -162,15 +176,21 @@ const ProviderJobCard: React.FC<{
       </CardContent>
 
       <CardFooter className="p-4 sm:p-5 pt-0 flex flex-col sm:flex-row justify-end gap-2">
-        <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs" asChild>
-          <Link href={`/provider/booking/${job.id}`} onClick={handleViewDetailsClick}>
+        {isLowBalance ? (
+          <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs" disabled>
             <ExternalLink className="mr-1.5 h-3.5 w-3.5"/>View Details
-          </Link>
-        </Button>
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" className="w-full sm:w-auto text-xs" asChild>
+            <Link href={`/provider/booking/${job.id}`} onClick={handleViewDetailsClick}>
+              <ExternalLink className="mr-1.5 h-3.5 w-3.5"/>View Details
+            </Link>
+          </Button>
+        )}
         
         {type === 'new' && onAccept && onReject && (
           <>
-            <Button size="sm" onClick={() => onReject(job.id!)} variant="destructive" disabled={isProcessingAction} className="w-full sm:w-auto text-xs">
+            <Button size="sm" onClick={() => onReject(job.id!)} variant="destructive" disabled={isProcessingAction || isLowBalance} className="w-full sm:w-auto text-xs">
               {isProcessingAction ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/> : <XCircle className="mr-1.5 h-3.5 w-3.5"/>} Reject
             </Button>
             <Button 
@@ -182,7 +202,7 @@ const ProviderJobCard: React.FC<{
                 }
                 onAccept(job.id!);
               }} 
-              disabled={isProcessingAction} 
+              disabled={isProcessingAction || isLowBalance} 
               className={cn("w-full sm:w-auto text-xs", isLowBalance && "opacity-50 cursor-not-allowed")}
             >
               {isProcessingAction ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/> : <CheckCircle className="mr-1.5 h-3.5 w-3.5"/>} Accept
