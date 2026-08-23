@@ -104,8 +104,10 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
   const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (job.platformFeeTotal || 0)) : 0;
   const isLowBalance = (type === 'new' || job.status === 'AssignedToProvider') && 
     providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
+  const isAccepted = job.status !== 'AssignedToProvider' && job.status !== 'Rescheduled';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
   const symbol = appConfig?.currencySymbol || "₹";
+  const displayTotal = isCash ? (job.totalAmount || 0) : (job.totalAmount || 0) - (job.platformFeeTotal || 0);
 
   const handleViewDetailsClick = async (e: React.MouseEvent) => {
     if (type === 'new' && onAccept) {
@@ -140,7 +142,7 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
           </Badge>
         </div>
         <CardDescription className="text-xs">
-          ID: {job.bookingId} | Customer: {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked - Add Money to Reveal]" : job.customerName}
+          ID: {job.bookingId} | Customer: {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked - Add Money to Reveal]" : !isAccepted ? "[Hidden until Accepted]" : job.customerName}
         </CardDescription>
       </CardHeader>
       <CardContent className="text-sm space-y-1">
@@ -160,13 +162,15 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
             <strong>Ends:</strong> {formatDateInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')} {formatTimeInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')}
           </p>
         )}
-        <p><strong>Address:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked - Add Money to Reveal]" : `${job.addressLine1}${job.addressLine2 ? `, ${job.addressLine2}` : ''}, ${job.city}`}</p>
+        <p><strong>Address:</strong> {isJobCompleted ? "[Hidden for Privacy]" : `${job.addressLine1}${job.addressLine2 ? `, ${job.addressLine2}` : ''}, ${job.city}`}</p>
         <div className="flex items-center gap-2">
             <strong>Contact:</strong>
             {isJobCompleted ? (
               <span>[Hidden for Privacy]</span>
             ) : isLowBalance ? (
               <span>[Locked]</span>
+            ) : !isAccepted ? (
+              <span>[Hidden until Accepted]</span>
             ) : (
               <>
                 <a href={`tel:${job.customerPhone}`} className="text-primary hover:underline font-medium">{job.customerPhone}</a>
@@ -205,7 +209,11 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
           )}
           <p className="text-xs font-black flex justify-between border-t border-dashed pt-1 text-primary">
             <span>Total Customer Pays:</span>
-            <span>{symbol}{(job.totalAmount || 0).toFixed(decimals)}</span>
+            <span>{symbol}{displayTotal.toFixed(decimals)}</span>
+          </p>
+          <p className="text-xs text-muted-foreground flex justify-between mt-1 pt-1 border-t border-muted/50">
+            <span>Payment Method:</span>
+            <span className="font-semibold text-foreground">{paymentMethod}</span>
           </p>
         </div>
 

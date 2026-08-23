@@ -82,6 +82,7 @@ export const defaultAppSettings: AppSettings = {
   // Provider Fee Settings
   providerFeeType: 'fixed', // 'fixed' or 'percentage'
   providerFeeValue: 0, // Default to 0, meaning no fee
+  providerExtraFeePercentage: 0,
 
   enableStatusUpdateEmails: true,
   enableAccountDisabledEmail: true,

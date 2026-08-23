@@ -336,7 +336,8 @@ export async function POST(request: Request) {
             const providerDoc = await transaction.get(providerDocRef);
             const providerData = providerDoc.exists ? providerDoc.data() : {};
             const currentWithdrawableBalance = providerData?.withdrawableBalance || 0;
-            const commission = calculateProviderFee(booking.totalAmount, appConfig.providerFeeType, appConfig.providerFeeValue);
+            const providerGross = (booking.totalAmount || 0) - (booking.platformFeeTotal || 0);
+            const commission = calculateProviderFee(providerGross, appConfig.providerFeeType, appConfig.providerFeeValue);
             
             // Monthly Stats Logic using Configured Timezone
             const timezone = appConfig.timezone || 'Asia/Kolkata';
@@ -350,11 +351,11 @@ export async function POST(request: Request) {
             }
 
             let balanceChange = 0;
-            stats.gross += booking.totalAmount;
+            stats.gross += providerGross;
             stats.commission += commission;
 
             const extraCharges = (booking.additionalCharges || []).reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
-            const originalAmount = booking.totalAmount - extraCharges;
+            const originalAmount = providerGross - extraCharges;
 
             if (isCashPayment(booking.paymentMethod)) {
                 balanceChange = booking.commissionPaidFromWallet ? 0 : -commission;
@@ -362,11 +363,14 @@ export async function POST(request: Request) {
                 stats.cashCommission += commission;
             } else {
                 // Customer prepaid online, but extra charges are collected by provider on-site (Pay After Service)
-                balanceChange = originalAmount - commission;
+                const originalCommission = calculateProviderFee(originalAmount, appConfig.providerFeeType, appConfig.providerFeeValue);
+                const extraCommission = appConfig.providerFeeType === 'percentage' 
+                    ? calculateProviderFee(extraCharges, appConfig.providerFeeType, appConfig.providerFeeValue) 
+                    : (extraCharges * (appConfig.providerExtraFeePercentage || 0)) / 100;
+                balanceChange = originalAmount - originalCommission;
                 stats.cashCollected += extraCharges;
-                const extraCommission = calculateProviderFee(extraCharges, appConfig.providerFeeType, appConfig.providerFeeValue);
                 stats.cashCommission += extraCommission;
-                stats.onlineNet += (originalAmount - commission);
+                stats.onlineNet += (originalAmount - originalCommission);
             }
             
             transaction.set(providerDocRef, { 

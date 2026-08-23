@@ -659,6 +659,7 @@ export interface AppSettings {
   // Provider Fee Settings
   providerFeeType?: ProviderFeeType;
   providerFeeValue?: number;
+  providerExtraFeePercentage?: number;
 
   enableStatusUpdateEmails?: boolean; // New: Toggle for generic status update emails
 

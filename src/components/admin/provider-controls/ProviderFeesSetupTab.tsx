@@ -21,6 +21,7 @@ import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 const providerFeesSchema = z.object({
   providerFeeType: z.enum(['fixed', 'percentage'], { required_error: "You must select a fee type."}),
   providerFeeValue: z.coerce.number().min(0, "Fee value must be non-negative."),
+  providerExtraFeePercentage: z.coerce.number().min(0, "Percentage must be non-negative.").max(100, "Percentage cannot exceed 100.").optional(),
 }).refine(data => {
     if (data.providerFeeType === 'percentage' && data.providerFeeValue > 100) {
         return false;
@@ -44,6 +45,7 @@ export default function ProviderFeesSetupTab() {
     defaultValues: {
       providerFeeType: 'fixed',
       providerFeeValue: 0,
+      providerExtraFeePercentage: 0,
     },
   });
 
@@ -52,6 +54,7 @@ export default function ProviderFeesSetupTab() {
       form.reset({
         providerFeeType: appConfig.providerFeeType || 'fixed',
         providerFeeValue: appConfig.providerFeeValue || 0,
+        providerExtraFeePercentage: appConfig.providerExtraFeePercentage || 0,
       });
     }
   }, [appConfig, isLoadingAppConfig, form]);
@@ -63,6 +66,7 @@ export default function ProviderFeesSetupTab() {
       const settingsToUpdate: Partial<AppSettings> = {
         providerFeeType: data.providerFeeType,
         providerFeeValue: data.providerFeeValue,
+        providerExtraFeePercentage: data.providerExtraFeePercentage || 0,
         updatedAt: Timestamp.now(),
       };
       await setDoc(settingsDocRef, settingsToUpdate, { merge: true });
@@ -146,6 +150,31 @@ export default function ProviderFeesSetupTab() {
                 </FormItem>
               )}
             />
+            {form.watch("providerFeeType") === 'fixed' && (
+              <FormField
+                control={form.control}
+                name="providerExtraFeePercentage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Commission on Extra Work / Additional Charges (%)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="e.g., 15"
+                        {...field}
+                        value={field.value ?? ""}
+                        disabled={isSaving}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      When a flat booking fee is used, enter the percentage commission (e.g., 15 for 15%) applied strictly to any added extra charges. Enter 0 if no commission is charged for extra work.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
           </CardContent>
           <CardFooter className="border-t px-6 py-4">
             <Button type="submit" disabled={isSaving}>

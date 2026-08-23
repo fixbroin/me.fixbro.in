@@ -363,7 +363,9 @@ export async function updateBookingStatusByProviderAction(
         // Calculate and deduct commission for additional charges
         const configSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
         const appConfig = configSnap.exists() ? configSnap.data() as any : {};
-        const extraCommission = calculateProviderFee(totalCharges, appConfig.providerFeeType, appConfig.providerFeeValue);
+        const extraCommission = appConfig.providerFeeType === 'percentage' 
+          ? calculateProviderFee(totalCharges, appConfig.providerFeeType, appConfig.providerFeeValue) 
+          : (totalCharges * (appConfig.providerExtraFeePercentage || 0)) / 100;
 
         if (extraCommission > 0) {
           const currentWalletBalance = providerData.providerWalletBalance || 0;

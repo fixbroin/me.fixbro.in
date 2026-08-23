@@ -70,7 +70,9 @@ export default function ProviderBookingDetailsPage() {
   const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (booking?.platformFeeTotal || 0)) : 0;
   const isLowBalance = booking && providerWalletBalance !== null && minBalanceForJobs !== null ? (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && 
     providerWalletBalance < Math.max(minBalanceForJobs || 0, requiredCommission) : false;
+  const isAccepted = booking?.status !== 'AssignedToProvider' && booking?.status !== 'Rescheduled';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
+  const displayTotal = isCash ? (booking?.totalAmount || 0) : (booking?.totalAmount || 0) - (booking?.platformFeeTotal || 0);
 
 
   const updateBookingStatus = async (newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
@@ -304,9 +306,9 @@ export default function ProviderBookingDetailsPage() {
           <section>
             <h3 className="text-lg font-semibold mb-2 flex items-center"><UserCircle className="mr-2 text-primary"/>Customer Information</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <p><strong>Name:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked - Add Money to Reveal]" : booking.customerName}</p>
-              <p className="flex items-center gap-1"><strong>Email:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked]" : (booking.customerEmail || 'N/A')}</p>
-              <p className="flex items-center gap-1"><strong>Phone:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked]" : (
+              <p><strong>Name:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked - Add Money to Reveal]" : !isAccepted ? "[Hidden until Accepted]" : booking.customerName}</p>
+              <p className="flex items-center gap-1"><strong>Email:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked]" : !isAccepted ? "[Hidden until Accepted]" : (booking.customerEmail || 'N/A')}</p>
+              <p className="flex items-center gap-1"><strong>Phone:</strong> {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked]" : !isAccepted ? "[Hidden until Accepted]" : (
                 <a href={`tel:${booking.customerPhone}`} className="text-primary hover:underline font-medium">{booking.customerPhone}</a>
               )}</p>
             </div>
@@ -317,8 +319,6 @@ export default function ProviderBookingDetailsPage() {
             <div className="text-sm space-y-0.5">
               {isJobCompleted ? (
                 <p className="text-muted-foreground italic">[Hidden for Privacy]</p>
-              ) : isLowBalance ? (
-                <p className="text-muted-foreground italic">[Locked - Add Money to Reveal]</p>
               ) : (
                 <>
                   <p>{booking.addressLine1}</p>
@@ -327,7 +327,7 @@ export default function ProviderBookingDetailsPage() {
                 </>
               )}
             </div>
-            {!isJobCompleted && !isLowBalance && booking.latitude && booking.longitude && (
+            {!isJobCompleted && !isLowBalance && isAccepted && booking.latitude && booking.longitude && (
                 <Button variant="link" size="sm" onClick={handleViewOnMap} className="px-0 text-xs mt-1">
                     View on Google Maps <ExternalLink className="ml-1 h-3 w-3"/>
                 </Button>
@@ -397,12 +397,12 @@ export default function ProviderBookingDetailsPage() {
            <section>
             <h3 className="text-lg font-semibold mb-2 flex items-center"><DollarSign className="mr-2 text-primary"/>Payment Details</h3>
              <div className="text-sm space-y-1">
-                <p><strong>Subtotal:</strong> {symbol}{booking.subTotal.toFixed(2)}</p>
-                {booking.discountAmount && booking.discountAmount > 0 && <p><strong>Discount:</strong> - {symbol}{booking.discountAmount.toFixed(2)} ({booking.discountCode})</p>}
+                <p><strong>Subtotal:</strong> {symbol}{booking.subTotal.toFixed(decimals)}</p>
+                {booking.discountAmount && booking.discountAmount > 0 && <p><strong>Discount:</strong> - {symbol}{booking.discountAmount.toFixed(decimals)} ({booking.discountCode})</p>}
                 {isCash && booking.appliedPlatformFees && booking.appliedPlatformFees.length > 0 && booking.appliedPlatformFees.map((fee, idx) => (
-                   <p key={idx}><strong>{fee.name}:</strong> + {symbol}{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(2)}</p>
+                   <p key={idx}><strong>{fee.name}:</strong> + {symbol}{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(decimals)}</p>
                  ))}
-                {booking.visitingCharge && booking.visitingCharge > 0 && <p><strong>Visiting Charge:</strong> + {symbol}{booking.visitingCharge.toFixed(2)}</p>}
+                {booking.visitingCharge && booking.visitingCharge > 0 && <p><strong>Visiting Charge:</strong> + {symbol}{booking.visitingCharge.toFixed(decimals)}</p>}
                 
 
 
@@ -412,14 +412,14 @@ export default function ProviderBookingDetailsPage() {
                     {booking.additionalCharges.map((c, i) => (
                       <div key={i} className="flex justify-between text-amber-900">
                         <span>{c.name}</span>
-                        <span>+ {symbol}{c.amount.toFixed(2)}</span>
+                        <span>+ {symbol}{c.amount.toFixed(decimals)}</span>
                       </div>
                     ))}
                   </div>
                 )}
 
-                <p><strong>Tax:</strong> + {symbol}{booking.taxAmount.toFixed(2)}</p>
-                <p className="font-bold text-lg text-primary mt-2"><strong>Total Amount:</strong> {symbol}{booking.totalAmount.toFixed(2)}</p>
+                <p><strong>Tax:</strong> + {symbol}{booking.taxAmount.toFixed(decimals)}</p>
+                <p className="font-bold text-lg text-primary mt-2"><strong>Total Amount:</strong> {symbol}{displayTotal.toFixed(decimals)}</p>
                 <p><strong>Payment Method:</strong> {booking.paymentMethod}</p>
              </div>
            </section>

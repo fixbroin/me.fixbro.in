@@ -35,6 +35,9 @@ export default function ProviderEarningsPage() {
   const symbol = appConfig?.currencySymbol || "₹";
   const { toast } = useToast();
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
+  const providerFeeType = appConfig?.providerFeeType || 'percentage';
+  const providerFeeValue = appConfig?.providerFeeValue || 0;
+  const providerExtraFeePercentage = appConfig?.providerExtraFeePercentage || 0;
   const [isSyncing, setIsSyncing] = useState(false);
 
   // EARNINGS DATA: Now read 100% from the User document (monthlyStats)
@@ -121,9 +124,12 @@ export default function ProviderEarningsPage() {
                     mStats.cashNet += (providerGross - commission);
                 } else {
                     mStats.cashCollected += extraCharges;
-                    const extraCommission = calculateProviderFee(extraCharges, appConfig.providerFeeType, appConfig.providerFeeValue);
+                    const originalCommission = calculateProviderFee(originalAmount, appConfig.providerFeeType, appConfig.providerFeeValue);
+                    const extraCommission = appConfig.providerFeeType === 'percentage' 
+                        ? calculateProviderFee(extraCharges, appConfig.providerFeeType, appConfig.providerFeeValue) 
+                        : (extraCharges * (appConfig.providerExtraFeePercentage || 0)) / 100;
                     mStats.cashCommission += extraCommission;
-                    mStats.onlineNet += (originalAmount - commission);
+                    mStats.onlineNet += (originalAmount - originalCommission);
                 }
             }
         });
@@ -208,8 +214,16 @@ export default function ProviderEarningsPage() {
 
         <CardContent className="pt-6">
             <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
-                <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <HandCoins className="h-4 w-4" /> Monthly Earnings Breakdown
+                <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                        <HandCoins className="h-4 w-4" /> Monthly Earnings Breakdown
+                    </span>
+                    <Badge variant="outline" className="text-xs font-semibold px-2 py-0.5 normal-case border-primary/20 bg-primary/5 text-primary self-start sm:self-auto">
+                        {providerFeeType === 'percentage' 
+                          ? `Admin Fee: ${providerFeeValue}%`
+                          : `Admin Fee: ${symbol}${providerFeeValue} (+ ${providerExtraFeePercentage}% on extra work)`
+                        }
+                    </Badge>
                 </h3>
                 
                 <div className="space-y-2 text-sm">
