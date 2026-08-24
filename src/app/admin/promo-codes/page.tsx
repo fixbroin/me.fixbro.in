@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { PlusCircle, Edit, Trash2, Loader2, Percent, XCircle, EyeOff, Eye, History, Search, User, Mail, Tag, IndianRupee } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Loader2, Percent, XCircle, EyeOff, Eye, History, Search, User, Mail, Tag, Coins } from "lucide-react";
 import type { FirestorePromoCode, DiscountType } from '@/types/firestore';
 import PromoCodeForm, { type PromoCodeFormData } from '@/components/admin/PromoCodeForm';
 import { db } from '@/lib/firebase';
@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { getTimestampMillis, formatCurrency, formatDateInTimezone } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
-import { getPromoCodeUsageHistory, type PromoCodeUsageRecord } from '@/lib/adminDashboardUtils';
+import { getPromoCodeUsageHistory, migratePromoCodeUsage, type PromoCodeUsageRecord } from '@/lib/adminDashboardUtils';
 import { getCache, setCache } from '@/lib/client-cache';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +38,30 @@ export default function AdminPromoCodesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [historySearchTerm, setHistorySearchTerm] = useState("");
   const { toast } = useToast();
+
+  const handleSyncUsageHistory = async () => {
+    setIsSubmitting(true);
+    toast({ title: "Syncing...", description: "Recalculating promo code usage and stats from bookings." });
+    try {
+      const res = await migratePromoCodeUsage();
+      if (res.success) {
+        toast({ title: "Success", description: `Synced ${res.count} usage records successfully.` });
+        await fetchPromoCodes();
+        await fetchUsageHistory(true);
+        // Reload stats doc via short delay or direct reload to ensure sync
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        toast({ title: "Error", description: res.error || "Failed to sync usage history.", variant: "destructive" });
+      }
+    } catch (err: any) {
+      console.error("Error syncing usage history:", err);
+      toast({ title: "Error", description: err.message || "Failed to sync usage history.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const promoCodesCollectionRef = collection(db, "adminPromoCodes");
 
@@ -240,9 +264,14 @@ export default function AdminPromoCodesPage() {
             <CardTitle className="text-2xl flex items-center"><Percent className="mr-2 h-6 w-6 text-primary" />Manage Promo Codes</CardTitle>
             <CardDescription>Create, edit, and manage promotional discount codes for customers.</CardDescription>
           </div>
-          <Button onClick={handleAddPromoCode} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Promo Code
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button onClick={handleSyncUsageHistory} variant="outline" disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
+              <History className="mr-2 h-4 w-4" /> Recalculate & Sync
+            </Button>
+            <Button onClick={handleAddPromoCode} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Promo Code
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="pt-6">
           {isLoading ? (
@@ -346,7 +375,7 @@ export default function AdminPromoCodesPage() {
               <h3 className="text-2xl font-black text-primary mt-1">{formatCurrency((stats as any).totalDiscountGiven || 0, symbol, decimals, code)}</h3>
             </div>
             <div className="p-3 rounded-2xl bg-primary/10 text-primary">
-              <IndianRupee className="h-6 w-6" />
+              <Coins className="h-6 w-6" />
             </div>
           </CardContent>
         </Card>
