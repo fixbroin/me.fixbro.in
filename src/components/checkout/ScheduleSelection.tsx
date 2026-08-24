@@ -47,6 +47,7 @@ interface ScheduleSelectionProps {
 
 export default function ScheduleSelection({ onSelect, initialDate, initialSlot, latitude, longitude }: ScheduleSelectionProps) {
   const slotsSectionRef = useRef<HTMLDivElement>(null);
+  const confirmButtonRef = useRef<HTMLDivElement>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(initialDate);
   const [displayMonth, setDisplayMonth] = useState<Date>(initialDate || new Date());
   const [availableTimeSlots, setAvailableTimeSlots] = useState<{ slot: string; remainingCapacity: number; endDateTime: string; dailyTimeline?: { dateLabel: string; startTime: string; endTime: string }[] }[]>([]);
@@ -404,6 +405,17 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot, 
     }
   };
 
+  const handleTimeSlotSelect = (slot: string) => {
+    setSelectedTimeSlot(slot);
+
+    // Scroll to confirm button on mobile
+    if (window.innerWidth < 1024) {
+      setTimeout(() => {
+        confirmButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 150);
+    }
+  };
+
   const handleConfirm = () => {
     if (selectedDate && selectedTimeSlot && selectedSlotData) {
       onSelect(selectedDate, selectedTimeSlot, selectedSlotData.endDateTime, interveningBreaksAndHolidays, selectedSlotData.dailyTimeline);
@@ -600,7 +612,7 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot, 
                       <div className="p-4 bg-primary/[0.03] dark:bg-muted/10 border border-primary/10 rounded-2xl">
                         <RadioGroup
                           value={selectedTimeSlot}
-                          onValueChange={setSelectedTimeSlot}
+                          onValueChange={handleTimeSlotSelect}
                           className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
                         >
                           {availableTimeSlots.map(({ slot, remainingCapacity }) => (
@@ -744,7 +756,7 @@ export default function ScheduleSelection({ onSelect, initialDate, initialSlot, 
         </div>
       </div>
 
-      <div className="sticky bottom-0 left-0 right-0 bg-background pt-4 pb-2 mt-auto border-t sm:border-none flex justify-end">
+      <div ref={confirmButtonRef} className="sticky bottom-0 left-0 right-0 bg-background pt-4 pb-2 mt-auto border-t sm:border-none flex justify-end">
         <Button 
           disabled={!selectedDate || !selectedTimeSlot} 
           onClick={handleConfirm}

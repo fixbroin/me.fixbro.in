@@ -98,7 +98,7 @@ export default function ProviderEarningsPage() {
         
         bookingsSnap.docs.forEach(d => {
             const b = d.data() as FirestoreBooking;
-            const providerGross = (b.totalAmount || 0) - (b.platformFeeTotal || 0);
+            const providerGross = (b.totalAmount || 0) - (b.platformFeeTotal || 0) - (b.taxAmount || 0);
             const commission = calculateProviderFee(providerGross, appConfig.providerFeeType, appConfig.providerFeeValue);
             const isCash = isCashPayment(b.paymentMethod);
             const bDate = b.scheduledDate || "";

@@ -312,21 +312,25 @@ export async function updateBookingStatusByProviderAction(
       const paymentMethod = finalizedPaymentMethod || bookingData.paymentMethod || 'Cash';
       
       if (isCashPayment(paymentMethod)) {
-        // Load settings
+        // Load settings and config
         const settings = await getProviderWalletSettingsAction();
+        const configSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
+        const appConfig = configSnap.exists() ? configSnap.data() as any : {};
+        const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
+        const symbol = appConfig?.currencySymbol || "₹";
+
         const currentWalletBalance = providerData.providerWalletBalance || 0;
 
         if (currentWalletBalance < settings.minBalanceForJobs) {
-          throw new Error(`Insufficient wallet balance. You must maintain at least ₹${settings.minBalanceForJobs.toFixed(2)} in your prepaid wallet to accept cash jobs. Please top up your wallet.`);
+          throw new Error(`Insufficient wallet balance. You must maintain at least ${symbol}${settings.minBalanceForJobs.toFixed(decimals)} in your prepaid wallet to accept cash jobs. Please top up your wallet.`);
         }
 
-        // Calculate commission
-        const configSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
-        const appConfig = configSnap.exists() ? configSnap.data() as any : {};
-        const commissionBase = (bookingData.totalAmount || 0) - (bookingData.platformFeeTotal || 0);
+        // Calculate commission (exclude platform fee and tax fee from commission base)
+        const commissionBase = (bookingData.subTotal || 0) + (bookingData.visitingCharge || 0) - (bookingData.discountAmount || 0);
         const commission = calculateProviderFee(commissionBase, appConfig.providerFeeType, appConfig.providerFeeValue);
         const platformFeeVal = bookingData.platformFeeTotal || 0;
-        const totalDeduction = commission + platformFeeVal;
+        const taxFeeVal = bookingData.taxAmount || 0;
+        const totalDeduction = commission + platformFeeVal + taxFeeVal;
 
         if (totalDeduction > 0) {
           // Deduct from wallet in MySQL
@@ -340,7 +344,7 @@ export async function updateBookingStatusByProviderAction(
             amount: -totalDeduction,
             type: 'commission_deduction',
             bookingId,
-            description: `Commission (${appConfig.currencySymbol || "₹"}${commission.toFixed(2)}) + Platform Fee (${appConfig.currencySymbol || "₹"}${platformFeeVal.toFixed(2)}) auto-deducted for Cash Booking #${bookingData.bookingId}`,
+            description: `Commission (${symbol}${commission.toFixed(decimals)}) + Platform Fee (${symbol}${platformFeeVal.toFixed(decimals)}) + Tax Fee (${symbol}${taxFeeVal.toFixed(decimals)}) auto-deducted for Cash Booking #${bookingData.bookingId}`,
             timestamp: Timestamp.now(),
           });
 

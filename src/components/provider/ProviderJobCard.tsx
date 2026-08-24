@@ -100,14 +100,14 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
 
   const paymentMethod = job.paymentMethod || 'Cash';
   const isCash = paymentMethod.toLowerCase() === 'pay after service';
-  const providerGross = (job.totalAmount || 0) - (job.platformFeeTotal || 0);
-  const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (job.platformFeeTotal || 0)) : 0;
+  const providerGross = (job.subTotal || 0) + (job.visitingCharge || 0) - (job.discountAmount || 0);
+  const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (job.platformFeeTotal || 0) + (job.taxAmount || 0)) : 0;
   const isLowBalance = (type === 'new' || job.status === 'AssignedToProvider') && 
     providerWalletBalance < Math.max(minBalanceForJobs, requiredCommission);
   const isAccepted = job.status !== 'AssignedToProvider' && job.status !== 'Rescheduled';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
   const symbol = appConfig?.currencySymbol || "₹";
-  const displayTotal = isCash ? (job.totalAmount || 0) : (job.totalAmount || 0) - (job.platformFeeTotal || 0);
+  const displayTotal = isCash ? (job.totalAmount || 0) : providerGross;
 
   const handleViewDetailsClick = async (e: React.MouseEvent) => {
     if (type === 'new' && onAccept) {

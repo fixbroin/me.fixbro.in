@@ -66,13 +66,13 @@ export default function ProviderBookingDetailsPage() {
   };
   const paymentMethod = booking?.paymentMethod || 'Cash';
   const isCash = paymentMethod.toLowerCase() === 'pay after service';
-  const providerGross = (booking?.totalAmount || 0) - (booking?.platformFeeTotal || 0);
-  const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (booking?.platformFeeTotal || 0)) : 0;
+  const providerGross = (booking?.subTotal || 0) + (booking?.visitingCharge || 0) - (booking?.discountAmount || 0);
+  const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (booking?.platformFeeTotal || 0) + (booking?.taxAmount || 0)) : 0;
   const isLowBalance = booking && providerWalletBalance !== null && minBalanceForJobs !== null ? (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && 
     providerWalletBalance < Math.max(minBalanceForJobs || 0, requiredCommission) : false;
   const isAccepted = booking?.status !== 'AssignedToProvider' && booking?.status !== 'Rescheduled';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
-  const displayTotal = isCash ? (booking?.totalAmount || 0) : (booking?.totalAmount || 0) - (booking?.platformFeeTotal || 0);
+  const displayTotal = isCash ? (booking?.totalAmount || 0) : providerGross;
 
 
   const updateBookingStatus = async (newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
@@ -418,7 +418,7 @@ export default function ProviderBookingDetailsPage() {
                   </div>
                 )}
 
-                <p><strong>Tax:</strong> + {symbol}{booking.taxAmount.toFixed(decimals)}</p>
+                {isCash && booking.taxAmount && booking.taxAmount > 0 && <p><strong>Tax:</strong> + {symbol}{booking.taxAmount.toFixed(decimals)}</p>}
                 <p className="font-bold text-lg text-primary mt-2"><strong>Total Amount:</strong> {symbol}{displayTotal.toFixed(decimals)}</p>
                 <p><strong>Payment Method:</strong> {booking.paymentMethod}</p>
              </div>

@@ -336,7 +336,7 @@ export async function POST(request: Request) {
             const providerDoc = await transaction.get(providerDocRef);
             const providerData = providerDoc.exists ? providerDoc.data() : {};
             const currentWithdrawableBalance = providerData?.withdrawableBalance || 0;
-            const providerGross = (booking.totalAmount || 0) - (booking.platformFeeTotal || 0);
+            const providerGross = (booking.subTotal || 0) + (booking.visitingCharge || 0) - (booking.discountAmount || 0);
             const commission = calculateProviderFee(providerGross, appConfig.providerFeeType, appConfig.providerFeeValue);
             
             // Monthly Stats Logic using Configured Timezone
