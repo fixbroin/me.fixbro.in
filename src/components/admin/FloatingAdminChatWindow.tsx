@@ -22,6 +22,7 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
   const [isMounted, setIsMounted] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [viewportOffset, setViewportOffset] = useState<number>(0);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
     const handleResize = () => {
       if (window.visualViewport) {
         setViewportHeight(window.visualViewport.height);
+        setViewportOffset(window.visualViewport.offsetTop);
       }
     };
 
@@ -85,7 +87,7 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
           exit="exit"
           variants={windowVariants}
           className={cn(
-            "fixed z-50 flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ease-in-out",
+            "fixed z-50 flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ease-in-out no-keyboard-scroll",
             isMobile 
               ? "inset-0 bg-background w-full" 
               : cn(
@@ -95,7 +97,14 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
                     : "bottom-24 right-6 w-[850px] h-[650px] max-w-[calc(100vw-3rem)] max-h-[calc(100vh-8rem)]"
                 )
           )}
-          style={viewportHeight && isMobile ? { height: `${viewportHeight}px` } : undefined}
+          style={viewportHeight && isMobile ? { 
+            position: 'fixed',
+            top: `${viewportOffset}px`,
+            left: 0,
+            right: 0,
+            height: `${viewportHeight}px`,
+            borderRadius: 0
+          } : undefined}
         >
           {isMobile ? (
             /* Mobile View Layout */
