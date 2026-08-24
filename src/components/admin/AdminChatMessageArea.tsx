@@ -53,6 +53,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
   const [isAiActive, setIsAiActive] = useState(true);
   const [isUpdatingAi, setIsUpdatingAi] = useState(false);
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { user: loggedInAdminUser } = useAuth();
   const { toast } = useToast();
 
@@ -193,6 +194,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
 
     const tempNewMessage = newMessage;
     setNewMessage('');
+    inputRef.current?.blur();
 
     // Instantly append to local messages array for 0ms response
     const optimisticMessage: ChatMessage = {
@@ -303,7 +305,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
 
   return (
     <div className="h-full flex flex-col bg-background relative">
-      <header className="p-4 border-b bg-card/50 backdrop-blur-md sticky top-0 z-20 shrink-0">
+      <header className="p-4 border-b bg-card/50 backdrop-blur-md sticky top-0 z-20 shrink-0 cursor-pointer" onClick={() => inputRef.current?.blur()}>
         <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="relative">
@@ -365,7 +367,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
         </div>
       </header>
 
-      <ScrollArea className="flex-grow p-4" ref={scrollAreaRootRef}>
+      <ScrollArea className="flex-grow p-4 cursor-pointer" ref={scrollAreaRootRef} onClick={() => inputRef.current?.blur()}>
         <div className="max-w-4xl mx-auto space-y-6 py-4">
           {isLoadingMessages && messages.length === 0 ? (
             <div className="flex flex-col justify-center items-center h-64 space-y-3">
@@ -460,6 +462,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
         <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex items-center space-x-2">
           <div className="relative flex-grow group">
             <Input
+              ref={inputRef}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Write a message..."

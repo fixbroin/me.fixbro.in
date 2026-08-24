@@ -21,10 +21,30 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
   const [selectedChatUser, setSelectedChatUser] = useState<FirestoreUser | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
     setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+
+    const handleResize = () => {
+      if (window.visualViewport) {
+        setViewportHeight(window.visualViewport.height);
+      }
+    };
+
+    window.visualViewport.addEventListener('resize', handleResize);
+    window.visualViewport.addEventListener('scroll', handleResize);
+    handleResize();
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('scroll', handleResize);
+    };
   }, []);
 
   useEffect(() => {
@@ -65,9 +85,9 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
           exit="exit"
           variants={windowVariants}
           className={cn(
-            "fixed z-40 flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ease-in-out",
+            "fixed z-50 flex flex-col shadow-2xl overflow-hidden transition-all duration-300 ease-in-out",
             isMobile 
-              ? "inset-0 bg-background h-full w-full" 
+              ? "inset-0 bg-background w-full" 
               : cn(
                   "border bg-card rounded-2xl",
                   isMaximized 
@@ -75,6 +95,7 @@ export default function FloatingAdminChatWindow({ isOpen, onClose }: FloatingAdm
                     : "bottom-24 right-6 w-[850px] h-[650px] max-w-[calc(100vw-3rem)] max-h-[calc(100vh-8rem)]"
                 )
           )}
+          style={viewportHeight && isMobile ? { height: `${viewportHeight}px` } : undefined}
         >
           {isMobile ? (
             /* Mobile View Layout */

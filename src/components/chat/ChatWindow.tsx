@@ -40,9 +40,55 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const { user: currentUser } = useAuth();
   const { settings: globalSettings, isLoading: isLoadingGlobalSettings } = useGlobalSettings();
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+
+    const handleResize = () => {
+      if (window.visualViewport) {
+        setViewportHeight(window.visualViewport.height);
+      }
+    };
+
+    window.visualViewport.addEventListener('resize', handleResize);
+    window.visualViewport.addEventListener('scroll', handleResize);
+    handleResize();
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('scroll', handleResize);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setTimeout(() => {
+        inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 800); // 800ms gives ample time for Firebase connection and page layout to stabilize
+    }
+  }, []);
+
+  const handleFocus = () => {
+    if (window.innerWidth < 768) {
+      setTimeout(() => {
+        if (scrollAreaRootRef.current) {
+          const viewport = scrollAreaRootRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement | null;
+          if (viewport) {
+            viewport.scrollTop = viewport.scrollHeight;
+          }
+        }
+      }, 150);
+    }
+  };
+
+  const handleBlur = () => {
+    // no-op
+  };
 
   const [adminProfile, setAdminProfile] = useState<{displayName?: string | null, photoURL?: string | null, uid?: string | null}>({
     displayName: ADMIN_FALLBACK_NAME,
@@ -183,6 +229,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
 
     const tempNewMessage = newMessage;
     setNewMessage('');
+    inputRef.current?.blur();
     
     // Instantly append to local messages array for 0ms response
     const optimisticMessage: ChatMessage = {
@@ -380,8 +427,23 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
 
 
   return (
-    <Card className="h-full flex flex-col shadow-2xl rounded-2xl border-none overflow-hidden bg-background ring-1 ring-border">
-      <CardHeader className="p-4 border-b bg-background sticky top-0 z-10 flex flex-row items-center justify-between">
+    <Card 
+      className="h-full flex flex-col shadow-2xl rounded-2xl border-none overflow-hidden bg-background ring-1 ring-border"
+      style={viewportHeight && window.innerWidth < 768 ? { 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0,
+        height: `${viewportHeight}px`, 
+        zIndex: 50, 
+        borderRadius: 0 
+      } : undefined}
+    >
+      <CardHeader 
+        className="p-4 border-b bg-background sticky top-0 z-10 flex flex-row items-center justify-between cursor-pointer"
+        onClick={() => inputRef.current?.blur()}
+      >
         <div className="flex items-center space-x-3">
           <div className="relative">
             <Avatar className="h-10 w-10 border-2 border-primary/10 ring-2 ring-background">
@@ -410,7 +472,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
       <CardContent className="p-0 flex-grow overflow-hidden relative bg-background">
        
         
-        <ScrollArea className="h-full px-4 py-6" ref={scrollAreaRootRef}>
+        <ScrollArea className="h-full px-4 py-6 cursor-pointer" ref={scrollAreaRootRef} onClick={() => inputRef.current?.blur()}>
           {isLoadingMessages ? (
             <div className="flex flex-col justify-center items-center h-full space-y-3">
                 <Loader2 className="h-8 w-8 animate-spin text-primary/40" />
@@ -515,8 +577,11 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
         <form onSubmit={handleSendMessage} className="flex w-full items-center gap-3">
           <div className="relative flex-grow group">
             <Input
+              ref={inputRef}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
               placeholder="Type your message here..."
               className="w-full pr-10 py-6 rounded-2xl bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all text-sm h-12"
               autoComplete="off"
