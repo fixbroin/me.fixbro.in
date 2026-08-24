@@ -466,7 +466,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Write a message..."
-              className="pr-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-primary/20 h-12 rounded-2xl text-sm transition-all"
+              className="pr-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-primary/20 h-12 rounded-2xl text-sm transition-all no-keyboard-scroll"
               autoComplete="off"
               disabled={isLoadingMessages || isLoadingSupportAdminProfile}
             />

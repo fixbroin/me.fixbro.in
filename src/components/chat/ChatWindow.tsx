@@ -42,6 +42,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [viewportOffset, setViewportOffset] = useState<number>(0);
   const { user: currentUser } = useAuth();
   const { settings: globalSettings, isLoading: isLoadingGlobalSettings } = useGlobalSettings();
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -52,6 +53,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
     const handleResize = () => {
       if (window.visualViewport) {
         setViewportHeight(window.visualViewport.height);
+        setViewportOffset(window.visualViewport.offsetTop);
       }
     };
 
@@ -428,13 +430,12 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
 
   return (
     <Card 
-      className="h-full flex flex-col shadow-2xl rounded-2xl border-none overflow-hidden bg-background ring-1 ring-border"
+      className="h-full flex flex-col shadow-2xl rounded-2xl border-none overflow-hidden bg-background ring-1 ring-border no-keyboard-scroll"
       style={viewportHeight && window.innerWidth < 768 ? { 
         position: 'fixed', 
-        top: 0, 
+        top: `${viewportOffset}px`, 
         left: 0, 
         right: 0, 
-        bottom: 0,
         height: `${viewportHeight}px`, 
         zIndex: 50, 
         borderRadius: 0 
@@ -583,7 +584,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
               onFocus={handleFocus}
               onBlur={handleBlur}
               placeholder="Type your message here..."
-              className="w-full pr-10 py-6 rounded-2xl bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all text-sm h-12"
+              className="w-full pr-10 py-6 rounded-2xl bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all text-sm h-12 no-keyboard-scroll"
               autoComplete="off"
               disabled={isLoadingMessages || isLoadingGlobalSettings || isLoadingAdminProfile || !adminProfile.uid || isAiTyping}
             />

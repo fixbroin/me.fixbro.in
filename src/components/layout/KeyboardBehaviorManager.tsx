@@ -46,20 +46,23 @@ export default function KeyboardBehaviorManager() {
         // 2. Set keyboard-active state immediately on focus
         document.documentElement.classList.add('keyboard-active');
 
-        // 3. Smoothly scroll the focused element ONLY if it is covered by the keyboard
-        setTimeout(() => {
-          const rect = target.getBoundingClientRect();
-          const viewportHeight = window.innerHeight;
-          
-          // Mobile keyboard typically takes up ~280px at the bottom of the screen.
-          // Any focused element below (window.innerHeight - 280px) will be covered by it.
-          const safeBottom = viewportHeight - 280;
+        // 3. Smoothly scroll the focused element ONLY if it is covered by the keyboard (and not excluded)
+        const shouldScroll = !target.classList.contains('no-keyboard-scroll') && !target.closest('.no-keyboard-scroll');
+        if (shouldScroll) {
+          setTimeout(() => {
+            const rect = target.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+            
+            // Mobile keyboard typically takes up ~280px at the bottom of the screen.
+            // Any focused element below (window.innerHeight - 280px) will be covered by it.
+            const safeBottom = viewportHeight - 280;
 
-          // Scroll only if element is covered by the keyboard (bottom > safeBottom) or scrolled off top (top < 60)
-          if (rect.bottom > safeBottom || rect.top < 60) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 300);
+            // Scroll only if element is covered by the keyboard (bottom > safeBottom) or scrolled off top (top < 60)
+            if (rect.bottom > safeBottom || rect.top < 60) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 300);
+        }
       }
     };
 
