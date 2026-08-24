@@ -207,6 +207,12 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
               <span className="font-bold">+{symbol}{(job.platformFeeTotal || 0).toFixed(decimals)}</span>
             </p>
           )}
+          {isCash && job.taxAmount !== undefined && job.taxAmount > 0 && (
+            <p className="text-xs text-muted-foreground flex justify-between text-amber-600">
+              <span>Tax (Collect in Cash):</span>
+              <span className="font-bold">+{symbol}{(job.taxAmount || 0).toFixed(decimals)}</span>
+            </p>
+          )}
           <p className="text-xs font-black flex justify-between border-t border-dashed pt-1 text-primary">
             <span>Total Customer Pays:</span>
             <span>{symbol}{displayTotal.toFixed(decimals)}</span>
