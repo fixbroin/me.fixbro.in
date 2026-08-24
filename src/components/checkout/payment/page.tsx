@@ -499,7 +499,12 @@ export default function PaymentPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
               amount: Math.round(totalAmountDue * Math.pow(10, currencyDecimals)),
-              currency: currencyCode
+              currency: currencyCode,
+              notes: isCancellationFeeMode && cancellationFeeDetails ? {
+                type: 'cancellation_fee',
+                bookingId: cancellationFeeDetails.bookingId,
+                amount: cancellationFeeDetails.feeAmount.toString()
+              } : undefined
           }),
       });
 

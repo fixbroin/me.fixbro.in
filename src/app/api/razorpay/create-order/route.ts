@@ -7,7 +7,7 @@ import { adminDb } from '@/lib/firebaseAdmin';
 
 export async function POST(req: NextRequest) {
   try {
-    const { amount, currency = 'INR' } = await req.json();
+    const { amount, currency = 'INR', notes } = await req.json();
 
     if (!amount || typeof amount !== 'number' || amount < 100) { // Razorpay minimum is 1 INR (100 paise)
       return NextResponse.json({ success: false, error: 'Invalid amount provided.' }, { status: 400 });
@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
       amount: amount, // amount in the smallest currency unit (paise)
       currency: currency,
       receipt: `receipt_${nanoid()}`,
+      notes: notes || {},
     };
 
     const order = await instance.orders.create(options);
