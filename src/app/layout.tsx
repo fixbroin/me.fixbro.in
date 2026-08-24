@@ -160,6 +160,23 @@ export default async function RootLayout({
             `,
           }}
         />
+        <script
+          id="wecanfix-chunk-error-handler"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('error', function(e) {
+                var target = e.target;
+                if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
+                  var src = target.src || target.href;
+                  if (src && src.indexOf('/_next/static/') !== -1) {
+                    console.warn('Next.js static chunk failed to load. Reloading to sync with latest deploy...', src);
+                    window.location.reload();
+                  }
+                }
+              }, true);
+            `,
+          }}
+        />
 
         <ThemeInjector />
         <AuthProvider>
