@@ -16,7 +16,7 @@ import { getActiveCheckoutEntries, removeCheckedOutItemsFromCart } from '@/lib/c
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { sendBookingConfirmationEmail, type BookingConfirmationEmailInput } from '@/ai/flows/sendBookingEmailFlow';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useLoading } from '@/contexts/LoadingContext';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
@@ -39,10 +39,14 @@ declare global {
   }
 }
 
-interface DisplayBookingDetails extends FirestoreBooking {
+interface DisplayBookingDetails extends Omit<FirestoreBooking, 'createdAt' | 'latitude' | 'longitude' | 'discountCode'> {
     servicesSummary: string;
     scheduledDateDisplay: string;
     visitingChargeDisplayed: number;
+    createdAt: string;
+    latitude: number | null;
+    longitude: number | null;
+    discountCode: string | null;
 }
 
 const generateBookingId = () => {
@@ -138,6 +142,7 @@ export default function ThankYouPage() {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { hideLoading } = useLoading();
   const { config: appConfig, isLoading: isLoadingAppSettings } = useApplicationConfig();
   const { settings: globalCompanySettings } = useGlobalSettings();
@@ -182,16 +187,30 @@ export default function ThankYouPage() {
       const razorpaySignature = localStorage.getItem('razorpaySignature');
 
       // --- 1. Handle Cancellation Fee Payment Verification ---
-      if (isProcessingCancellationFee && bookingFirestoreDocIdForCancellation && feeAmountStr && razorpayPaymentId) {
+      const stripePaymentMethod = searchParams.get('payment_method');
+      const stripeSessionId = searchParams.get('session_id');
+      const isStripeCancellation = stripePaymentMethod === 'stripe' && !!stripeSessionId;
+
+      if (isProcessingCancellationFee && bookingFirestoreDocIdForCancellation && feeAmountStr && (razorpayPaymentId || isStripeCancellation)) {
         try {
-            const verificationResponse = await fetch('/api/razorpay/verify-payment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ razorpay_payment_id: razorpayPaymentId, razorpay_order_id: razorpayOrderId, razorpay_signature: razorpaySignature }),
-            });
-            const verificationResult = await verificationResponse.json();
-            if (!verificationResult.success || verificationResult.status !== 'captured') {
-                throw new Error(verificationResult.error || "Payment verification failed.");
+            let paymentTransactionId = razorpayPaymentId;
+            if (isStripeCancellation) {
+              const verifyRes = await fetch(`/api/stripe/verify-session?session_id=${stripeSessionId}`);
+              const verifyData = await verifyRes.json();
+              if (!verifyData.success) {
+                throw new Error(verifyData.error || "Stripe payment verification failed.");
+              }
+              paymentTransactionId = verifyData.payment_intent || stripeSessionId;
+            } else {
+              const verificationResponse = await fetch('/api/razorpay/verify-payment', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ razorpay_payment_id: razorpayPaymentId, razorpay_order_id: razorpayOrderId, razorpay_signature: razorpaySignature }),
+              });
+              const verificationResult = await verificationResponse.json();
+              if (!verificationResult.success || verificationResult.status !== 'captured') {
+                  throw new Error(verificationResult.error || "Payment verification failed.");
+              }
             }
             toast({ title: "Payment Verified", description: "Your payment has been successfully verified." });
             
@@ -208,7 +227,7 @@ export default function ThankYouPage() {
                     status: "Cancelled" as BookingStatus, 
                     updatedAt: Timestamp.now(),
                     cancellationFeePaid: feeAmount,
-                    cancellationPaymentId: razorpayPaymentId,
+                    cancellationPaymentId: paymentTransactionId,
                 });
 
                 // 1. Create and send notification to USER
@@ -276,7 +295,7 @@ export default function ThankYouPage() {
                       paidAmount: originalBookingData.paymentMethod === 'Online' ? originalBookingData.totalAmount : 0,
                       cancellationFee: feeAmount,
                       refundableAmount: originalBookingData.paymentMethod === 'Online' ? Math.max(0, originalBookingData.totalAmount - feeAmount) : 0,
-                      cancellationPaymentId: razorpayPaymentId || undefined,
+                      cancellationPaymentId: paymentTransactionId || undefined,
                       siteName: globalCompanySettings?.websiteName || "Wecanfix",
                       smtpHost: appConfig.smtpHost,
                       smtpPort: appConfig.smtpPort,
@@ -314,6 +333,115 @@ export default function ThankYouPage() {
       }
 
       // --- 2. Handle Regular Booking Confirmation ---
+      const stripeBookingId = searchParams.get('bookingId');
+      const isStripeBooking = stripePaymentMethod === 'stripe' && !isProcessingCancellationFee;
+
+      if (isStripeBooking) {
+        if (!stripeSessionId || !stripeBookingId) {
+            toast({ title: "Verification Failed", description: "Payment details are missing. Please contact support if you were charged.", variant: "destructive" });
+            router.push('/cart'); setIsLoadingPage(false); return;
+        }
+        try {
+            const verifyRes = await fetch(`/api/stripe/verify-session?session_id=${stripeSessionId}`);
+            const verifyData = await verifyRes.json();
+            if (!verifyData.success) {
+                throw new Error(verifyData.error || "Stripe payment verification failed.");
+            }
+            toast({ title: "Payment Verified", description: "Your payment has been successfully verified." });
+
+            const bookingRef = doc(db, 'bookings', stripeBookingId);
+            const bookingSnap = await getDoc(bookingRef);
+
+            if (bookingSnap.exists()) {
+                const bookingData = bookingSnap.data() as FirestoreBooking;
+                let finalBookingNum = bookingData.bookingNumber;
+
+                if (bookingData.status === 'Pending Payment') {
+                    const nextBookingNumber = await assignNewBookingNumber();
+                    finalBookingNum = nextBookingNumber;
+
+                    await updateDoc(bookingRef, {
+                        status: 'Confirmed',
+                        bookingNumber: nextBookingNumber,
+                        stripeSessionId: stripeSessionId,
+                        stripePaymentIntent: verifyData.payment_intent || null,
+                        updatedAt: Timestamp.now(),
+                    });
+
+                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+                    fetch(`${appUrl}/api/bookings/post-process`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ bookingDocId: stripeBookingId, triggerSource: 'stripe_checkout_thankyou' })
+                    }).catch(err => console.error("Error triggering post-process from thank-you:", err));
+
+                    const servicesSummary = (bookingData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
+                    logUserActivity(
+                      'newBooking',
+                      {
+                        bookingId: bookingData.bookingId,
+                        bookingDocId: stripeBookingId,
+                        totalAmount: bookingData.totalAmount,
+                        paymentMethod: 'Online',
+                        customerName: bookingData.customerName,
+                        customerPhone: bookingData.customerPhone,
+                        servicesSummary
+                      },
+                      currentUser?.uid,
+                      !currentUser ? getGuestId() : null,
+                      bookingData.customerName
+                    );
+
+                    if (currentUser?.uid) {
+                        const userNotification: Omit<FirestoreNotification, 'id'> = {
+                          userId: currentUser.uid,
+                          title: "Booking Confirmed!",
+                          message: `Your booking ${bookingData.bookingId} has been successfully placed. We'll assign a provider shortly.`,
+                          type: 'success',
+                          href: '/my-bookings',
+                          read: false,
+                          createdAt: Timestamp.now(),
+                        };
+                        await addDoc(collection(db, "userNotifications"), userNotification);
+                    }
+                }
+
+                const servicesSummary = (bookingData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
+                setBookingDetailsForDisplay({ 
+                    ...bookingData, 
+                    id: stripeBookingId, 
+                    bookingNumber: finalBookingNum,
+                    servicesSummary, 
+                    createdAt: (() => {
+                        const millis = getTimestampMillis(bookingData.createdAt);
+                        if (!millis) return 'N/A';
+                        const d = new Date(millis);
+                        return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
+                    })(),
+                    scheduledDateDisplay: formatDateForDisplay(bookingData.scheduledDate, appConfig),
+                    latitude: bookingData.latitude === undefined ? null : bookingData.latitude, 
+                    longitude: bookingData.longitude === undefined ? null : bookingData.longitude, 
+                    visitingChargeDisplayed: bookingData.visitingCharge || 0, 
+                    discountCode: bookingData.discountCode || null, 
+                    discountAmount: bookingData.discountAmount || 0, 
+                });
+            } else {
+                throw new Error("Booking record not found.");
+            }
+
+        } catch (error: any) {
+            console.error("Error during Stripe payment confirmation:", error);
+            toast({ title: "Payment Error", description: error.message, variant: "destructive", duration: 7000 });
+            router.push('/checkout/payment'); 
+            setIsLoadingPage(false); 
+            return;
+        } finally {
+            await clearLocalStorageItems(currentUser?.uid);
+            setIsLoadingPage(false);
+        }
+        return;
+      }
+
       if (isOnlinePayment) {
         if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
             toast({ title: "Verification Failed", description: "Payment details are missing. Please contact support if you were charged.", variant: "destructive" });

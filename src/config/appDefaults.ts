@@ -26,8 +26,14 @@ export const defaultAppSettings: AppSettings = {
   enableKeyboardSuggestions: true,
   // Payment
   enableOnlinePayment: true,
+  enableRazorpay: true,
+  enableStripe: false,
   razorpayKeyId: "",
   razorpayKeySecret: "",
+  razorpayWebhookSecret: "",
+  stripePublishableKey: "",
+  stripeSecretKey: "",
+  stripeWebhookSecret: "",
   enableCOD: true, // Represents "Pay After Service"
   // Time Slots
   timeSlotSettings: {

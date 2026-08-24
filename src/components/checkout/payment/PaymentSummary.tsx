@@ -12,7 +12,7 @@ import { formatCurrency } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { db, auth } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs } from '@/lib/mysqlDb';
+import { doc, getDoc, collection, query, where, getDocs, Timestamp, addDoc } from '@/lib/mysqlDb';
 import type { FirestoreService, AppliedPlatformFeeItem } from '@/types/firestore';
 import { getActiveCheckoutEntries, type CartEntry } from '@/lib/cartManager';
 import TaxBreakdownDisplay from '@/components/shared/TaxBreakdownDisplay';
@@ -24,6 +24,15 @@ declare global {
     Razorpay: any;
   }
 }
+
+const generateBookingId = (): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = 'FB-';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(chars.length * Math.random()));
+  }
+  return result;
+};
 
 interface AppliedPromoCodeInfo {
   id: string;
@@ -89,6 +98,7 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
   const [serviceDetailsMap, setServiceDetailsMap] = useState<Record<string, FirestoreService>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isGatewayDialogOpen, setIsGatewayDialogOpen] = useState(false);
 
   const [categoryOverrides, setCategoryOverrides] = useState<{
     visitingChargeAmount?: number;
@@ -325,25 +335,9 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
     document.body.appendChild(script);
   });
 
-  const handleBookNow = async () => {
-    if (!canBook) return;
+  const handleRazorpayCheckout = async () => {
     setIsProcessingPayment(true);
     showLoading();
-
-    const storageMethod = paymentMethod === 'Pay After Service' ? 'Pay After Service' : 'Online';
-
-    if (paymentMethod === 'Pay After Service') {
-        localStorage.setItem('wecanfixPaymentMethod', storageMethod);
-        localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
-        if (appliedPromo) {
-            localStorage.setItem('wecanfixBookingDiscountCode', appliedPromo.code);
-            localStorage.setItem('wecanfixBookingDiscountAmount', appliedPromo.calculatedDiscount.toString());
-            localStorage.setItem('wecanfixAppliedPromoCodeId', appliedPromo.id);
-        }
-        if (calculatedPlatformFees.length > 0) localStorage.setItem('wecanfixAppliedPlatformFees', JSON.stringify(calculatedPlatformFees));
-        router.push('/checkout/thank-you'); 
-        return; 
-    }
 
     const scriptLoaded = await loadRazorpay();
     if (!scriptLoaded) {
@@ -372,6 +366,17 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       });
       const orderDetails = await res.json();
 
+      let customerName = "Guest", customerEmail = "guest@example.com", customerContact = undefined;
+      const customerAddressDataString = localStorage.getItem('wecanfixCustomerAddress');
+      if (customerAddressDataString) {
+        try {
+          const addr = JSON.parse(customerAddressDataString);
+          customerName = addr.fullName || customerName;
+          customerEmail = addr.email || customerEmail;
+          customerContact = addr.phone || undefined;
+        } catch (e) {}
+      }
+
       const options = {
         key: appConfig.razorpayKeyId,
         amount: orderDetails.amount,
@@ -394,9 +399,9 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
           router.push('/checkout/thank-you');
         },
         prefill: {
-          name: auth.currentUser?.displayName || "Guest",
-          email: auth.currentUser?.email || "guest@example.com",
-          contact: auth.currentUser?.phoneNumber || ""
+          name: customerName,
+          email: customerEmail,
+          contact: customerContact
         },
         theme: { color: "#45A0A2" },
         modal: { ondismiss: () => { setIsProcessingPayment(false); hideLoading(); }}
@@ -407,6 +412,179 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       toast({ title: "Payment Error", variant: "destructive" });
       setIsProcessingPayment(false);
       hideLoading();
+    }
+  };
+
+  const handleStripeCheckout = async () => {
+    setIsProcessingPayment(true);
+    showLoading();
+
+    try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const newBookingId = generateBookingId();
+      
+      let customerEmail = "";
+      let customerName = "Guest User", customerPhone = "N/A", addressLine1 = "N/A", addressLine2: string | undefined, city = "N/A", state = "N/A", pincode = "N/A";
+      let latitude: number | undefined, longitude: number | undefined;
+      let bookingDiscountCode: string | undefined, bookingDiscountAmount: number | undefined, appliedPromoCodeId: string | undefined;
+      let storedAppliedPlatformFees: AppliedPlatformFeeItem[] = [];
+      let estimatedEndTime: string | undefined;
+      let currentCategoryId: string | null = null;
+      let storedInterveningBreaks: any[] = [];
+      let storedDailyTimeline: any[] = [];
+
+      if (typeof window !== 'undefined') {
+        const storedEmail = localStorage.getItem('wecanfixCustomerEmail');
+        customerEmail = (storedEmail && storedEmail.trim()) ? storedEmail : (auth.currentUser?.email || "");
+        currentCategoryId = localStorage.getItem('wecanfixActiveCheckoutCategory');
+        const breaksStr = localStorage.getItem('wecanfixInterveningBreaks');
+        if (breaksStr) { try { storedInterveningBreaks = JSON.parse(breaksStr); } catch (e) {} }
+        const dailyTimelineStr = localStorage.getItem('wecanfixDailyTimeline');
+        if (dailyTimelineStr) { try { storedDailyTimeline = JSON.parse(dailyTimelineStr); } catch (e) {} }
+        bookingDiscountCode = localStorage.getItem('wecanfixBookingDiscountCode') || undefined;
+        const discountAmountStr = localStorage.getItem('wecanfixBookingDiscountAmount');
+        bookingDiscountAmount = discountAmountStr ? parseFloat(discountAmountStr) : undefined;
+        appliedPromoCodeId = localStorage.getItem('wecanfixAppliedPromoCodeId') || undefined;
+        const platformFeesStr = localStorage.getItem('wecanfixAppliedPlatformFees');
+        if (platformFeesStr) { try { storedAppliedPlatformFees = JSON.parse(platformFeesStr); } catch (e) {} }
+        const addressDataString = localStorage.getItem('wecanfixCustomerAddress');
+        if (addressDataString) { const addressData = JSON.parse(addressDataString); customerName = addressData.fullName || customerName; customerPhone = addressData.phone || customerPhone; customerEmail = addressData.email || customerEmail; addressLine1 = addressData.addressLine1 || addressLine1; addressLine2 = addressData.addressLine2 || undefined; city = addressData.city || city; state = addressData.state || state; pincode = addressData.pincode || pincode; latitude = addressData.latitude === null ? undefined : addressData.latitude; longitude = addressData.longitude === null ? undefined : addressData.longitude; }
+      }
+
+      const bookingServices = cartEntries.map(entry => {
+        const detail = serviceDetailsMap[entry.serviceId];
+        if (!detail) return null;
+        const displayedPriceForQuantity = calculateIncrementalTotalPriceForItem(detail, entry.quantity);
+        const itemTaxRate = (detail.taxPercent || 0) > 0 ? (detail.taxPercent || 0) : 0;
+        const basePriceForQuantity = getBasePrice(displayedPriceForQuantity, detail.isTaxInclusive === true, itemTaxRate);
+        const taxAmountForItem = basePriceForQuantity * (itemTaxRate / 100);
+
+        return {
+          serviceId: entry.serviceId,
+          name: detail.name,
+          quantity: entry.quantity,
+          pricePerUnit: displayedPriceForQuantity / entry.quantity,
+          discountedPricePerUnit: detail.discountedPrice || null,
+          isTaxInclusive: detail.isTaxInclusive === true,
+          taxPercentApplied: itemTaxRate,
+          taxAmountForItem: taxAmountForItem,
+          imageUrl: detail.imageUrl || null
+        };
+      }).filter(Boolean);
+
+      const totalPlatformFeeBaseAmount = calculatedPlatformFees.reduce((sum, fee) => sum + fee.calculatedFeeAmount, 0);
+      const totalTaxOnPlatformFees = calculatedPlatformFees.reduce((sum, fee) => sum + fee.taxAmountOnFee, 0);
+
+      const newBookingData = {
+        bookingId: newBookingId,
+        bookingNumber: 0,
+        ...(auth.currentUser?.uid && { userId: auth.currentUser.uid }),
+        customerName, customerEmail, customerPhone, addressLine1, ...(addressLine2 && { addressLine2 }), city, state, pincode,
+        ...(latitude !== undefined && { latitude }), ...(longitude !== undefined && { longitude }),
+        scheduledDate: localStorage.getItem('wecanfixScheduledDate') || "",
+        scheduledTimeSlot: localStorage.getItem('wecanfixScheduledTimeSlot') || "",
+        estimatedEndTime: localStorage.getItem('wecanfixEstimatedEndTime') || null,
+        interveningBreaks: storedInterveningBreaks,
+        dailyTimeline: storedDailyTimeline,
+        services: bookingServices,
+        subTotal: subTotal,
+        ...(visitingCharge > 0 && { visitingCharge: visitingCharge }),
+        taxAmount: taxAmount,
+        totalAmount: totalAmountDue,
+        platformFeeTotal: totalPlatformFeeBaseAmount + totalTaxOnPlatformFees,
+        ...(appliedPromo && { discountCode: appliedPromo.code }),
+        ...(discountAmount > 0 && { discountAmount: discountAmount }),
+        ...(calculatedPlatformFees.length > 0 && { appliedPlatformFees: calculatedPlatformFees }),
+        paymentMethod: 'Online',
+        status: 'Pending Payment',
+        createdAt: Timestamp.now(),
+        isReviewedByCustomer: false,
+        workCategoryId: currentCategoryId || undefined,
+      };
+
+      const docRef = await addDoc(collection(db, "bookings"), newBookingData);
+
+      const res = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'booking',
+          bookingId: docRef.id,
+          amount: totalAmountDue,
+          currency: code,
+          successUrl: `${origin}/checkout/thank-you?payment_method=stripe&session_id={CHECKOUT_SESSION_ID}&bookingId=${docRef.id}`,
+          cancelUrl: `${origin}/checkout`,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to initiate Stripe checkout.');
+      }
+
+      const data = await res.json();
+
+      localStorage.setItem('wecanfixPaymentMethod', 'Online');
+      localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
+      if (appliedPromo) {
+        localStorage.setItem('wecanfixBookingDiscountCode', appliedPromo.code);
+        localStorage.setItem('wecanfixBookingDiscountAmount', appliedPromo.calculatedDiscount.toString());
+        localStorage.setItem('wecanfixAppliedPromoCodeId', appliedPromo.id);
+      }
+      if (calculatedPlatformFees.length > 0) {
+        localStorage.setItem('wecanfixAppliedPlatformFees', JSON.stringify(calculatedPlatformFees));
+      }
+
+      router.push(data.url);
+
+    } catch (error: any) {
+      toast({ title: "Stripe Payment Error", description: error.message || "Could not initiate payment.", variant: "destructive" });
+      setIsProcessingPayment(false);
+      hideLoading();
+    }
+  };
+
+  const handleBookNow = async () => {
+    if (!canBook) return;
+    setIsProcessingPayment(true);
+    showLoading();
+
+    const storageMethod = paymentMethod === 'Pay After Service' ? 'Pay After Service' : 'Online';
+
+    if (paymentMethod === 'Pay After Service') {
+        localStorage.setItem('wecanfixPaymentMethod', storageMethod);
+        localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
+        if (appliedPromo) {
+            localStorage.setItem('wecanfixBookingDiscountCode', appliedPromo.code);
+            localStorage.setItem('wecanfixBookingDiscountAmount', appliedPromo.calculatedDiscount.toString());
+            localStorage.setItem('wecanfixAppliedPromoCodeId', appliedPromo.id);
+        }
+        if (calculatedPlatformFees.length > 0) localStorage.setItem('wecanfixAppliedPlatformFees', JSON.stringify(calculatedPlatformFees));
+        router.push('/checkout/thank-you'); 
+        return; 
+    }
+
+    if (paymentMethod === 'online') {
+        const razorpayEnabled = appConfig.enableRazorpay !== false && !!appConfig.razorpayKeyId;
+        const stripeEnabled = appConfig.enableStripe === true && !!appConfig.stripePublishableKey;
+
+        if (!razorpayEnabled && !stripeEnabled) {
+          toast({ title: "Payments Disabled", description: "Online payments are currently not available.", variant: "destructive" });
+          setIsProcessingPayment(false); hideLoading(); return;
+        }
+
+        if (razorpayEnabled && stripeEnabled) {
+          setIsGatewayDialogOpen(true);
+          setIsProcessingPayment(false);
+          hideLoading();
+          return;
+        }
+
+        if (stripeEnabled) {
+          await handleStripeCheckout();
+        } else {
+          await handleRazorpayCheckout();
+        }
     }
   };
 
@@ -521,6 +699,41 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
               {dynamicPlatformFeeDescription}
             </DialogDescription>
           </DialogHeader>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isGatewayDialogOpen} onOpenChange={setIsGatewayDialogOpen}>
+        <DialogContent className="max-w-[90vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl font-bold">Select Payment Method</DialogTitle>
+            <DialogDescription className="text-center text-sm">
+              Please choose your preferred gateway to complete your booking.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Button
+              className="flex justify-between items-center py-6 border rounded-xl hover:bg-accent hover:text-accent-foreground font-semibold"
+              variant="outline"
+              onClick={async () => {
+                setIsGatewayDialogOpen(false);
+                await handleRazorpayCheckout();
+              }}
+            >
+              <span className="text-lg">Razorpay</span>
+              <span className="text-xs text-muted-foreground">(Cards, Netbanking, UPI, Wallets)</span>
+            </Button>
+            <Button
+              className="flex justify-between items-center py-6 border rounded-xl hover:bg-accent hover:text-accent-foreground font-semibold"
+              variant="outline"
+              onClick={async () => {
+                setIsGatewayDialogOpen(false);
+                await handleStripeCheckout();
+              }}
+            >
+              <span className="text-lg">Stripe</span>
+              <span className="text-xs text-muted-foreground">(Credit/Debit Cards, International)</span>
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </Card>

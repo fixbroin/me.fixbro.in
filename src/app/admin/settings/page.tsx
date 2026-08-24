@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { Check, ChevronsUpDown, Search as SearchIcon } from "lucide-react";
+import { Check, Copy, ChevronsUpDown, Search as SearchIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -173,6 +173,8 @@ export default function AdminSettingsPage() {
   const symbol = settings.currencySymbol || '₹';
   const previewDate = useMemo(() => new Date(), []);
   const [isSaving, setIsSaving] = useState(false);
+  const [copiedStripe, setCopiedStripe] = useState(false);
+  const [copiedRazorpay, setCopiedRazorpay] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [timezoneSearch, setTimezoneSearch] = useState("");
   const [isTimezoneDialogOpen, setIsTimezoneDialogOpen] = useState(false);
@@ -1445,7 +1447,7 @@ export default function AdminSettingsPage() {
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div className="space-y-0.5">
-                  <Label htmlFor="enableOnlinePayment" className="text-base">Enable Online Payments (Razorpay)</Label>
+                  <Label htmlFor="enableOnlinePayment" className="text-base">Enable Online Payments (Razorpay & Stripe)</Label>
                   <p className="text-sm text-muted-foreground">
                     Allow customers to pay using online methods like UPI, Cards, Netbanking.
                   </p>
@@ -1460,29 +1462,173 @@ export default function AdminSettingsPage() {
               </div>
 
               {settings.enableOnlinePayment && (
-                <div className="space-y-4 pl-4 border-l-2 border-primary ml-2 pt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="razorpayKeyId">Razorpay Key ID</Label>
-                    <Input
-                      id="razorpayKeyId"
-                      name="razorpayKeyId"
-                      value={settings.razorpayKeyId}
-                      onChange={handleInputChange}
-                      placeholder="rzp_live_xxxxxxxxxxxxxx"
-                      disabled={isSaving}
-                    />
+                <div className="space-y-6 pl-4 border-l-2 border-primary ml-2 pt-4">
+                  {/* Razorpay Configurations */}
+                  <div className="space-y-4 rounded-xl border p-4 bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-md font-bold">Razorpay Payment Gateway</Label>
+                        <p className="text-xs text-muted-foreground">Enable Razorpay checkout payments.</p>
+                      </div>
+                      <Switch
+                        id="enableRazorpay"
+                        name="enableRazorpay"
+                        checked={settings.enableRazorpay}
+                        onCheckedChange={(checked) => handleSwitchChange('enableRazorpay', checked)}
+                        disabled={isSaving}
+                      />
+                    </div>
+                    {settings.enableRazorpay && (
+                      <div className="space-y-4 pt-2 border-t border-dashed">
+                        <div className="space-y-2">
+                          <Label htmlFor="razorpayKeyId">Razorpay Key ID</Label>
+                          <Input
+                            id="razorpayKeyId"
+                            name="razorpayKeyId"
+                            value={settings.razorpayKeyId || ""}
+                            onChange={handleInputChange}
+                            placeholder="rzp_live_xxxxxxxxxxxxxx"
+                            disabled={isSaving}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="razorpayKeySecret">Razorpay Key Secret</Label>
+                          <Input
+                            id="razorpayKeySecret"
+                            name="razorpayKeySecret"
+                            type="password"
+                            value={settings.razorpayKeySecret || ""}
+                            onChange={handleInputChange}
+                            placeholder="••••••••••••••••••••••"
+                            disabled={isSaving}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="razorpayWebhookSecret">Razorpay Webhook Secret</Label>
+                          <Input
+                            id="razorpayWebhookSecret"
+                            name="razorpayWebhookSecret"
+                            type="password"
+                            value={settings.razorpayWebhookSecret || ""}
+                            onChange={handleInputChange}
+                            placeholder="••••••••••••••••••••••"
+                            disabled={isSaving}
+                          />
+                          <p className="text-[10px] text-muted-foreground leading-normal mt-1">
+                            Required to authenticate webhook callbacks from Razorpay.
+                          </p>
+                        </div>
+                        <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 text-xs">
+                          <p className="font-bold text-primary mb-1 uppercase tracking-wider text-[10px]">Razorpay Webhook Endpoint URL:</p>
+                          <div className="flex gap-2 items-center">
+                            <code className="flex-1 block select-all bg-background border rounded px-2 py-1.5 font-mono text-[11px] text-foreground font-semibold break-all">
+                              {typeof window !== 'undefined' ? `${window.location.origin}/api/razorpay/webhook` : "/api/razorpay/webhook"}
+                            </code>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 bg-background"
+                              onClick={() => {
+                                const url = typeof window !== 'undefined' ? `${window.location.origin}/api/razorpay/webhook` : "/api/razorpay/webhook";
+                                navigator.clipboard.writeText(url);
+                                setCopiedRazorpay(true);
+                                setTimeout(() => setCopiedRazorpay(false), 2000);
+                              }}
+                            >
+                              {copiedRazorpay ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1.5 leading-normal">
+                            Register this URL in your Razorpay Dashboard under Settings &gt; Webhooks.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="razorpayKeySecret">Razorpay Key Secret</Label>
-                    <Input
-                      id="razorpayKeySecret"
-                      name="razorpayKeySecret"
-                      type="password"
-                      value={settings.razorpayKeySecret}
-                      onChange={handleInputChange}
-                      placeholder="••••••••••••••••••••••"
-                      disabled={isSaving}
-                    />
+
+                  {/* Stripe Configurations */}
+                  <div className="space-y-4 rounded-xl border p-4 bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-md font-bold">Stripe Payment Gateway</Label>
+                        <p className="text-xs text-muted-foreground">Enable Stripe checkout payments.</p>
+                      </div>
+                      <Switch
+                        id="enableStripe"
+                        name="enableStripe"
+                        checked={settings.enableStripe}
+                        onCheckedChange={(checked) => handleSwitchChange('enableStripe', checked)}
+                        disabled={isSaving}
+                      />
+                    </div>
+                    {settings.enableStripe && (
+                      <div className="space-y-4 pt-2 border-t border-dashed">
+                        <div className="space-y-2">
+                          <Label htmlFor="stripePublishableKey">Stripe Publishable Key</Label>
+                          <Input
+                            id="stripePublishableKey"
+                            name="stripePublishableKey"
+                            value={settings.stripePublishableKey || ""}
+                            onChange={handleInputChange}
+                            placeholder="pk_live_xxxxxxxxxxxxxx"
+                            disabled={isSaving}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="stripeSecretKey">Stripe Secret Key</Label>
+                          <Input
+                            id="stripeSecretKey"
+                            name="stripeSecretKey"
+                            type="password"
+                            value={settings.stripeSecretKey || ""}
+                            onChange={handleInputChange}
+                            placeholder="sk_live_xxxxxxxxxxxxxx"
+                            disabled={isSaving}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="stripeWebhookSecret">Stripe Webhook Secret</Label>
+                          <Input
+                            id="stripeWebhookSecret"
+                            name="stripeWebhookSecret"
+                            type="password"
+                            value={settings.stripeWebhookSecret || ""}
+                            onChange={handleInputChange}
+                            placeholder="whsec_xxxxxxxxxxxxxx"
+                            disabled={isSaving}
+                          />
+                          <p className="text-[10px] text-muted-foreground leading-normal mt-1">
+                            Required to authenticate webhook callbacks from Stripe.
+                          </p>
+                        </div>
+                        <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 text-xs">
+                          <p className="font-bold text-primary mb-1 uppercase tracking-wider text-[10px]">Stripe Webhook Endpoint URL:</p>
+                          <div className="flex gap-2 items-center">
+                            <code className="flex-1 block select-all bg-background border rounded px-2 py-1.5 font-mono text-[11px] text-foreground font-semibold break-all">
+                              {typeof window !== 'undefined' ? `${window.location.origin}/api/stripe/webhook` : "/api/stripe/webhook"}
+                            </code>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 bg-background"
+                              onClick={() => {
+                                const url = typeof window !== 'undefined' ? `${window.location.origin}/api/stripe/webhook` : "/api/stripe/webhook";
+                                navigator.clipboard.writeText(url);
+                                setCopiedStripe(true);
+                                setTimeout(() => setCopiedStripe(false), 2000);
+                              }}
+                            >
+                              {copiedStripe ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1.5 leading-normal">
+                            Register this URL in your Stripe Dashboard under Developers &gt; Webhooks. Select event: <strong className="text-foreground">checkout.session.completed</strong>.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

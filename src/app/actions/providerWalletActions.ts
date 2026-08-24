@@ -29,6 +29,8 @@ export interface WalletTransaction {
   bonusAmount?: number;
   razorpayPaymentId?: string | null;
   razorpayOrderId?: string | null;
+  stripeSessionId?: string | null;
+  stripePaymentIntent?: string | null;
 }
 
 const DEFAULT_SETTINGS: WalletProviderSettings = {
@@ -106,6 +108,8 @@ export async function getProviderWalletDetailsAction(providerId: string) {
         bonusAmount: data.bonusAmount,
         razorpayPaymentId: data.razorpay_payment_id || null,
         razorpayOrderId: data.razorpay_order_id || null,
+        stripeSessionId: data.stripe_session_id || null,
+        stripePaymentIntent: data.stripe_payment_intent || null,
       });
     });
 
@@ -120,13 +124,46 @@ export async function getProviderWalletDetailsAction(providerId: string) {
 export async function depositProviderWalletAction(
   providerId: string,
   amount: number,
-  paymentDetails: { razorpay_order_id: string; razorpay_payment_id: string }
+  paymentDetails: { 
+    razorpay_order_id?: string; 
+    razorpay_payment_id?: string;
+    stripe_session_id?: string;
+    stripe_payment_intent?: string;
+    payment_method?: string;
+  }
 ) {
   try {
+    // Idempotency check: prevent duplicate credits
+    if (paymentDetails.stripe_session_id) {
+      const q = query(
+        collection(db, 'providerWalletTransactions'),
+        where('stripe_session_id', '==', paymentDetails.stripe_session_id)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return { success: true, message: "This transaction has already been credited." };
+      }
+    }
+    if (paymentDetails.razorpay_payment_id) {
+      const q = query(
+        collection(db, 'providerWalletTransactions'),
+        where('razorpay_payment_id', '==', paymentDetails.razorpay_payment_id)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return { success: true, message: "This transaction has already been credited." };
+      }
+    }
+
     const settings = await getProviderWalletSettingsAction();
     const bonusPercentage = settings.depositBonusPercentage || 0;
     const bonusAmount = bonusPercentage > 0 ? (amount * bonusPercentage) / 100 : 0;
     const finalCredit = amount + bonusAmount;
+
+    // Retrieve active currency symbol
+    const appConfigSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
+    const appConfig = appConfigSnap.exists() ? appConfigSnap.data() as any : null;
+    const symbol = appConfig?.currencySymbol || "₹";
 
     // Fetch user details from MySQL
     const userDocRef = doc(db, 'users', providerId);
@@ -140,29 +177,34 @@ export async function depositProviderWalletAction(
       providerWalletBalance: finalBalance,
     });
 
+    const isStripe = paymentDetails.payment_method?.toLowerCase() === 'stripe' || !!paymentDetails.stripe_session_id;
+    const methodLabel = isStripe ? 'Stripe' : 'Razorpay';
+
     // Write ledger in MySQL
     await addDoc(collection(db, 'providerWalletTransactions'), {
       providerId,
       amount,
       type: 'deposit',
-      description: `Prepaid wallet deposit via Razorpay${bonusPercentage > 0 ? ` (+${bonusPercentage}% bonus)` : ''}`,
+      description: `Prepaid wallet deposit via ${methodLabel}${bonusPercentage > 0 ? ` (+${bonusPercentage}% bonus)` : ''}`,
       timestamp: Timestamp.now(),
       bonusAmount: bonusAmount || null,
-      razorpay_order_id: paymentDetails.razorpay_order_id,
-      razorpay_payment_id: paymentDetails.razorpay_payment_id,
+      razorpay_order_id: paymentDetails.razorpay_order_id || null,
+      razorpay_payment_id: paymentDetails.razorpay_payment_id || null,
+      stripe_session_id: paymentDetails.stripe_session_id || null,
+      stripe_payment_intent: paymentDetails.stripe_payment_intent || null,
     });
 
     // Dispatch push to Provider
     await sendServerPushNotification({
       userId: providerId,
       title: "Wallet Deposited!",
-      body: `Successfully added ₹${finalCredit.toFixed(2)} to your prepaid wallet.`,
+      body: `Successfully added ${symbol}${finalCredit.toFixed(2)} to your prepaid wallet.`,
       href: '/provider/wallet',
       type: 'provider_wallet_deposit',
       variables: {
         amount: finalCredit.toFixed(2),
         balance: finalBalance.toFixed(2),
-        currencySymbol: '₹'
+        currencySymbol: symbol
       }
     }).catch(e => console.error("Error sending provider deposit push:", e));
 
@@ -174,14 +216,14 @@ export async function depositProviderWalletAction(
           sendServerPushNotification({
             userId: adminDoc.id,
             title: "Provider Wallet Deposit",
-            body: `Provider ${providerName} added ₹${finalCredit.toFixed(2)} to their wallet.`,
+            body: `Provider ${providerName} added ${symbol}${finalCredit.toFixed(2)} to their wallet.`,
             href: '/admin/provider-controls?tab=wallet_complaints',
             type: 'admin_provider_deposit_alert',
             variables: {
               providerName,
               amount: finalCredit.toFixed(2),
               balance: finalBalance.toFixed(2),
-              currencySymbol: '₹'
+              currencySymbol: symbol
             }
           })
         );
@@ -192,7 +234,7 @@ export async function depositProviderWalletAction(
     }
 
     revalidatePath('/provider/wallet');
-    return { success: true, message: `Successfully deposited ₹${finalCredit.toFixed(2)} to your wallet.` };
+    return { success: true, message: `Successfully deposited ${symbol}${finalCredit.toFixed(2)} to your wallet.` };
   } catch (error: any) {
     console.error("Error depositing to provider wallet:", error);
     return { success: false, message: error.message || "Deposit transaction failed." };

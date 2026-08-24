@@ -246,6 +246,9 @@ export const generateInvoicePdf = async (booking: FirestoreBooking, companyDetai
   if (booking.razorpayPaymentId) {
     finalY += 6;
     doc.text(`Payment ID: ${booking.razorpayPaymentId}`, 14, finalY);
+  } else if (booking.stripePaymentIntent || booking.stripeSessionId) {
+    finalY += 6;
+    doc.text(`Payment ID: ${booking.stripePaymentIntent || booking.stripeSessionId}`, 14, finalY);
   }
 
   const pageHeight = doc.internal.pageSize.height;

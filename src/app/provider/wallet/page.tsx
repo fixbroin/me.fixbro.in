@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -41,9 +42,12 @@ declare global {
 export default function ProviderWalletPage() {
   const { user: providerUser, isLoading: authIsLoading } = useAuth();
   const { config: appConfig, isLoading: isLoadingAppConfig } = useApplicationConfig();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const symbol = appConfig?.currencySymbol || "₹";
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
+  const [isGatewayDialogOpen, setIsGatewayDialogOpen] = useState(false);
 
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
@@ -82,6 +86,55 @@ export default function ProviderWalletPage() {
   }, [providerUser?.uid, toast]);
 
   useEffect(() => {
+    const depositParam = searchParams.get('deposit');
+    const sessionId = searchParams.get('session_id');
+    const depositAmountParam = searchParams.get('amount');
+
+    if (depositParam === 'success') {
+      const verifyAndCreditStripeDeposit = async () => {
+        if (sessionId && providerUser?.uid && depositAmountParam) {
+          setIsProcessingDeposit(true);
+          try {
+            const res = await fetch(`/api/stripe/verify-session?session_id=${sessionId}`);
+            const data = await res.json();
+            if (res.ok && data.success && (data.status === 'paid' || data.status === 'complete')) {
+              const amount = parseFloat(depositAmountParam);
+              const creditRes = await depositProviderWalletAction(providerUser.uid, amount, {
+                stripe_session_id: sessionId,
+                stripe_payment_intent: data.payment_intent || undefined,
+                payment_method: 'Stripe'
+              });
+              if (creditRes.success) {
+                toast({ title: "Deposit Confirmed", description: creditRes.message });
+              } else {
+                toast({ title: "Deposit Credit Error", description: creditRes.message, variant: "destructive" });
+              }
+            } else {
+              toast({ title: "Verification Failed", description: data.error || "Could not verify Stripe transaction.", variant: "destructive" });
+            }
+          } catch (err: any) {
+            toast({ title: "Verification Error", description: err.message || "Failed to verify transaction.", variant: "destructive" });
+          } finally {
+            setIsProcessingDeposit(false);
+            router.replace('/provider/wallet');
+            loadWalletDetails();
+          }
+        } else {
+          toast({ title: "Deposit Successful", description: "Your wallet balance has been updated." });
+          router.replace('/provider/wallet');
+          loadWalletDetails();
+        }
+      };
+      
+      verifyAndCreditStripeDeposit();
+    } else if (depositParam === 'cancelled') {
+      toast({ title: "Deposit Cancelled", description: "Prepaid wallet deposit was cancelled.", variant: "destructive" });
+      router.replace('/provider/wallet');
+      loadWalletDetails();
+    }
+  }, [searchParams, router, loadWalletDetails, toast, providerUser?.uid]);
+
+  useEffect(() => {
     if (providerUser?.uid) {
       loadWalletDetails();
     }
@@ -96,27 +149,14 @@ export default function ProviderWalletPage() {
     document.body.appendChild(script); 
   });
 
-  const handleDepositSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!providerUser?.uid || !walletSettings) return;
-
-    const amount = parseFloat(depositAmount);
-    if (isNaN(amount) || amount <= 0) {
-      toast({ title: "Invalid Amount", description: "Please enter a valid deposit amount.", variant: "destructive" });
-      return;
-    }
-
-    if (amount < walletSettings.minDepositAmount) {
-      toast({ title: "Amount Below Minimum", description: `Minimum deposit allowed is ${symbol}${walletSettings.minDepositAmount}.`, variant: "destructive" });
-      return;
-    }
-
-    if (amount > walletSettings.maxDepositAmount) {
-      toast({ title: "Amount Exceeds Maximum", description: `Maximum deposit allowed is ${symbol}${walletSettings.maxDepositAmount}.`, variant: "destructive" });
-      return;
-    }
+  const handleRazorpayDeposit = async () => {
+    if (!providerUser?.uid) return;
+    const userUid = providerUser.uid;
+    const userDisplayName = providerUser.displayName || '';
+    const userEmail = providerUser.email || '';
 
     setIsProcessingDeposit(true);
+    const amount = parseFloat(depositAmount);
     try {
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
@@ -125,7 +165,6 @@ export default function ProviderWalletPage() {
         return;
       }
 
-      // 1. Create Razorpay order on server
       const currencyCode = appConfig?.currencyCode || 'INR';
       const getCurrencySubunitDecimals = (cc: string): number => {
         const c = cc.toUpperCase();
@@ -147,7 +186,6 @@ export default function ProviderWalletPage() {
         throw new Error(orderData.error || 'Failed to initialize payment order.');
       }
 
-      // 2. Open Razorpay checkout
       const options = {
         key: appConfig.razorpayKeyId,
         amount: orderData.amount,
@@ -157,7 +195,6 @@ export default function ProviderWalletPage() {
         order_id: orderData.id,
         handler: async function (response: any) {
           try {
-            // Verify payment on the server
             const verifyRes = await fetch('/api/razorpay/verify-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -170,9 +207,8 @@ export default function ProviderWalletPage() {
 
             const verifyData = await verifyRes.json();
             if (verifyRes.ok && verifyData.success) {
-              // Commit deposit credit action
               const depositResult = await depositProviderWalletAction(
-                providerUser.uid,
+                userUid,
                 amount,
                 {
                   razorpay_order_id: response.razorpay_order_id,
@@ -197,11 +233,11 @@ export default function ProviderWalletPage() {
           }
         },
         prefill: {
-          name: providerUser.displayName || '',
-          email: providerUser.email || '',
+          name: userDisplayName,
+          email: userEmail,
         },
         theme: {
-          color: "#0d9488", // primary teal theme
+          color: "#0d9488",
         },
         modal: {
           ondismiss: function () {
@@ -217,6 +253,80 @@ export default function ProviderWalletPage() {
       console.error("Razorpay workflow failed:", err);
       toast({ title: "Checkout Error", description: err.message || "Could not launch Razorpay gateway.", variant: "destructive" });
       setIsProcessingDeposit(false);
+    }
+  };
+
+  const handleStripeDeposit = async () => {
+    if (!providerUser?.uid) return;
+    setIsProcessingDeposit(true);
+    const amount = parseFloat(depositAmount);
+    try {
+      const currencyCode = appConfig?.currencyCode || 'INR';
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+      const res = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'wallet_topup',
+          providerId: providerUser?.uid,
+          amount: amount,
+          currency: currencyCode,
+          successUrl: `${origin}/provider/wallet?deposit=success&session_id={CHECKOUT_SESSION_ID}&amount=${amount}`,
+          cancelUrl: `${origin}/provider/wallet?deposit=cancelled`,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to initiate Stripe session.');
+      }
+
+      const data = await res.json();
+      router.push(data.url);
+    } catch (err: any) {
+      toast({ title: "Checkout Error", description: err.message || "Could not launch Stripe gateway.", variant: "destructive" });
+      setIsProcessingDeposit(false);
+    }
+  };
+
+  const handleDepositSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!providerUser?.uid || !walletSettings) return;
+
+    const amount = parseFloat(depositAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: "Invalid Amount", description: "Please enter a valid deposit amount.", variant: "destructive" });
+      return;
+    }
+
+    if (amount < walletSettings.minDepositAmount) {
+      toast({ title: "Amount Below Minimum", description: `Minimum deposit allowed is ${symbol}${walletSettings.minDepositAmount}.`, variant: "destructive" });
+      return;
+    }
+
+    if (amount > walletSettings.maxDepositAmount) {
+      toast({ title: "Amount Exceeds Maximum", description: `Maximum deposit allowed is ${symbol}${walletSettings.maxDepositAmount}.`, variant: "destructive" });
+      return;
+    }
+
+    const razorpayEnabled = appConfig.enableRazorpay !== false && !!appConfig.razorpayKeyId;
+    const stripeEnabled = appConfig.enableStripe === true && !!appConfig.stripePublishableKey;
+
+    if (!razorpayEnabled && !stripeEnabled) {
+      toast({ title: "Gateways Disabled", description: "Online payments are currently not available.", variant: "destructive" });
+      return;
+    }
+
+    if (razorpayEnabled && stripeEnabled) {
+      setIsGatewayDialogOpen(true);
+      return;
+    }
+
+    if (stripeEnabled) {
+      await handleStripeDeposit();
+    } else {
+      await handleRazorpayDeposit();
     }
   };
 
@@ -391,7 +501,7 @@ export default function ProviderWalletPage() {
                     ) : (
                       <Plus className="mr-1.5 h-4 w-4" />
                     )}
-                    Add Money via Razorpay
+                    Continue to Payment
                   </Button>
                 </form>
               )}
@@ -447,6 +557,16 @@ export default function ProviderWalletPage() {
                                 {tx.bookingId && (
                                   <span className="block text-[10px] text-muted-foreground font-mono mt-0.5">
                                     Ref: #{tx.bookingId}
+                                  </span>
+                                )}
+                                {tx.stripePaymentIntent && (
+                                  <span className="block text-[10px] text-muted-foreground font-mono mt-0.5 select-all">
+                                    Stripe ID: {tx.stripePaymentIntent}
+                                  </span>
+                                )}
+                                {!tx.stripePaymentIntent && tx.stripeSessionId && (
+                                  <span className="block text-[10px] text-muted-foreground font-mono mt-0.5 select-all">
+                                    Stripe Session ID: {tx.stripeSessionId}
                                   </span>
                                 )}
                                 {tx.razorpayPaymentId && (
@@ -510,6 +630,16 @@ export default function ProviderWalletPage() {
                             {tx.bookingId && (
                               <span className="block text-[10px] text-muted-foreground font-mono mt-0.5">
                                 Ref: #{tx.bookingId}
+                              </span>
+                            )}
+                            {tx.stripePaymentIntent && (
+                              <span className="block text-[10px] text-muted-foreground font-mono mt-0.5 select-all">
+                                Stripe ID: {tx.stripePaymentIntent}
+                              </span>
+                            )}
+                            {!tx.stripePaymentIntent && tx.stripeSessionId && (
+                              <span className="block text-[10px] text-muted-foreground font-mono mt-0.5 select-all">
+                                Stripe Session ID: {tx.stripeSessionId}
                               </span>
                             )}
                             {tx.razorpayPaymentId && (
@@ -742,6 +872,45 @@ export default function ProviderWalletPage() {
           </DialogContent>
         </Dialog>
       )}
+      {/* Gateway Selection Dialog */}
+      <Dialog open={isGatewayDialogOpen} onOpenChange={setIsGatewayDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-center text-teal-800">Select Top-Up Method</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Button 
+              className="py-6 flex items-center justify-between text-left font-semibold text-md border-2 border-teal-600/20 hover:border-teal-600 hover:bg-teal-50 rounded-xl h-auto w-full"
+              variant="outline"
+              onClick={async () => {
+                setIsGatewayDialogOpen(false);
+                await handleRazorpayDeposit();
+              }}
+            >
+              <span className="flex flex-col">
+                <span className="font-bold text-slate-800">Cards, UPI, NetBanking</span>
+                <span className="text-xs text-muted-foreground font-normal mt-0.5">Instant deposit via Razorpay</span>
+              </span>
+              <Plus className="h-5 w-5 text-teal-600 ml-4 shrink-0" />
+            </Button>
+
+            <Button 
+              className="py-6 flex items-center justify-between text-left font-semibold text-md border-2 border-teal-600/20 hover:border-teal-600 hover:bg-teal-50 rounded-xl h-auto w-full"
+              variant="outline"
+              onClick={async () => {
+                setIsGatewayDialogOpen(false);
+                await handleStripeDeposit();
+              }}
+            >
+              <span className="flex flex-col">
+                <span className="font-bold text-slate-800">Stripe Checkout</span>
+                <span className="text-xs text-muted-foreground font-normal mt-0.5">International cards, Link & Google Pay</span>
+              </span>
+              <Plus className="h-5 w-5 text-teal-600 ml-4 shrink-0" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <div className="h-32 w-full" />
     </div>
   );

@@ -536,9 +536,9 @@
         </li>
         <li class="step-item">
           <strong>Configure Administrator Email:</strong>
-          <p>Open the file <a href="../src/contexts/AuthContext.tsx"><code>src/contexts/AuthContext.tsx</code></a> in your editor. Find line 36 where the admin email is defined:</p>
-          <pre><code>export const ADMIN_EMAIL = "admin@yourdomain.com";</code></pre>
-          <p>Change <code>"admin@yourdomain.com"</code> to your preferred administrator email. When you register/sign up on the website's frontend with this exact email address, the system will automatically authorize and create your profile with full Super Admin privileges.</p>
+          <p>You can set the primary administrator email directly in your environment variables file (<code>.env</code>) by adding or editing the <code>NEXT_PUBLIC_ADMIN_EMAIL</code> variable. Alternatively, you can modify it directly in the codebase by opening <a href="../src/contexts/AuthContext.tsx"><code>src/contexts/AuthContext.tsx</code></a> in your editor and changing the default fallback email on line 36:</p>
+          <pre><code>export const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "admin@yourdomain.com";</code></pre>
+          <p>Change <code>"admin@yourdomain.com"</code> or set the <code>NEXT_PUBLIC_ADMIN_EMAIL</code> in your <code>.env</code> file to your preferred administrator email. When you register/sign up on the website's frontend with this exact email address, the system will automatically authorize and create your profile with full Super Admin privileges.</p>
         </li>
         <li class="step-item">
           <strong>Install Dependencies:</strong>
@@ -604,6 +604,9 @@ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=your_firebase_measurement_id
 # Base URL for dynamic paths/sitemaps
 NEXT_PUBLIC_BASE_URL=https://yourdomain.com
 PORT=3006
+
+# System Administrator Configuration (Primary admin account & notifications destination)
+NEXT_PUBLIC_ADMIN_EMAIL=your_admin_email_here
 
 # Google Maps API Key (Optional)
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY="your_google_maps_api_key_here"
@@ -995,6 +998,17 @@ MYSQL_PORT=3306</code></pre>
         <li>Toggle <strong>Enable Online Payments (Razorpay)</strong> to <code>ON</code>.</li>
         <li>Enter your <strong>Razorpay Key ID</strong> and <strong>Razorpay Key Secret</strong> (test keys for testing, live keys for production).</li>
         <li>Make sure to toggle <strong>Enable "Pay After Service"</strong> if you want to support Cash on Delivery (COD).</li>
+        <li>Click <strong>Save Payment Settings</strong>. The system automatically syncs these credentials dynamically.</li>
+      </ol>
+
+      <h3>Setting up Stripe:</h3>
+      <ol>
+        <li>Log into your admin dashboard and navigate to <strong>App Settings</strong> in the sidebar.</li>
+        <li>Click the <strong>Payment</strong> tab.</li>
+        <li>Toggle <strong>Enable Stripe Payment Gateway</strong> to <code>ON</code>.</li>
+        <li>Enter your <strong>Stripe Publishable Key</strong> and <strong>Stripe Secret Key</strong> (test keys for testing, live keys for production).</li>
+        <li>Enter your <strong>Stripe Webhook Secret</strong>. You can retrieve this by setting up a webhook on your Stripe Dashboard.</li>
+        <li>Configure a Webhook on your Stripe Dashboard pointing to: <code>https://yourdomain.com/api/stripe/webhook</code>, and select the <code>checkout.session.completed</code> event.</li>
         <li>Click <strong>Save Payment Settings</strong>. The system automatically syncs these credentials dynamically.</li>
       </ol>
 

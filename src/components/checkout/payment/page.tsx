@@ -13,7 +13,7 @@ import CheckoutStepper from '@/components/checkout/CheckoutStepper';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getCartEntries, type CartEntry } from '@/lib/cartManager';
 import { db, auth } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, Timestamp } from '@/lib/mysqlDb';
+import { doc, getDoc, collection, query, where, getDocs, Timestamp, addDoc } from '@/lib/mysqlDb';
 import type { FirestoreService, FirestoreUser, FirestorePromoCode, AppSettings, PlatformFeeSetting, AppliedPlatformFeeItem, PriceVariant } from '@/types/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
@@ -31,6 +31,15 @@ import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { isWebView, requestNativePayment } from '@/lib/webview-bridge';
 import { getTimestampMillis } from '@/lib/utils';
 
+
+const generateBookingId = (): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = 'FB-';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(chars.length * Math.random()));
+  }
+  return result;
+};
 
 declare global {
   interface Window {
@@ -94,6 +103,7 @@ export default function PaymentPage() {
 
   const [isCancellationFeeMode, setIsCancellationFeeMode] = useState(false);
   const [cancellationFeeDetails, setCancellationFeeDetails] = useState<{ bookingId: string; feeAmount: number; humanReadableBookingId?: string } | null>(null);
+  const [isGatewayDialogOpen, setIsGatewayDialogOpen] = useState(false);
 
   const [cartEntries, setCartEntries] = useState<CartEntry[]>([]);
   const [serviceDetailsMap, setServiceDetailsMap] = useState<Record<string, FirestoreService>>({});
@@ -449,51 +459,30 @@ export default function PaymentPage() {
 
   const loadRazorpayScript = () => new Promise((resolve) => { if (window.Razorpay) { resolve(true); return; } const script = document.createElement('script'); script.src = 'https://checkout.razorpay.com/v1/checkout.js'; script.onload = () => resolve(true); script.onerror = () => resolve(false); document.body.appendChild(script); });
 
-  const handlePaymentAction = async () => {
-    if (!paymentMethod && !isCancellationFeeMode) { toast({ title: "Payment Method Required", description: "Please select a payment method.", variant: "destructive" }); return; }
-    setIsProcessingPayment(true); showLoading();
+  const handleRazorpayCheckout = async () => {
+    setIsProcessingPayment(true);
+    showLoading();
 
-    if (paymentMethod === 'Pay After Service' && !isCancellationFeeMode) {
-        localStorage.setItem('wecanfixPaymentMethod', 'Pay After Service');
-        localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
-        if (appliedPromoCode) {
-            localStorage.setItem('wecanfixBookingDiscountCode', appliedPromoCode.code);
-            localStorage.setItem('wecanfixBookingDiscountAmount', appliedPromoCode.calculatedDiscount.toString());
-            localStorage.setItem('wecanfixAppliedPromoCodeId', appliedPromoCode.id);
-        } else {
-            localStorage.removeItem('wecanfixBookingDiscountCode');
-            localStorage.removeItem('wecanfixBookingDiscountAmount');
-            localStorage.removeItem('wecanfixAppliedPromoCodeId');
-        }
-        if (calculatedPlatformFees.length > 0) localStorage.setItem('wecanfixAppliedPlatformFees', JSON.stringify(calculatedPlatformFees)); else localStorage.removeItem('wecanfixAppliedPlatformFees');
-        
-        router.push('/checkout/thank-you'); 
-        return; 
-    }
-
-    if (!onlinePaymentEnabled || !appConfig.razorpayKeyId) {
-        const errorMsg = isCancellationFeeMode ? "Online Payment Required" : "Online Payments Disabled";
-        toast({ title: errorMsg, description: "Online payments are currently not available or configured.", variant: "destructive" });
-        setIsProcessingPayment(false); hideLoading(); return;
-    }
-    
     // Check if in WebView, if so, trigger native payment
     if (isWebView()) {
         const paymentDetails = {
             amount: Math.round(totalAmountDue * 100),
-            currency: 'INR',
+            currency: appConfig?.currencyCode || 'INR',
             description: isCancellationFeeMode && cancellationFeeDetails?.humanReadableBookingId ? `Cancellation Fee for Booking ${cancellationFeeDetails.humanReadableBookingId}` : "Service Booking Payment"
         };
         requestNativePayment(paymentDetails);
-        // The WebView bridge will later call a global JS function with the payment result
-        // For now, we assume the Flutter app will handle the navigation to thank-you on success.
         setIsProcessingPayment(false);
         hideLoading();
         return;
     }
 
     const scriptLoaded = await loadRazorpayScript();
-    if (!scriptLoaded) { toast({ title: "Error", description: "Could not load Razorpay checkout. Please try again.", variant: "destructive" }); setIsProcessingPayment(false); hideLoading(); return; }
+    if (!scriptLoaded) { 
+      toast({ title: "Error", description: "Could not load Razorpay checkout. Please try again.", variant: "destructive" }); 
+      setIsProcessingPayment(false); 
+      hideLoading(); 
+      return; 
+    }
 
     try {
       const currencyCode = appConfig?.currencyCode || 'INR';
@@ -522,26 +511,40 @@ export default function PaymentPage() {
 
       const customerAddressDataString = localStorage.getItem('wecanfixCustomerAddress');
       let customerName = "Guest", customerEmail = "guest@example.com", customerContact = undefined;
-      if (customerAddressDataString) { try { const addr = JSON.parse(customerAddressDataString); customerName = addr.fullName || customerName; customerEmail = addr.email || customerEmail; customerContact = addr.phone || undefined; } catch (e) { console.error("Error parsing address for Razorpay:", e); } }
-      else if (auth.currentUser) { customerName = auth.currentUser.displayName || customerName; customerEmail = auth.currentUser.email || customerEmail; }
+      if (customerAddressDataString) { 
+        try { 
+          const addr = JSON.parse(customerAddressDataString); 
+          customerName = addr.fullName || customerName; 
+          customerEmail = addr.email || customerEmail; 
+          customerContact = addr.phone || undefined; 
+        } catch (e) { 
+          console.error("Error parsing address for Razorpay:", e); 
+        } 
+      } else if (auth.currentUser) { 
+        customerName = auth.currentUser.displayName || customerName; 
+        customerEmail = auth.currentUser.email || customerEmail; 
+      }
 
       const paymentDescription = isCancellationFeeMode && cancellationFeeDetails?.humanReadableBookingId ? `Cancellation Fee for Booking ${cancellationFeeDetails.humanReadableBookingId}` : "Service Booking Payment";
 
       const options = {
-        key: appConfig.razorpayKeyId, amount: orderDetails.amount, currency: currencyCode, name: globalSettings?.websiteName || "Wecanfix Services",
-        description: paymentDescription, order_id: orderDetails.id,
+        key: appConfig.razorpayKeyId, 
+        amount: orderDetails.amount, 
+        currency: currencyCode, 
+        name: globalSettings?.websiteName || "Wecanfix Services",
+        description: paymentDescription, 
+        order_id: orderDetails.id,
         handler: (response: any) => {
           localStorage.setItem('razorpayPaymentId', response.razorpay_payment_id);
           localStorage.setItem('razorpayOrderId', response.razorpay_order_id);
           localStorage.setItem('razorpaySignature', response.razorpay_signature);
-          localStorage.setItem('wecanfixPaymentMethod', 'Online'); // Set generic Online for successful razorpay
+          localStorage.setItem('wecanfixPaymentMethod', 'Online');
           localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
 
           if (isCancellationFeeMode && cancellationFeeDetails) {
             localStorage.setItem('isProcessingCancellationFee', 'true');
             localStorage.setItem('bookingIdForCancellationFee', cancellationFeeDetails.bookingId);
             localStorage.setItem('cancellationFeeAmount', cancellationFeeDetails.feeAmount.toString());
-            // Clear booking-specific promo data for fee payment
             localStorage.removeItem('wecanfixBookingDiscountCode');
             localStorage.removeItem('wecanfixBookingDiscountAmount');
             localStorage.removeItem('wecanfixAppliedPromoCodeId');
@@ -557,14 +560,228 @@ export default function PaymentPage() {
           router.push('/checkout/thank-you');
         },
         prefill: { name: customerName, email: customerEmail, contact: customerContact },
-        notes: { address: isCancellationFeeMode ? "Cancellation Fee" : `${globalSettings?.websiteName || "Wecanfix"} Service Booking`, ...(isCancellationFeeMode && cancellationFeeDetails && {booking_id_cancelled: cancellationFeeDetails.humanReadableBookingId || cancellationFeeDetails.bookingId}), ...(!isCancellationFeeMode && {cart_item_count: cartEntries.length.toString(), applied_promo_code: appliedPromoCode?.code || "N/A"}) },
+        notes: { 
+          address: isCancellationFeeMode ? "Cancellation Fee" : `${globalSettings?.websiteName || "Wecanfix"} Service Booking`, 
+          ...(isCancellationFeeMode && cancellationFeeDetails && {booking_id_cancelled: cancellationFeeDetails.humanReadableBookingId || cancellationFeeDetails.bookingId}), 
+          ...(!isCancellationFeeMode && {cart_item_count: cartEntries.length.toString(), applied_promo_code: appliedPromoCode?.code || "N/A"}) 
+        },
         theme: { color: "#45A0A2" },
         modal: { ondismiss: () => { setIsProcessingPayment(false); hideLoading(); }}
       };
       const rzp = new window.Razorpay(options);
-      rzp.on('payment.failed', (response: any) => { toast({ title: "Payment Failed", description: response.error.description || "An error occurred.", variant: "destructive" }); setIsProcessingPayment(false); hideLoading(); });
+      rzp.on('payment.failed', (response: any) => { 
+        toast({ title: "Payment Failed", description: response.error.description || "An error occurred.", variant: "destructive" }); 
+        setIsProcessingPayment(false); 
+        hideLoading(); 
+      });
       rzp.open();
-    } catch (error) { toast({ title: "Payment Error", description: (error as Error).message || "An unexpected error occurred.", variant: "destructive" }); setIsProcessingPayment(false); hideLoading(); }
+    } catch (error) { 
+      toast({ title: "Payment Error", description: (error as Error).message || "An unexpected error occurred.", variant: "destructive" }); 
+      setIsProcessingPayment(false); 
+      hideLoading(); 
+    }
+  };
+
+  const handleStripeCheckout = async () => {
+    setIsProcessingPayment(true);
+    showLoading();
+
+    try {
+      const currencyCode = appConfig?.currencyCode || 'INR';
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+      if (isCancellationFeeMode && cancellationFeeDetails) {
+        localStorage.setItem('isProcessingCancellationFee', 'true');
+        localStorage.setItem('bookingIdForCancellationFee', cancellationFeeDetails.bookingId);
+        localStorage.setItem('cancellationFeeAmount', cancellationFeeDetails.feeAmount.toString());
+        localStorage.setItem('wecanfixPaymentMethod', 'Online');
+
+        const res = await fetch('/api/stripe/create-checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'cancellation_fee',
+            bookingId: cancellationFeeDetails.bookingId,
+            amount: cancellationFeeDetails.feeAmount,
+            currency: currencyCode,
+            successUrl: `${origin}/checkout/thank-you?payment_method=stripe&session_id={CHECKOUT_SESSION_ID}&reason=cancellation_fee&bookingId=${cancellationFeeDetails.bookingId}`,
+            cancelUrl: `${origin}/checkout/payment?reason=cancellation_fee&booking_id=${cancellationFeeDetails.bookingId}`,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to initiate Stripe session.');
+        }
+
+        const data = await res.json();
+        router.push(data.url);
+        return;
+      }
+
+      const newBookingId = generateBookingId();
+      let customerEmail = "";
+      let customerName = "Guest User", customerPhone = "N/A", addressLine1 = "N/A", addressLine2: string | undefined, city = "N/A", state = "N/A", pincode = "N/A";
+      let latitude: number | undefined, longitude: number | undefined;
+      let bookingDiscountCode: string | undefined, bookingDiscountAmount: number | undefined, appliedPromoCodeId: string | undefined;
+      let storedAppliedPlatformFees: AppliedPlatformFeeItem[] = [];
+      let estimatedEndTime: string | undefined;
+      let currentCategoryId: string | null = null;
+      let storedInterveningBreaks: any[] = [];
+      let storedDailyTimeline: any[] = [];
+
+      if (typeof window !== 'undefined') {
+        const storedEmail = localStorage.getItem('wecanfixCustomerEmail');
+        customerEmail = (storedEmail && storedEmail.trim()) ? storedEmail : (currentUser?.email || "");
+        currentCategoryId = localStorage.getItem('wecanfixActiveCheckoutCategory');
+        const breaksStr = localStorage.getItem('wecanfixInterveningBreaks');
+        if (breaksStr) { try { storedInterveningBreaks = JSON.parse(breaksStr); } catch (e) {} }
+        const dailyTimelineStr = localStorage.getItem('wecanfixDailyTimeline');
+        if (dailyTimelineStr) { try { storedDailyTimeline = JSON.parse(dailyTimelineStr); } catch (e) {} }
+        bookingDiscountCode = localStorage.getItem('wecanfixBookingDiscountCode') || undefined;
+        const discountAmountStr = localStorage.getItem('wecanfixBookingDiscountAmount');
+        bookingDiscountAmount = discountAmountStr ? parseFloat(discountAmountStr) : undefined;
+        appliedPromoCodeId = localStorage.getItem('wecanfixAppliedPromoCodeId') || undefined;
+        const platformFeesStr = localStorage.getItem('wecanfixAppliedPlatformFees');
+        if (platformFeesStr) { try { storedAppliedPlatformFees = JSON.parse(platformFeesStr); } catch (e) {} }
+        const addressDataString = localStorage.getItem('wecanfixCustomerAddress');
+        if (addressDataString) { const addressData = JSON.parse(addressDataString); customerName = addressData.fullName || customerName; customerPhone = addressData.phone || customerPhone; customerEmail = addressData.email || customerEmail; addressLine1 = addressData.addressLine1 || addressLine1; addressLine2 = addressData.addressLine2 || undefined; city = addressData.city || city; state = addressData.state || state; pincode = addressData.pincode || pincode; latitude = addressData.latitude === null ? undefined : addressData.latitude; longitude = addressData.longitude === null ? undefined : addressData.longitude; }
+      }
+
+      const bookingServices = cartEntries.map(entry => {
+        const detail = serviceDetailsMap[entry.serviceId];
+        if (!detail) return null;
+        const displayedPriceForQuantity = calculateIncrementalTotalPriceForItem(detail, entry.quantity);
+        const itemTaxRate = (detail.taxPercent || 0) > 0 ? (detail.taxPercent || 0) : 0;
+        const basePriceForQuantity = getBasePrice(displayedPriceForQuantity, detail.isTaxInclusive === true, itemTaxRate);
+        const taxAmountForItem = basePriceForQuantity * (itemTaxRate / 100);
+
+        return {
+          serviceId: entry.serviceId,
+          name: detail.name,
+          quantity: entry.quantity,
+          pricePerUnit: displayedPriceForQuantity / entry.quantity,
+          discountedPricePerUnit: detail.discountedPrice || null,
+          isTaxInclusive: detail.isTaxInclusive === true,
+          taxPercentApplied: itemTaxRate,
+          taxAmountForItem: taxAmountForItem,
+          imageUrl: detail.imageUrl || null
+        };
+      }).filter(Boolean);
+
+      const newBookingData = {
+        bookingId: newBookingId,
+        bookingNumber: 0,
+        ...(currentUser?.uid && { userId: currentUser.uid }),
+        customerName, customerEmail, customerPhone, addressLine1, ...(addressLine2 && { addressLine2 }), city, state, pincode,
+        ...(latitude !== undefined && { latitude }), ...(longitude !== undefined && { longitude }),
+        scheduledDate: localStorage.getItem('wecanfixScheduledDate') || "",
+        scheduledTimeSlot: localStorage.getItem('wecanfixScheduledTimeSlot') || "",
+        estimatedEndTime: localStorage.getItem('wecanfixEstimatedEndTime') || null,
+        interveningBreaks: storedInterveningBreaks,
+        dailyTimeline: storedDailyTimeline,
+        services: bookingServices,
+        subTotal: subTotal,
+        ...(visitingCharge > 0 && { visitingCharge: visitingCharge }),
+        taxAmount: taxAmount,
+        totalAmount: totalAmountDue,
+        platformFeeTotal: totalPlatformFeeBaseAmount + totalTaxOnPlatformFees,
+        ...(bookingDiscountCode !== undefined && { discountCode: bookingDiscountCode }),
+        ...(bookingDiscountAmount !== undefined && { discountAmount: bookingDiscountAmount }),
+        ...(calculatedPlatformFees.length > 0 && { appliedPlatformFees: calculatedPlatformFees }),
+        paymentMethod: 'Online',
+        status: 'Pending Payment',
+        createdAt: Timestamp.now(),
+        isReviewedByCustomer: false,
+        workCategoryId: currentCategoryId || undefined,
+      };
+
+      const docRef = await addDoc(collection(db, "bookings"), newBookingData);
+
+      const res = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'booking',
+          bookingId: docRef.id,
+          amount: totalAmountDue,
+          currency: currencyCode,
+          successUrl: `${origin}/checkout/thank-you?payment_method=stripe&session_id={CHECKOUT_SESSION_ID}&bookingId=${docRef.id}`,
+          cancelUrl: `${origin}/checkout/payment`,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to initiate Stripe checkout.');
+      }
+
+      const data = await res.json();
+
+      localStorage.setItem('wecanfixPaymentMethod', 'Online');
+      localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
+      if (appliedPromoCode) {
+        localStorage.setItem('wecanfixBookingDiscountCode', appliedPromoCode.code);
+        localStorage.setItem('wecanfixBookingDiscountAmount', appliedPromoCode.calculatedDiscount.toString());
+        localStorage.setItem('wecanfixAppliedPromoCodeId', appliedPromoCode.id);
+      }
+      if (calculatedPlatformFees.length > 0) {
+        localStorage.setItem('wecanfixAppliedPlatformFees', JSON.stringify(calculatedPlatformFees));
+      }
+
+      router.push(data.url);
+
+    } catch (error: any) {
+      toast({ title: "Stripe Payment Error", description: error.message || "Could not initiate payment.", variant: "destructive" });
+      setIsProcessingPayment(false);
+      hideLoading();
+    }
+  };
+
+  const handlePaymentAction = async () => {
+    if (!paymentMethod && !isCancellationFeeMode) { toast({ title: "Payment Method Required", description: "Please select a payment method.", variant: "destructive" }); return; }
+    setIsProcessingPayment(true); showLoading();
+
+    if (paymentMethod === 'Pay After Service' && !isCancellationFeeMode) {
+        localStorage.setItem('wecanfixPaymentMethod', 'Pay After Service');
+        localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
+        if (appliedPromoCode) {
+            localStorage.setItem('wecanfixBookingDiscountCode', appliedPromoCode.code);
+            localStorage.setItem('wecanfixBookingDiscountAmount', appliedPromoCode.calculatedDiscount.toString());
+            localStorage.setItem('wecanfixAppliedPromoCodeId', appliedPromoCode.id);
+        } else {
+            localStorage.removeItem('wecanfixBookingDiscountCode');
+            localStorage.removeItem('wecanfixBookingDiscountAmount');
+            localStorage.removeItem('wecanfixAppliedPromoCodeId');
+        }
+        if (calculatedPlatformFees.length > 0) localStorage.setItem('wecanfixAppliedPlatformFees', JSON.stringify(calculatedPlatformFees)); else localStorage.removeItem('wecanfixAppliedPlatformFees');
+        
+        router.push('/checkout/thank-you'); 
+        return; 
+    }
+
+    const razorpayEnabled = appConfig.enableRazorpay !== false && !!appConfig.razorpayKeyId;
+    const stripeEnabled = appConfig.enableStripe === true && !!appConfig.stripePublishableKey;
+
+    if (!onlinePaymentEnabled || (!razorpayEnabled && !stripeEnabled)) {
+        const errorMsg = isCancellationFeeMode ? "Online Payment Required" : "Online Payments Disabled";
+        toast({ title: errorMsg, description: "Online payments are currently not available or configured.", variant: "destructive" });
+        setIsProcessingPayment(false); hideLoading(); return;
+    }
+
+    if (razorpayEnabled && stripeEnabled) {
+        // If both are enabled, trigger gateway selection dialog
+        setIsGatewayDialogOpen(true);
+        setIsProcessingPayment(false);
+        hideLoading();
+        return;
+    }
+
+    if (stripeEnabled) {
+        await handleStripeCheckout();
+    } else {
+        await handleRazorpayCheckout();
+    }
   };
 
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -695,6 +912,45 @@ export default function PaymentPage() {
           </Button>
         </CardFooter>
       </Card>
+
+      <Dialog open={isGatewayDialogOpen} onOpenChange={setIsGatewayDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-center">Choose Payment Gateway</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Button 
+              className="py-6 flex items-center justify-between text-left font-semibold text-md border-2 border-primary/20 hover:border-primary hover:bg-primary/5 rounded-xl h-auto w-full"
+              variant="outline"
+              onClick={async () => {
+                setIsGatewayDialogOpen(false);
+                await handleRazorpayCheckout();
+              }}
+            >
+              <span className="flex flex-col">
+                <span className="font-bold text-foreground">Cards, UPI, NetBanking</span>
+                <span className="text-xs text-muted-foreground font-normal mt-0.5">Secure payment via Razorpay</span>
+              </span>
+              <ArrowRight className="h-5 w-5 text-primary ml-4 shrink-0" />
+            </Button>
+
+            <Button 
+              className="py-6 flex items-center justify-between text-left font-semibold text-md border-2 border-primary/20 hover:border-primary hover:bg-primary/5 rounded-xl h-auto w-full"
+              variant="outline"
+              onClick={async () => {
+                setIsGatewayDialogOpen(false);
+                await handleStripeCheckout();
+              }}
+            >
+              <span className="flex flex-col">
+                <span className="font-bold text-foreground">Stripe Checkout</span>
+                <span className="text-xs text-muted-foreground font-normal mt-0.5">International cards, Link & Google Pay</span>
+              </span>
+              <ArrowRight className="h-5 w-5 text-primary ml-4 shrink-0" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

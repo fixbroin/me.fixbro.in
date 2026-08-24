@@ -230,8 +230,42 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
                     }
                 </Badge>
             </div>
-            {booking.razorpayPaymentId && <p><strong>Razorpay Payment ID:</strong> <span className="text-xs">{booking.razorpayPaymentId}</span></p>}
-            {booking.razorpayOrderId && <p><strong>Razorpay Order ID:</strong> <span className="text-xs">{booking.razorpayOrderId}</span></p>}
+            {booking.razorpayPaymentId && (
+              <div className="col-span-1 sm:col-span-2">
+                <strong>Razorpay Payment ID:</strong>
+                <span className="text-xs font-mono break-all block mt-0.5 select-all">{booking.razorpayPaymentId}</span>
+              </div>
+            )}
+            {booking.razorpayOrderId && (
+              <div className="col-span-1 sm:col-span-2">
+                <strong>Razorpay Order ID:</strong>
+                <span className="text-xs font-mono break-all block mt-0.5 select-all">{booking.razorpayOrderId}</span>
+              </div>
+            )}
+            {booking.stripeSessionId && (
+              <div className="col-span-1 sm:col-span-2">
+                <strong>Stripe Session ID:</strong>
+                <span className="text-xs font-mono break-all block mt-0.5 select-all">{booking.stripeSessionId}</span>
+              </div>
+            )}
+            {booking.stripePaymentIntent && (
+              <div className="col-span-1 sm:col-span-2">
+                <strong>Stripe Payment Intent ID:</strong>
+                <span className="text-xs font-mono break-all block mt-0.5 select-all">{booking.stripePaymentIntent}</span>
+              </div>
+            )}
+            {booking.status === 'Cancelled' && booking.cancellationFeePaid !== undefined && (
+              <div>
+                <strong>Cancellation Fee Paid:</strong>
+                <span className="font-bold text-red-600 ml-1.5">{symbol}{booking.cancellationFeePaid}</span>
+              </div>
+            )}
+            {booking.status === 'Cancelled' && booking.cancellationPaymentId && (
+              <div className="col-span-1 sm:col-span-2">
+                <strong>Cancellation Payment ID:</strong>
+                <span className="text-xs font-mono break-all block mt-0.5 select-all">{booking.cancellationPaymentId}</span>
+              </div>
+            )}
             {booking.createdAt && <p><strong>Booked On:</strong> {formatDetailTimestamp(booking.createdAt)}</p>}
             {booking.updatedAt && <p><strong>Last Updated:</strong> {formatDetailTimestamp(booking.updatedAt)}</p>}
           </div>

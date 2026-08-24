@@ -217,6 +217,8 @@ export interface FirestoreBooking {
   razorpayPaymentId?: string;
   razorpayOrderId?: string;
   razorpaySignature?: string;
+  stripeSessionId?: string;
+  stripePaymentIntent?: string;
   status: BookingStatus;
   notes?: string; // Any special instructions from customer
   previousScheduledDate?: string; // NEW: Store previous date before reschedule
@@ -605,8 +607,14 @@ export interface AppSettings {
   dateFormat?: string;
   // Payment
   enableOnlinePayment: boolean;
+  enableRazorpay: boolean;
+  enableStripe: boolean;
   razorpayKeyId: string;
   razorpayKeySecret: string;
+  razorpayWebhookSecret?: string;
+  stripePublishableKey: string;
+  stripeSecretKey: string;
+  stripeWebhookSecret: string;
   enableCOD: boolean; // Represents "Pay After Service"
   // Time Slots
   timeSlotSettings: {
