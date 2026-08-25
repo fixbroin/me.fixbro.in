@@ -210,14 +210,47 @@ export async function depositProviderWalletAction(
 
     // Dispatch push to Admins
     try {
-      const adminsSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'admin')));
-      if (!adminsSnap.empty) {
-        const promises = adminsSnap.docs.map(adminDoc => 
-          sendServerPushNotification({
-            userId: adminDoc.id,
+      const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
+      const adminIds = new Set<string>();
+
+      // Get super_admin and finance_admin roles
+      const adminsSnap = await getDocs(
+        query(
+          collection(db, 'users'),
+          where('role', 'in', ['super_admin', 'finance_admin'])
+        )
+      );
+      adminsSnap.forEach(adminDoc => {
+        adminIds.add(adminDoc.id);
+      });
+
+      // Explicitly fetch the primary admin email user
+      const primaryAdminQuery = query(collection(db, 'users'), where('email', '==', ADMIN_EMAIL), limit(1));
+      const primaryAdminSnap = await getDocs(primaryAdminQuery);
+      if (!primaryAdminSnap.empty) {
+        adminIds.add(primaryAdminSnap.docs[0].id);
+      }
+
+      if (adminIds.size > 0) {
+        const promises = Array.from(adminIds).map(async (adminUid) => {
+          // Write userNotification in database for admin panel inbox
+          const adminNotificationData = {
+            userId: adminUid,
+            title: "Provider Wallet Deposit",
+            message: `Provider ${providerName} added ${symbol}${finalCredit.toFixed(2)} to their wallet.`,
+            type: 'info',
+            href: '/admin/provider-withdrawals?tab=wallet_complaints',
+            read: false,
+            createdAt: Timestamp.now(),
+          };
+          await addDoc(collection(db, "userNotifications"), adminNotificationData);
+
+          // Dispatch FCM push alert
+          return sendServerPushNotification({
+            userId: adminUid,
             title: "Provider Wallet Deposit",
             body: `Provider ${providerName} added ${symbol}${finalCredit.toFixed(2)} to their wallet.`,
-            href: '/admin/provider-controls?tab=wallet_complaints',
+            href: '/admin/provider-withdrawals?tab=wallet_complaints',
             type: 'admin_provider_deposit_alert',
             variables: {
               providerName,
@@ -225,8 +258,8 @@ export async function depositProviderWalletAction(
               balance: finalBalance.toFixed(2),
               currencySymbol: symbol
             }
-          })
-        );
+          });
+        });
         await Promise.allSettled(promises);
       }
     } catch (e) {
