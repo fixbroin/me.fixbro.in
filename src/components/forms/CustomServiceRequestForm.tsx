@@ -558,7 +558,7 @@ export default function CustomServiceRequestForm({
                     <DialogHeader className="p-4 border-b">
                       <DialogTitle>Select a Category</DialogTitle>
                     </DialogHeader>
-                    <ScrollArea className="h-72">
+                    <ScrollArea className="max-h-[80vh]">
                       <div className="p-2">
                         {categories.map((c) => (
                           <div
