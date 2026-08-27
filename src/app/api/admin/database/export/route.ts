@@ -45,8 +45,16 @@ const TABLES = [
   'seoSettings'
 ];
 
-export async function GET() {
+import { NextRequest } from 'next/server';
+import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
+
+export async function GET(request: NextRequest) {
   try {
+    const user = await verifyRequest(request);
+    if (!user || !isUserAdmin(user)) {
+      return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
+    }
+
     const pool = await getPool();
     const exportData: Record<string, any[]> = {};
 

@@ -429,19 +429,30 @@ export function resolvePath(path: string): { table: string; docId: string | null
   let tableName = parts[0] || path;
   if (tableName === 'adminTaxes') tableName = 'taxes';
 
+  let finalTable = tableName;
+  let docId: string | null = null;
+  let parentId: string | null = null;
+
   if (parts.length === 1) {
-    return { table: tableName, docId: null, parentId: null };
+    finalTable = tableName;
+  } else if (parts.length === 2) {
+    finalTable = tableName;
+    docId = parts[1];
+  } else if (parts.length === 3) {
+    finalTable = `${parts[0]}_${parts[2]}`;
+    parentId = parts[1];
+  } else if (parts.length >= 4) {
+    finalTable = `${parts[0]}_${parts[2]}`;
+    docId = parts.slice(3).join('/');
+    parentId = parts[1];
   }
-  if (parts.length === 2) {
-    return { table: tableName, docId: parts[1], parentId: null };
+
+  // Validate whitelisted table name to prevent SQL Injection
+  if (!TABLES.includes(finalTable)) {
+    throw new Error(`Access denied: Invalid database table "${finalTable}"`);
   }
-  if (parts.length === 3) {
-    return { table: `${parts[0]}_${parts[2]}`, docId: null, parentId: parts[1] };
-  }
-  if (parts.length >= 4) {
-    return { table: `${parts[0]}_${parts[2]}`, docId: parts.slice(3).join('/'), parentId: parts[1] };
-  }
-  return { table: tableName, docId: null, parentId: null };
+
+  return { table: finalTable, docId, parentId };
 }
 
 // Database query runners implementing Firestore interfaces on MySQL
@@ -507,6 +518,11 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
       const field = c.field;
       const op = c.op;
       const value = serializeDbData(c.value);
+
+      // Safe field validation to prevent SQL Injection
+      if (field && !/^[a-zA-Z0-9_$.*\[\]\-]+$/.test(field)) {
+        throw new Error(`Access denied: Unsafe field name in query "${field}"`);
+      }
 
       // Handle document id filter
       if (field === 'id' || field === 'uid' || field === '__name__') {
@@ -620,6 +636,15 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
     } else if (c.type === 'orderBy') {
       const field = c.field;
       const direction = c.direction || 'asc';
+
+      // Safe field validation
+      if (field && !/^[a-zA-Z0-9_$.*\[\]\-]+$/.test(field)) {
+        throw new Error(`Access denied: Unsafe order field name "${field}"`);
+      }
+      if (!['asc', 'desc'].includes(direction.toLowerCase())) {
+        throw new Error(`Access denied: Invalid sorting direction "${direction}"`);
+      }
+
       if (field === 'createdAt' || field === 'updatedAt') {
         orderByClauses.push(`\`${field}\` ${direction.toUpperCase()}`);
       } else if (['order', 'price', 'rating', 'reviewCount', 'discountedPrice', 'minQuantity', 'maxQuantity'].includes(field)) {
@@ -648,6 +673,11 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
             const f = cond.field;
             const o = cond.op;
             const val = serializeDbData(cond.value);
+
+            // Safe field validation for OR query
+            if (f && !/^[a-zA-Z0-9_$.*\[\]\-]+$/.test(f)) {
+              throw new Error(`Access denied: Unsafe field name in OR query "${f}"`);
+            }
             if (f === 'id' || f === 'uid' || f === '__name__') {
               tempWhere.push('`id` = ?');
               tempParams.push(val);

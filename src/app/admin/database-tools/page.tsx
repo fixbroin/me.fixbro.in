@@ -13,6 +13,17 @@ import PermissionGuard from '@/components/admin/PermissionGuard';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { executeGetNextCacheStatus, executeClearNextCache } from '@/app/actions/dbActions';
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
+import { auth } from '@/lib/firebase';
+
+async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  const token = await auth.currentUser?.getIdToken();
+  const headers = {
+    ...(init?.headers || {}),
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+  return fetch(url, { ...init, headers });
+}
+
 export default function DatabaseToolsPage() {
   const { toast } = useToast();
   const showToast = toast;
@@ -75,7 +86,7 @@ export default function DatabaseToolsPage() {
     showToast({ title: "Exporting Database", description: "Generating your backup file..." });
 
     try {
-      const response = await fetch('/api/admin/database/export');
+      const response = await authFetch('/api/admin/database/export');
       if (!response.ok) throw new Error("Database export failed");
       
       const blob = await response.blob();
@@ -106,7 +117,7 @@ export default function DatabaseToolsPage() {
       const formData = new FormData();
       formData.append('file', dbFile);
 
-      const response = await fetch('/api/admin/database/import', {
+      const response = await authFetch('/api/admin/database/import', {
         method: 'POST',
         body: formData
       });
@@ -144,7 +155,7 @@ export default function DatabaseToolsPage() {
     showToast({ title: "Backing Up Images", description: "Compressing public/uploads folder into a ZIP..." });
 
     try {
-      const response = await fetch('/api/admin/images/export');
+      const response = await authFetch('/api/admin/images/export');
       if (!response.ok) throw new Error("Images backup failed");
 
       const blob = await response.blob();
@@ -175,7 +186,7 @@ export default function DatabaseToolsPage() {
       const formData = new FormData();
       formData.append('file', imagesFile);
 
-      const response = await fetch('/api/admin/images/import', {
+      const response = await authFetch('/api/admin/images/import', {
         method: 'POST',
         body: formData
       });
@@ -204,7 +215,7 @@ export default function DatabaseToolsPage() {
     showToast({ title: "Migrating Data", description: "Fetching documents from Firebase Firestore and merging into MySQL..." });
 
     try {
-      const res = await fetch('/api/admin/database/migrate-firebase-to-mysql', { method: 'POST' });
+      const res = await authFetch('/api/admin/database/migrate-firebase-to-mysql', { method: 'POST' });
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Migration failed");

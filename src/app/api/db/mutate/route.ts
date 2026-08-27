@@ -1,9 +1,22 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { getPool, addDocInternal, setDocInternal, updateDocInternal, deleteDocInternal } from '@/lib/mysql';
+import { verifyRequest, validateAccess } from '@/lib/dbSecurity';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const user = await verifyRequest(request);
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
+    }
+
     const { action, path, id, docId, data, options } = await request.json();
+
+    // Check Firestore-style access rules
+    const isWriteAllowed = validateAccess(user, path, 'write');
+    if (!isWriteAllowed) {
+      return NextResponse.json({ success: false, error: `Forbidden: No write access to "${path}".` }, { status: 403 });
+    }
+
     const pool = await getPool();
 
     if (action === 'addDoc') {

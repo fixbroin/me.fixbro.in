@@ -4,15 +4,34 @@ import { nanoid } from 'nanoid';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { executeDbGetDoc } from '@/app/actions/dbActions';
+import { verifyRequest } from '@/lib/dbSecurity';
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await verifyRequest(req);
+    if (!user || user.uid === 'guest') {
+      return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
+    }
+
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const uploadPath = (formData.get('uploadPath') as string) || 'general';
 
     if (!file) {
       return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
+    }
+
+    // Validate size (5MB max)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      return NextResponse.json({ success: false, error: 'File size exceeds limit of 5MB.' }, { status: 400 });
+    }
+
+    // Validate extension
+    const ext = path.extname(file.name).toLowerCase();
+    const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp3', '.wav', '.pdf'];
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      return NextResponse.json({ success: false, error: `Invalid file extension "${ext}". Allowed: jpg, jpeg, png, gif, webp, mp3, wav, pdf.` }, { status: 400 });
     }
 
     // 1. Check Media Storage Configuration
@@ -83,7 +102,7 @@ export async function POST(req: NextRequest) {
     await fs.mkdir(targetDir, { recursive: true });
 
     // Generate readable sequential filename preserving original extension
-    const ext = path.extname(file.name) || '.jpg';
+    const fileExt = ext || '.jpg';
     
     // Map folder name to singular label (e.g. services -> service)
     const segment = cleanSubfolder.split('/').pop()?.toLowerCase() || 'media';
@@ -108,7 +127,7 @@ export async function POST(req: NextRequest) {
       counter = matchingFiles.length + 1;
     } catch {}
 
-    let filename = `${prefix}${counter}${ext}`;
+    let filename = `${prefix}${counter}${fileExt}`;
     let fullPath = path.join(targetDir, filename);
 
     // Ensure no collisions by checking file access
@@ -116,7 +135,7 @@ export async function POST(req: NextRequest) {
       while (true) {
         await fs.access(fullPath);
         counter++;
-        filename = `${prefix}${counter}${ext}`;
+        filename = `${prefix}${counter}${fileExt}`;
         fullPath = path.join(targetDir, filename);
       }
     } catch {
@@ -145,6 +164,11 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const user = await verifyRequest(req);
+    if (!user || user.uid === 'guest') {
+      return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
+    }
+
     const { fileUrl } = await req.json();
     if (!fileUrl || typeof fileUrl !== 'string') {
       return NextResponse.json({ success: false, error: 'No fileUrl provided' }, { status: 400 });
@@ -152,24 +176,40 @@ export async function DELETE(req: NextRequest) {
 
     // 1. Local VPS Disk Deletion
     if (fileUrl.startsWith('/uploads/') || fileUrl.startsWith('uploads/')) {
-      const cleanPath = fileUrl.replace(/^\/?uploads\//, '');
+      const cleanPath = path.normalize(fileUrl.replace(/^\/?uploads\//, '')).replace(/^(\.\.(\/|\\|$))+/, '');
       let baseDir = process.cwd();
       if (baseDir.includes(path.join('.next', 'standalone')) || baseDir.endsWith('standalone')) {
         baseDir = path.join(baseDir, '..', '..');
       }
-      const filePath = path.join(baseDir, 'public', 'uploads', cleanPath);
+      
+      const targetDir = path.join(baseDir, 'public', 'uploads');
+      const filePath = path.resolve(targetDir, cleanPath);
+      
+      // Directory traversal prevention
+      if (!filePath.startsWith(targetDir)) {
+        return NextResponse.json({ success: false, error: 'Access denied: Directory traversal detected.' }, { status: 403 });
+      }
+
       try {
         await fs.unlink(filePath);
       } catch (err) {
         console.warn("Local file unlink note:", filePath, err);
       }
     } else if (fileUrl.startsWith('/sounds/') || fileUrl.startsWith('sounds/')) {
-      const cleanPath = fileUrl.replace(/^\/?sounds\//, '');
+      const cleanPath = path.normalize(fileUrl.replace(/^\/?sounds\//, '')).replace(/^(\.\.(\/|\\|$))+/, '');
       let baseDir = process.cwd();
       if (baseDir.includes(path.join('.next', 'standalone')) || baseDir.endsWith('standalone')) {
         baseDir = path.join(baseDir, '..', '..');
       }
-      const filePath = path.join(baseDir, 'public', 'sounds', cleanPath);
+      
+      const targetDir = path.join(baseDir, 'public', 'sounds');
+      const filePath = path.resolve(targetDir, cleanPath);
+      
+      // Directory traversal prevention
+      if (!filePath.startsWith(targetDir)) {
+        return NextResponse.json({ success: false, error: 'Access denied: Directory traversal detected.' }, { status: 403 });
+      }
+
       try {
         await fs.unlink(filePath);
       } catch (err) {

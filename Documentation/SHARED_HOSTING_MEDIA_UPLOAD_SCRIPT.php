@@ -44,14 +44,20 @@ if (isset($_POST['action']) && $_POST['action'] === 'delete') {
         $parts = explode('/uploads/', $fileUrl);
         if (count($parts) > 1) {
             $relativePath = trim($parts[1], '/');
-            $cleanRelativePath = preg_replace('/[^a-zA-Z0-9_\-\.\/]/', '', $relativePath);
-            $targetFilePath = __DIR__ . '/uploads/' . $cleanRelativePath;
-            if (file_exists($targetFilePath) && is_file($targetFilePath)) {
-                @unlink($targetFilePath);
+            // Normalize path to prevent directory traversal
+            $cleanRelativePath = str_replace(['..', '\\'], ['', '/'], $relativePath);
+            $targetFilePath = realpath(__DIR__ . '/uploads') . '/' . $cleanRelativePath;
+            $baseUploadDir = realpath(__DIR__ . '/uploads');
+            
+            // Check that target path is within baseUploadDir
+            if ($baseUploadDir && strpos(realpath(dirname($targetFilePath)), $baseUploadDir) === 0) {
+                if (file_exists($targetFilePath) && is_file($targetFilePath)) {
+                    @unlink($targetFilePath);
+                }
             }
         }
     }
-    echo json_encode(['success' => true, 'message' => 'File deleted if existed']);
+    echo json_encode(['success' => true, 'message' => 'File deletion processed']);
     exit();
 }
 
@@ -62,6 +68,15 @@ if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
 }
 
 $file = $_FILES['file'];
+
+// Validate Size (10MB Max)
+$maxSize = 10 * 1024 * 1024;
+if ($file['size'] > $maxSize) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'File size exceeds limit of 10MB']);
+    exit();
+}
+
 $uploadPath = isset($_POST['uploadPath']) ? trim($_POST['uploadPath']) : 'general';
 
 // Sanitize subfolder path
@@ -75,6 +90,15 @@ if (!file_exists($targetDir)) {
 // Generate unique filename preserving extension
 $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
 $ext = $ext ? '.' . strtolower($ext) : '.jpg';
+
+// Validate Extension
+$allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp3', '.wav', '.pdf'];
+if (!in_array($ext, $allowedExtensions)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Invalid file extension. Allowed: jpg, jpeg, png, gif, webp, mp3, wav, pdf']);
+    exit();
+}
+
 $filename = time() . '-' . bin2hex(random_bytes(4)) . $ext;
 $targetFilePath = $targetDir . $filename;
 

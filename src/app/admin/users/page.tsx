@@ -22,7 +22,6 @@ import AppImage from '@/components/ui/AppImage';
 import { openWhatsAppChooser } from '@/lib/whatsappUtils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getArchivedUsers } from '@/lib/adminDashboardUtils';
@@ -363,18 +362,28 @@ export default function AdminUsersPage() {
     if (data.length === 0) return;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `users_export_${timestamp}`;
-    if (format === 'csv') {
-      const csvContent = [headers.join(','), ...data.map(row => row.join(','))].join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    if (format === 'csv' || format === 'excel') {
+      const escapeCSVField = (val: any): string => {
+        if (val === null || val === undefined) return '';
+        let str = String(val);
+        if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+          str = '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+      };
+
+      const csvContent = [
+        headers.map(escapeCSVField).join(','),
+        ...data.map(row => row.map(escapeCSVField).join(','))
+      ].join('\n');
+      
+      const bom = '\uFEFF';
+      const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = `${filename}.csv`;
       link.click();
-    } else if (format === 'excel') {
-      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
-      XLSX.writeFile(workbook, `${filename}.xlsx`);
     } else if (format === 'pdf') {
       const doc = new jsPDF();
       doc.text("User Directory Export", 14, 16);

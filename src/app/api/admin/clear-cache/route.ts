@@ -1,18 +1,14 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebaseAdmin';
 import { triggerRefresh } from '@/lib/revalidateUtils';
+import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Security Check: Only allow Admins
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const user = await verifyRequest(req);
+    if (!user || !isUserAdmin(user)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const token = authHeader.split('Bearer ')[1];
-    const decodedToken = await adminAuth.verifyIdToken(token);
     
     const { tag } = await req.json();
 

@@ -67,8 +67,15 @@ function getRealFirestore() {
   return getFirestore(app);
 }
 
-export async function POST() {
+import { type NextRequest } from 'next/server';
+import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
+
+export async function POST(req: NextRequest) {
   try {
+    const user = await verifyRequest(req);
+    if (!user || !isUserAdmin(user)) {
+      return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
+    }
     const firestore = getRealFirestore();
     const pool = await getPool();
     const summary: Record<string, number> = {};

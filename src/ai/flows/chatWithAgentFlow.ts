@@ -259,8 +259,8 @@ async function getUserAndBookings(userId?: string): Promise<{ name: string; emai
     bookings.push({ id: bDoc.id, ...bDoc.data() } as FirestoreBooking);
   });
   
-  // Find the primary admin UID for chat session lookup
-  const adminQuery = await adminDb.collection("users").where("email", "==", "wecanfix.in@gmail.com").limit(1).get();
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
+  const adminQuery = await adminDb.collection("users").where("email", "==", adminEmail).limit(1).get();
   if (!adminQuery.empty) {
     adminId = adminQuery.docs[0].id;
   }

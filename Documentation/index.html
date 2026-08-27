@@ -617,6 +617,9 @@ CRON_SECRET=your_cron_secret_here
 WHATSAPP_TOKEN=your_whatsapp_access_token_here
 WHATSAPP_PHONE_NUMBER_ID=your_whatsapp_phone_number_id_here
 
+# Internal API Secret for Server-side requests bypass
+INTERNAL_API_SECRET=your_secure_internal_secret_key_here
+
 # Firebase Service Account Credentials JSON (Single Line String)
 FIREBASE_ADMIN_SDK_CONFIG='{"type": "service_account", "project_id": "your_project_id", "private_key": "-----BEGIN PRIVATE KEY-----\nyour_private_key_lines_here\n-----END PRIVATE KEY-----\n", "client_email": "your_client_email", "client_id": "your_client_id", "auth_uri": "https://accounts.google.com/o/oauth2/auth", "token_uri": "https://oauth2.googleapis.com/token", "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs", "client_x509_cert_url": "your_client_x509_cert_url", "universe_domain": "googleapis.com"}'</code></pre>
     </section>
@@ -995,8 +998,10 @@ MYSQL_PORT=3306</code></pre>
       <ol>
         <li>Log into your admin dashboard and navigate to <strong>App Settings</strong> in the sidebar.</li>
         <li>Click the <strong>Payment</strong> tab.</li>
-        <li>Toggle <strong>Enable Online Payments (Razorpay)</strong> to <code>ON</code>.</li>
+        <li>Toggle <strong>Razorpay Payment Gateway</strong> to <code>ON</code>.</li>
         <li>Enter your <strong>Razorpay Key ID</strong> and <strong>Razorpay Key Secret</strong> (test keys for testing, live keys for production).</li>
+        <li>Enter your <strong>Razorpay Webhook Secret</strong>. You can configure and retrieve this by setting up a webhook on your Razorpay Dashboard.</li>
+        <li>Configure a Webhook on your Razorpay Dashboard pointing to: <code>https://yourdomain.com/api/razorpay/webhook</code>, and select the <code>order.paid</code> and <code>payment.captured</code> events.</li>
         <li>Make sure to toggle <strong>Enable "Pay After Service"</strong> if you want to support Cash on Delivery (COD).</li>
         <li>Click <strong>Save Payment Settings</strong>. The system automatically syncs these credentials dynamically.</li>
       </ol>

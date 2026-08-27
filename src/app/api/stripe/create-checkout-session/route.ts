@@ -20,6 +20,33 @@ export async function POST(req: NextRequest) {
     const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
     const appConfig = appConfigSnap.exists ? appConfigSnap.data() as any : null;
 
+    let reconciledAmount = amount;
+
+    if (bookingId && (type === 'booking' || type === 'cancellation_fee')) {
+      const bookingDoc = await adminDb.collection('bookings').doc(bookingId).get();
+      if (!bookingDoc.exists) {
+        return NextResponse.json({ success: false, error: 'Booking not found.' }, { status: 404 });
+      }
+      const bookingData = bookingDoc.data() as any;
+      if (type === 'booking') {
+        reconciledAmount = bookingData.totalAmount;
+      } else if (type === 'cancellation_fee') {
+        const feeValue = appConfig?.cancellationFeeValue || 0;
+        const feeType = appConfig?.cancellationFeeType || 'fixed';
+        if (feeType === 'percentage') {
+          reconciledAmount = (feeValue / 100) * (bookingData.totalAmount || 0);
+        } else {
+          reconciledAmount = feeValue;
+        }
+      }
+    } else if (type === 'wallet_topup' && providerId) {
+      const minDeposit = appConfig?.minDepositAmount || 500;
+      const maxDeposit = appConfig?.maxDepositAmount || 10000;
+      if (amount < minDeposit || amount > maxDeposit) {
+        return NextResponse.json({ success: false, error: `Deposit must be between ${minDeposit} and ${maxDeposit}.` }, { status: 400 });
+      }
+    }
+
     const stripeSecretKey = appConfig?.stripeSecretKey;
     if (!stripeSecretKey) {
       console.error("Stripe Secret Key is not configured in settings.");
@@ -31,7 +58,7 @@ export async function POST(req: NextRequest) {
     });
 
     const decimals = getCurrencySubunitDecimals(currency);
-    const stripeAmount = Math.round(amount * Math.pow(10, decimals));
+    const stripeAmount = Math.round(reconciledAmount * Math.pow(10, decimals));
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -56,7 +83,7 @@ export async function POST(req: NextRequest) {
         type,
         bookingId: bookingId || "",
         providerId: providerId || "",
-        amount: amount.toString(),
+        amount: reconciledAmount.toString(),
       },
       success_url: successUrl,
       cancel_url: cancelUrl,

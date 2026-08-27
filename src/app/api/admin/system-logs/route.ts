@@ -7,8 +7,15 @@ import os from 'os';
 
 const execPromise = util.promisify(exec);
 
-export async function GET(request: Request) {
+import { NextRequest } from 'next/server';
+import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
+
+export async function GET(request: NextRequest) {
   try {
+    const user = await verifyRequest(request);
+    if (!user || !isUserAdmin(user)) {
+      return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
+    }
     let logOutput = '';
 
     // 1. Try reading via PM2 command
