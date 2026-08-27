@@ -170,7 +170,7 @@ export default function CustomServiceAdminPage() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const { toast } = useToast();
-  const { adminPermissions } = useAuth();
+  const { adminPermissions, user } = useAuth();
 
   useEffect(() => {
     setIsLoading(true);
@@ -242,11 +242,15 @@ export default function CustomServiceAdminPage() {
                 const imageRef = storageRef(storage, url);
                 await deleteObject(imageRef);
               } else {
-                await fetch('/api/upload', {
-                  method: 'DELETE',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ fileUrl: url })
-                });
+                 const token = await user?.getIdToken();
+                 await fetch('/api/upload', {
+                   method: 'DELETE',
+                   headers: { 
+                     'Content-Type': 'application/json',
+                     'Authorization': `Bearer ${token}`
+                   },
+                   body: JSON.stringify({ fileUrl: url })
+                 });
               }
             } catch (err) {
               console.error("Failed to delete image from storage:", url, err);

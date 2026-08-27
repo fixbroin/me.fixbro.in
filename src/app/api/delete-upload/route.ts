@@ -12,9 +12,17 @@ export async function POST(req: NextRequest) {
 
     // Forward to /api/upload DELETE logic
     const origin = req.nextUrl.origin;
+    const authHeader = req.headers.get('authorization');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+
     const res = await fetch(`${origin}/api/upload`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ fileUrl: targetUrl })
     });
     const data = await res.json();
