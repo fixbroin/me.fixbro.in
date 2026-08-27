@@ -50,7 +50,11 @@ const TABLES = [
   'areas',
   'searchAnalytics',
   'leaves',
-  'seoSettings'
+  'seoSettings',
+  'outOfZoneRequests',
+  'customServiceRequests',
+  'push_templates',
+  'email_templates'
 ];
 
 async function main() {

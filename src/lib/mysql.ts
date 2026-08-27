@@ -52,7 +52,10 @@ const TABLES = [
   'searchAnalytics',
   'leaves',
   'seoSettings',
-  'outofZoneRequests'
+  'outOfZoneRequests',
+  'customServiceRequests',
+  'push_templates',
+  'email_templates'
 ];
 
 /**
