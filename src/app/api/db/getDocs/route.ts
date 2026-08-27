@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
         'userCarts': 'userId',
         'userActivities': 'userId',
         'visitorInfoLogs': 'userId',
-        'leaves': 'providerId'
+        'leaves': 'providerId',
+        'customServiceRequests': 'userId'
       };
 
       const filterField = privateTablesToFilter[path];
@@ -50,6 +51,26 @@ export async function POST(request: NextRequest) {
         if (!hasValidFilter) {
           const actualField = (path === 'bookings' && user.role === 'provider') ? 'providerId' : filterField;
           constraints.push({ type: 'where', field: actualField, op: '==', value: user.uid });
+        }
+      }
+
+      if (path === 'users') {
+        const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
+        const isAdminQuery = constraints.some((c: any) => 
+          (c && c.type === 'where' && c.field === 'email' && c.value === ADMIN_EMAIL) || 
+          (c && c.type === 'where' && c.field === 'role' && (c.value === 'super_admin' || c.value === 'finance_admin'))
+        );
+        if (!isAdminQuery) {
+          let hasSelfFilter = false;
+          for (const c of constraints) {
+            if (c && c.type === 'where' && c.op === '==' && c.field === 'uid' && c.value === user.uid) {
+              hasSelfFilter = true;
+              break;
+            }
+          }
+          if (!hasSelfFilter) {
+            constraints.push({ type: 'where', field: 'uid', op: '==', value: user.uid });
+          }
         }
       }
     }

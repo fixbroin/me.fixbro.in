@@ -103,8 +103,9 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     return action === 'read';
   }
 
-  // 3. User Accounts (Owner only)
+  // 3. User Accounts (Owner only, or query-level filtered getDocs)
   if (table === 'users') {
+    if (action === 'read') return !docId || isOwner;
     return isOwner;
   }
 
@@ -147,8 +148,8 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     return true; // Owner checking is handled via query parameters
   }
 
-  // 10. Withdrawals & Quotations & Invoices & Referrals
-  if (['withdrawalRequests', 'quotations', 'invoices', 'referrals', 'leaves'].includes(table)) {
+  // 10. Withdrawals & Quotations & Invoices & Referrals & Custom Requests
+  if (['withdrawalRequests', 'quotations', 'invoices', 'referrals', 'leaves', 'customServiceRequests'].includes(table)) {
     return true; // Handled dynamically in components/actions by filtering for providerId/userId
   }
 
