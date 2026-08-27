@@ -1,10 +1,16 @@
+import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
 // src/app/api/admin/images/export/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import AdmZip from 'adm-zip';
 import path from 'path';
 import fs from 'fs';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const user = await verifyRequest(request);
+  if (!user || !isUserAdmin(user)) {
+    return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
+  }
+
   try {
     let baseDir = process.cwd();
     if (baseDir.includes(path.join('.next', 'standalone')) || baseDir.endsWith('standalone')) {

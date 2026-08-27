@@ -142,7 +142,7 @@ function getBookingTimestampMillis(b: FirestoreBooking): number {
 
 export default function AdminBookingsPage() {
   const { stats } = useAdminStats();
-  const { adminPermissions } = useAuth();
+  const { adminPermissions, user } = useAuth();
   const [bookings, setBookings] = useState<FirestoreBooking[]>([]);
   const [displayLimit, setDisplayLimit] = useState(50);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
@@ -470,11 +470,16 @@ export default function AdminBookingsPage() {
       }
       
       if (Object.keys(statsUpdates).length > 0) {
-        fetch('/api/admin/stats/decrement', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(statsUpdates),
-        }).catch(err => console.error("Error decrementing stats:", err));
+        user?.getIdToken().then(token => {
+          fetch('/api/admin/stats/decrement', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(statsUpdates),
+          }).catch(err => console.error("Error decrementing stats:", err));
+        });
       }
 
       await triggerRefresh('bookings');

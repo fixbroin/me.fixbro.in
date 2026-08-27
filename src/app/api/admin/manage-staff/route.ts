@@ -1,10 +1,16 @@
+import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 import { Timestamp, FieldValue } from '@/lib/mysqlDbAdmin';
 import { SUPER_ADMIN_PERMISSIONS } from '@/config/rbac';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const user = await verifyRequest(request);
+  if (!user || !isUserAdmin(user)) {
+    return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
+  }
+
   try {
     // 1. Verify Requestor is a Super Admin
     const authHeader = request.headers.get('Authorization');
@@ -93,7 +99,12 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
+  const user = await verifyRequest(request);
+  if (!user || !isUserAdmin(user)) {
+    return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
+  }
+
     try {
       const authHeader = request.headers.get('Authorization');
       if (!authHeader?.startsWith('Bearer ')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

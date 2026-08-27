@@ -13,7 +13,7 @@ import { Image as ImageIcon, Search, Upload, RefreshCw, Loader2, Sparkles, Folde
 import Image from 'next/image';
 import { useToast } from "@/hooks/use-toast";
 import PermissionGuard from '@/components/admin/PermissionGuard';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, updateDoc, setDoc } from '@/lib/mysqlDb';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { compressImage } from '@/lib/imageCompressor';
@@ -620,7 +620,14 @@ export default function AdminImageGalleryPage() {
       formData.append('uploadPath', selectedItem.uploadFolder);
 
       setUploadProgress(50);
-      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+      const token = await auth.currentUser?.getIdToken();
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
       const uploadData = await uploadRes.json();
 
       if (!uploadRes.ok || !uploadData.success) {

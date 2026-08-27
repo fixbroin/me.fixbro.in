@@ -474,7 +474,12 @@ export default function AdminAreasPage() {
 
       try {
         const q = `${area.name}, ${parentCity.name}, India`;
-        const res = await fetch(`/api/admin/geocode?q=${encodeURIComponent(q)}`);
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch(`/api/admin/geocode?q=${encodeURIComponent(q)}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         const data = await res.json();
         
         if (data.lat && data.lon) {
