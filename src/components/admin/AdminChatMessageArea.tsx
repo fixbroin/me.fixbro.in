@@ -53,7 +53,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
   const [isAiActive, setIsAiActive] = useState(true);
   const [isUpdatingAi, setIsUpdatingAi] = useState(false);
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const { user: loggedInAdminUser } = useAuth();
   const { toast } = useToast();
 
@@ -177,6 +177,22 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
       } finally {
           setIsUpdatingAi(false);
       }
+  };
+
+  // Auto-resize textarea height
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = '48px'; // Default/minimum height (matching h-12)
+      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 150)}px`;
+    }
+  }, [newMessage]);
+
+  // Handle enter key submit
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage(e as any);
+    }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -461,13 +477,13 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
       <footer className="p-4 border-t bg-card/80 backdrop-blur-md sticky bottom-0 z-20 shrink-0">
         <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex items-center space-x-2">
           <div className="relative flex-grow group">
-            <Input
+            <textarea
               ref={inputRef}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="Write a message..."
-              className="pr-12 bg-muted/30 border-none focus-visible:ring-2 focus-visible:ring-primary/20 h-12 rounded-2xl text-sm transition-all no-keyboard-scroll"
-              autoComplete="off"
+              className="w-full pr-12 pl-4 py-3.5 bg-muted/30 border-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 h-12 rounded-2xl text-sm transition-all resize-none no-keyboard-scroll overflow-y-auto"
               disabled={isLoadingMessages || isLoadingSupportAdminProfile}
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">

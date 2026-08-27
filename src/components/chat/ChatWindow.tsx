@@ -40,7 +40,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [isAiTyping, setIsAiTyping] = useState(false);
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const [viewportOffset, setViewportOffset] = useState<number>(0);
   const { user: currentUser } = useAuth();
@@ -213,6 +213,22 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
       }
     }
   }, [messages, isLoadingMessages, isAiTyping]);
+
+  // Auto-resize textarea height
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = '48px'; // Default/minimum height (matching h-12)
+      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 150)}px`;
+    }
+  }, [newMessage]);
+
+  // Handle enter key submit
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage(e as any);
+    }
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -577,15 +593,15 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
       <CardFooter className="p-4 border-t bg-background">
         <form onSubmit={handleSendMessage} className="flex w-full items-center gap-3">
           <div className="relative flex-grow group">
-            <Input
+            <textarea
               ref={inputRef}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
               onFocus={handleFocus}
               onBlur={handleBlur}
               placeholder="Type your message here..."
-              className="w-full pr-10 py-6 rounded-2xl bg-muted/50 border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all text-sm h-12 no-keyboard-scroll"
-              autoComplete="off"
+              className="w-full pr-10 pl-4 py-3.5 rounded-2xl bg-muted/50 border-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all text-sm h-12 resize-none no-keyboard-scroll overflow-y-auto"
               disabled={isLoadingMessages || isLoadingGlobalSettings || isLoadingAdminProfile || !adminProfile.uid || isAiTyping}
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-40 group-focus-within:opacity-100 transition-opacity">
