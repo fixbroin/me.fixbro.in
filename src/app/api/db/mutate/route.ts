@@ -11,10 +11,14 @@ export async function POST(request: NextRequest) {
 
     const { action, path, id, docId, data, options } = await request.json();
 
+    // Reconstruct the full document path to validate access properly
+    const targetId = id || docId;
+    const fullPath = targetId ? `${path}/${targetId}` : path;
+
     // Check Firestore-style access rules
-    const isWriteAllowed = validateAccess(user, path, 'write');
+    const isWriteAllowed = validateAccess(user, fullPath, 'write');
     if (!isWriteAllowed) {
-      return NextResponse.json({ success: false, error: `Forbidden: No write access to "${path}".` }, { status: 403 });
+      return NextResponse.json({ success: false, error: `Forbidden: No write access to "${fullPath}".` }, { status: 403 });
     }
 
     const pool = await getPool();

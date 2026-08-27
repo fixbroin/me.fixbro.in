@@ -118,8 +118,15 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     return isOwner;
   }
 
-  // 6. Contact & Popup Submissions (Write-only for guests, read-only for admin)
-  if (table === 'contactUsSubmissions' || table === 'popupSubmissions') {
+  // 6. Contact & Popup Submissions & Logs (Write-only for guests/users, read-only for admin)
+  if ([
+    'contactUsSubmissions',
+    'popupSubmissions',
+    'userActivities',
+    'outOfZoneRequests',
+    'visitorInfoLogs',
+    'searchAnalytics'
+  ].includes(table)) {
     return action === 'write';
   }
 
