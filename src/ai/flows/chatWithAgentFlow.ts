@@ -508,7 +508,7 @@ const chatAgentFlow = ai.defineFlow(
     });
 
     const response = await ai.generate({
-      model: 'googleai/gemini-2.0-flash',
+      model: 'googleai/gemini-3.6-flash',
       system: systemPrompt,
       prompt: message,
       config: { temperature: 0.4 },
