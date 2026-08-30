@@ -102,9 +102,9 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     return action === 'read';
   }
 
-  // 3. User Accounts (Owner only, or query-level filtered getDocs)
+  // 3. User Accounts (Owner only, or query-level filtered getDocs, or allowed if authenticated to view provider/public user info)
   if (table === 'users') {
-    if (action === 'read') return !docId || isOwner;
+    if (action === 'read') return user.uid !== 'guest';
     return isOwner;
   }
 
