@@ -408,7 +408,7 @@ export default function MyBookingsPage() {
       });
     } else { 
       if (eligibility.isFinalWindow) {
-        if (booking.paymentMethod === 'Pay After Service' || booking.paymentMethod === 'Cash on Delivery' || booking.status === 'Pending Payment') {
+        if (booking.paymentMethod !== 'Online' || booking.status === 'Pending Payment') {
           setCancellationDialogContent({
             title: "Restricted Cancellation Window",
             description: (
@@ -433,7 +433,7 @@ export default function MyBookingsPage() {
             onAction: proceedWithCancellation,
           });
         }
-      } else if (booking.paymentMethod === 'Pay After Service' || booking.paymentMethod === 'Cash on Delivery' || booking.status === 'Pending Payment') {
+      } else if (booking.paymentMethod !== 'Online' || booking.status === 'Pending Payment') {
         setCancellationDialogContent({
           title: "Cancellation Fee Applies",
           description: (
