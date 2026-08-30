@@ -85,7 +85,6 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     'appConfiguration',
     'contentPages',
     'adminFAQs',
-    'adminReviews',
     'taxes',
     'adminPopups',
     'blogPosts',
@@ -156,7 +155,7 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
   // 11. Customer Reviews (Public read, authenticated write)
   if (table === 'adminReviews') {
     if (action === 'read') return true;
-    return action === 'write' && user !== null;
+    return action === 'write' && user.uid !== 'guest';
   }
 
   // Block everything else by default

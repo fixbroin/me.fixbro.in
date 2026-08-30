@@ -10,7 +10,7 @@ import { getBaseUrl } from '@/lib/config';
 import AppImage from '@/components/ui/AppImage';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import { getContentPageData, getGlobalWebSettings, getGlobalAppSettings } from '@/lib/webServerUtils';
-import { formatDateInTimezone } from '@/lib/utils';
+import { formatDateInTimezone, formatCurrency } from '@/lib/utils';
 
 function getTimestampMillis(ts: any): number {
   if (!ts) return 0;
@@ -84,6 +84,10 @@ export default async function CancellationPolicyPage() {
   try {
     const pageData = await getContentPageData(PAGE_SLUG);
     const appConfig = await getGlobalAppSettings();
+    
+    const symbol = appConfig?.currencySymbol || "₹";
+    const decimals = appConfig?.currencyDecimalPoints ?? 2;
+    const code = appConfig?.currencyCode || "INR";
 
     const breadcrumbItems = [
         { label: "Home", href: "/" },
@@ -184,7 +188,7 @@ export default async function CancellationPolicyPage() {
                       <strong>
                         {appConfig.cancellationFeeType === 'percentage' 
                           ? `${appConfig.cancellationFeeValue}%` 
-                          : `${appConfig.currencySymbol || '₹'}${appConfig.cancellationFeeValue}`}
+                          : formatCurrency(appConfig.cancellationFeeValue || 0, symbol, decimals, code)}
                       </strong>.
                     </p>
                   </div>
