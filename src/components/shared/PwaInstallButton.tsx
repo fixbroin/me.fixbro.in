@@ -32,7 +32,7 @@ const PwaInstallButton = () => {
   const [isAppInstalled, setIsAppInstalled] = useState(false);
   const [showIosGuide, setShowIosInstruction] = useState(false);
   const [isIos, setIsIos] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(true);
   
   const isMobile = useIsMobile();
   const pathname = usePathname();
@@ -79,18 +79,29 @@ const PwaInstallButton = () => {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
-  // 2. Timer logic for minimizing the mobile banner
+  // 2. Timer and Page visibility logic for the PWA prompt
   useEffect(() => {
-    if (!isMounted || isAppInstalled || isDismissed || isMinimized || !isMobile) return;
-    
-    // Banner is visible, start the 10s countdown to move it to the side
-    if (installPrompt || isIos) {
+    if (!isMounted || isAppInstalled || isDismissed) return;
+
+    if (pathname === '/') {
+      // Check if the home page banner was already shown in this session
+      const bannerShownSession = sessionStorage.getItem('pwa_banner_shown_home');
+      if (!bannerShownSession && (installPrompt || isIos)) {
+        setIsMinimized(false);
+        // Show for 3 to 4 seconds (3500ms), then minimize to floating button
         const timer = setTimeout(() => {
-            setIsMinimized(true);
-        }, 5000);
+          setIsMinimized(true);
+          sessionStorage.setItem('pwa_banner_shown_home', 'true');
+        }, 3500);
         return () => clearTimeout(timer);
+      } else {
+        setIsMinimized(true);
+      }
+    } else {
+      // On all other pages, directly keep it minimized (floating button)
+      setIsMinimized(true);
     }
-  }, [isMounted, isAppInstalled, isDismissed, isMobile, installPrompt, isIos, isMinimized]);
+  }, [pathname, isMounted, isAppInstalled, isDismissed, installPrompt, isIos]);
 
   const handleInstallClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
