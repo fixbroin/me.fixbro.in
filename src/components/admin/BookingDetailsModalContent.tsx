@@ -8,12 +8,13 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, ExternalLink, Tag, HandCoins, Plus, UserCheck, Loader2, Phone, UserCircle, Clock, AlertTriangle, Wallet } from 'lucide-react'; 
+import { MapPin, ExternalLink, Tag, HandCoins, Plus, UserCheck, Loader2, Phone, UserCircle, Clock, AlertTriangle, Wallet, Ban } from 'lucide-react'; 
 import AppImage from '@/components/ui/AppImage'; 
 import { getTimestampMillis, formatScheduledDate, formatCurrency, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { db } from '@/lib/firebase';
-import { doc, getDoc } from '@/lib/mysqlDb';
+import { doc, getDoc, updateDoc, Timestamp } from '@/lib/mysqlDb';
+import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { openWhatsAppChooser } from '@/lib/whatsappUtils';
 import ProviderWalletAdjustmentModal from '@/components/admin/provider/ProviderWalletAdjustmentModal';
@@ -38,6 +39,7 @@ const getBasePriceForInvoice = (displayedPrice: number, isTaxInclusive?: boolean
 
 
 export default function BookingDetailsModalContent({ booking }: BookingDetailsModalContentProps) {
+  const { toast } = useToast();
   const { config: appConfig } = useApplicationConfig();
   const symbol = appConfig?.currencySymbol || '₹';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
@@ -45,6 +47,35 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
   const [provider, setProvider] = useState<ProviderApplication | null>(null);
   const [isLoadingProvider, setIsLoadingProvider] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+  const [refundStatus, setRefundStatus] = useState<string>(booking.cancellationRefundStatus || 'Pending');
+  const [isUpdatingRefund, setIsUpdatingRefund] = useState(false);
+
+  const handleMarkAsProcessed = async () => {
+    if (!booking.id) return;
+    setIsUpdatingRefund(true);
+    try {
+      await updateDoc(doc(db, "bookings", booking.id), {
+        cancellationRefundStatus: 'Processed',
+        updatedAt: Timestamp.now()
+      });
+      setRefundStatus('Processed');
+      toast({
+        title: "Refund Processed",
+        description: `Booking #${booking.bookingId} refund has been marked as Processed.`,
+      });
+      // Fire clear cache for bookings to keep pages fresh
+      await fetch('/api/admin/clear-cache?tag=bookings', { method: 'POST' }).catch(err => console.error(err));
+    } catch (e) {
+      console.error("Failed to update refund status:", e);
+      toast({
+        title: "Update Failed",
+        description: "Could not update refund status.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUpdatingRefund(false);
+    }
+  };
 
   useEffect(() => {
     async function fetchProvider() {
@@ -398,6 +429,90 @@ export default function BookingDetailsModalContent({ booking }: BookingDetailsMo
           </div>
         </CardContent>
       </Card>
+
+      {booking.status === 'Cancelled' && (
+        <Card className="shadow-sm border-destructive/20 bg-destructive/5 animate-in fade-in slide-in-from-bottom-2 duration-350">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2 text-destructive">
+              <Ban className="h-5 w-5 text-destructive" />
+              Cancellation & Refund Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {booking.paymentMethod === 'Online' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <strong className="text-muted-foreground block text-xs uppercase tracking-wider">Original Paid Amount:</strong>
+                  <span className="font-semibold text-foreground text-sm block mt-0.5">{formatCurrency(booking.totalAmount, symbol, decimals, code)}</span>
+                </div>
+                <div>
+                  <strong className="text-muted-foreground block text-xs uppercase tracking-wider">Cancellation Fee Charged:</strong>
+                  <span className="font-bold text-red-600 text-sm block mt-0.5">
+                    {booking.cancellationFeeCharged !== undefined 
+                      ? formatCurrency(booking.cancellationFeeCharged, symbol, decimals, code)
+                      : 'N/A'}
+                  </span>
+                </div>
+                <div>
+                  <strong className="text-muted-foreground block text-xs uppercase tracking-wider">Calculated Refund Amount:</strong>
+                  <span className="font-bold text-green-600 text-sm block mt-0.5">
+                    {booking.refundableAmount !== undefined 
+                      ? formatCurrency(booking.refundableAmount, symbol, decimals, code)
+                      : 'N/A'}
+                  </span>
+                </div>
+                <div>
+                  <strong className="text-muted-foreground block text-xs uppercase tracking-wider">Refund Status:</strong>
+                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    <Badge variant="outline" className={
+                      refundStatus === 'Processed'
+                        ? "bg-green-50 text-green-700 border-green-200"
+                        : refundStatus === 'Pending'
+                          ? "bg-amber-50 text-amber-700 border-amber-200"
+                          : "bg-muted text-muted-foreground"
+                    }>
+                      {refundStatus}
+                    </Badge>
+                    {refundStatus === 'Pending' && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-7 text-xs px-2.5 font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-200 bg-emerald-50/20"
+                        onClick={handleMarkAsProcessed}
+                        disabled={isUpdatingRefund}
+                      >
+                        {isUpdatingRefund ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                        Mark as Processed
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <strong className="text-muted-foreground block text-xs uppercase tracking-wider">Original Payment Option:</strong>
+                  <span className="font-semibold text-foreground text-sm block mt-0.5">Pay After Service / Cash on Delivery</span>
+                </div>
+                <div>
+                  <strong className="text-muted-foreground block text-xs uppercase tracking-wider">Cancellation Fee Paid:</strong>
+                  <span className="font-bold text-red-600 text-sm block mt-0.5">
+                    {booking.cancellationFeePaid !== undefined && booking.cancellationFeePaid > 0
+                      ? formatCurrency(booking.cancellationFeePaid, symbol, decimals, code) 
+                      : 'Not Paid / Free'}
+                  </span>
+                </div>
+                {booking.cancellationPaymentId && (
+                  <div className="col-span-1 sm:col-span-2">
+                    <strong className="text-muted-foreground block text-xs uppercase tracking-wider">Cancellation Payment Transaction ID:</strong>
+                    <span className="text-xs font-mono break-all block mt-0.5 select-all text-foreground bg-muted p-2 rounded">{booking.cancellationPaymentId}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {booking.notes && (
         <Card className="shadow-sm">

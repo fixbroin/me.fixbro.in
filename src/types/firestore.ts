@@ -230,6 +230,9 @@ export interface FirestoreBooking {
   updatedAt?: Timestamp;
   isReviewedByCustomer?: boolean;
   cancellationFeePaid?: number;
+  cancellationFeeCharged?: number;
+  refundableAmount?: number;
+  cancellationRefundStatus?: 'Pending' | 'Processed' | 'Failed' | 'N/A';
   cancellationPaymentId?: string;
   isStatsTracked?: boolean;
   isCompletionStatsTracked?: boolean;

@@ -302,7 +302,13 @@ export default function MyBookingsPage() {
         setIsCancelling(booking.id);
         const bookingDocRef = doc(db, "bookings", booking.id);
         try {
-            await updateDoc(bookingDocRef, { status: "Cancelled" as BookingStatus, updatedAt: Timestamp.now() });
+            await updateDoc(bookingDocRef, { 
+                status: "Cancelled" as BookingStatus, 
+                updatedAt: Timestamp.now(),
+                cancellationFeeCharged: feeAmount,
+                refundableAmount: booking.paymentMethod === 'Online' ? finalRefundAmount : 0,
+                cancellationRefundStatus: booking.paymentMethod === 'Online' ? (finalRefundAmount > 0 ? 'Pending' : 'N/A') : 'N/A'
+            });
             
             // 1. Create and send notification to USER
             const userNotificationData: FirestoreNotification = {
