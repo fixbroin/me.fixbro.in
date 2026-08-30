@@ -3,7 +3,7 @@
 import type { ContentPage, GlobalWebSettings } from "@/types/firestore";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowLeft, PackageSearch } from "lucide-react";
+import { ArrowLeft, PackageSearch, HandCoins } from "lucide-react";
 import type { Metadata, ResolvingMetadata } from 'next';
 import { getGlobalSEOSettings } from '@/lib/seoServerUtils';
 import { getBaseUrl } from '@/lib/config'; 
@@ -145,6 +145,82 @@ export default async function CancellationPolicyPage() {
                     return millis ? formatDateInTimezone(new Date(millis), 'Asia/Kolkata', appConfig?.dateFormat) : 'N/A';
                 })()}
               </p>
+            )}
+          </div>
+          
+          {/* Dynamic Active Policy Card */}
+          <div className="bg-primary/5 border border-primary/10 rounded-2xl p-6 mb-8">
+            <h2 className="text-xl font-semibold text-foreground mb-4">Active Cancellation Rules</h2>
+            {!appConfig?.enableCancellationPolicy ? (
+              <p className="text-sm text-muted-foreground">
+                Cancellation policy is currently disabled. You can cancel any booking at any time for a full 100% refund.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {/* 1. Free Cancellation */}
+                <div className="flex gap-4 items-start">
+                  <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0 text-green-500 font-bold text-sm">1</div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Free Cancellation Window</h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Cancel at least{" "}
+                      <strong>
+                        {appConfig.freeCancellationDays || 0} day(s),{" "}
+                        {appConfig.freeCancellationHours || 0} hour(s), and{" "}
+                        {appConfig.freeCancellationMinutes || 0} minute(s)
+                      </strong>{" "}
+                      before your scheduled service time for a <strong>100% refund</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. Standard Cancellation Fee */}
+                <div className="flex gap-4 items-start border-t pt-4">
+                  <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0 text-amber-500 font-bold text-sm">2</div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Standard Cancellation Fee</h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Cancellations made after the free cancellation window has passed will incur a fee of{" "}
+                      <strong>
+                        {appConfig.cancellationFeeType === 'percentage' 
+                          ? `${appConfig.cancellationFeeValue}%` 
+                          : `${appConfig.currencySymbol || '₹'}${appConfig.cancellationFeeValue}`}
+                      </strong>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. Final Restricted Window */}
+                {appConfig.enableFinalCancellationWindow && (
+                  <div className="flex gap-4 items-start border-t pt-4">
+                    <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0 text-destructive font-bold text-sm">3</div>
+                    <div>
+                      <h3 className="font-semibold text-destructive">Final Restricted Window</h3>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        Cancellations made within{" "}
+                        <strong>
+                          {appConfig.finalCancellationHours || 0} hour(s) and{" "}
+                          {appConfig.finalCancellationMinutes || 0} minute(s)
+                        </strong>{" "}
+                        before the scheduled service start time will receive a <strong>100% cancellation charge (No Refund / ₹0 Refund)</strong>.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Pay After Service / COD Note */}
+                <div className="flex gap-4 items-start border-t pt-4">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 text-primary font-bold text-sm">
+                    <HandCoins className="h-4.5 w-4.5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Pay After Service / Cash on Delivery</h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      For bookings scheduled under <strong>Pay After Service</strong> or <strong>Cash on Delivery</strong>, any applicable cancellation fee or restricted charge must be paid securely online before the cancellation request is processed.
+                    </p>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
           
