@@ -641,6 +641,9 @@ export interface AppSettings {
   freeCancellationMinutes?: number;
   cancellationFeeType?: 'fixed' | 'percentage';
   cancellationFeeValue?: number;
+  enableFinalCancellationWindow?: boolean;
+  finalCancellationHours?: number;
+  finalCancellationMinutes?: number;
   chatNotificationSoundUrl?: string; // New: default sound for chat notifications
   currencyCode?: string;
   currencySymbol?: string;

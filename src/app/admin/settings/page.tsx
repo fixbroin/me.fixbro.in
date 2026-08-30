@@ -281,13 +281,16 @@ export default function AdminSettingsPage() {
                 ...(firestoreData.timeSlotSettings?.weeklyAvailability || {}),
             }
           },
-           // Merge cancellation policy settings
+          // Merge cancellation policy settings
           enableCancellationPolicy: typeof firestoreData.enableCancellationPolicy === 'boolean' ? firestoreData.enableCancellationPolicy : defaultAppSettings.enableCancellationPolicy,
           freeCancellationDays: firestoreData.freeCancellationDays ?? defaultAppSettings.freeCancellationDays,
           freeCancellationHours: firestoreData.freeCancellationHours ?? defaultAppSettings.freeCancellationHours,
           freeCancellationMinutes: firestoreData.freeCancellationMinutes ?? defaultAppSettings.freeCancellationMinutes,
           cancellationFeeType: firestoreData.cancellationFeeType ?? defaultAppSettings.cancellationFeeType,
           cancellationFeeValue: firestoreData.cancellationFeeValue ?? defaultAppSettings.cancellationFeeValue,
+          enableFinalCancellationWindow: typeof firestoreData.enableFinalCancellationWindow === 'boolean' ? firestoreData.enableFinalCancellationWindow : defaultAppSettings.enableFinalCancellationWindow,
+          finalCancellationHours: firestoreData.finalCancellationHours ?? defaultAppSettings.finalCancellationHours,
+          finalCancellationMinutes: firestoreData.finalCancellationMinutes ?? defaultAppSettings.finalCancellationMinutes,
           maxProviderRadiusKm: firestoreData.maxProviderRadiusKm ?? defaultAppSettings.maxProviderRadiusKm, // Merge new field
           autoDispatchRadiusKm: firestoreData.autoDispatchRadiusKm ?? defaultAppSettings.autoDispatchRadiusKm, // Merge auto dispatch field
         };
@@ -440,7 +443,7 @@ export default function AdminSettingsPage() {
     setSettings(prev => {
       const newSettings = JSON.parse(JSON.stringify(prev)); 
 
-      if (['carouselAutoplayDelay', 'visitingChargeTaxPercent', 'minimumBookingAmount', 'visitingChargeAmount', 'limitLateBookingHours', 'freeCancellationDays', 'freeCancellationHours', 'freeCancellationMinutes', 'cancellationFeeValue', 'maxProviderRadiusKm', 'autoDispatchRadiusKm', 'timeSlotSettings.slotIntervalMinutes', 'timeSlotSettings.breakTimeMinutes', 'currencyDecimalPoints'].includes(name)) {
+      if (['carouselAutoplayDelay', 'visitingChargeTaxPercent', 'minimumBookingAmount', 'visitingChargeAmount', 'limitLateBookingHours', 'freeCancellationDays', 'freeCancellationHours', 'freeCancellationMinutes', 'cancellationFeeValue', 'maxProviderRadiusKm', 'autoDispatchRadiusKm', 'timeSlotSettings.slotIntervalMinutes', 'timeSlotSettings.breakTimeMinutes', 'currencyDecimalPoints', 'finalCancellationHours', 'finalCancellationMinutes'].includes(name)) {
         const keys = name.split('.');
         const parsedValue = value === '' ? '' : (isNaN(parseFloat(value)) ? 0 : parseFloat(value));
         if (keys.length > 1) {
@@ -590,7 +593,8 @@ export default function AdminSettingsPage() {
       'carouselAutoplayDelay', 'visitingChargeTaxPercent', 'minimumBookingAmount', 
       'visitingChargeAmount', 'limitLateBookingHours', 'freeCancellationDays', 
       'freeCancellationHours', 'freeCancellationMinutes', 'cancellationFeeValue', 
-      'maxProviderRadiusKm', 'autoDispatchRadiusKm', 'currencyDecimalPoints'
+      'maxProviderRadiusKm', 'autoDispatchRadiusKm', 'currencyDecimalPoints',
+      'finalCancellationHours', 'finalCancellationMinutes'
     ];
     numericKeys.forEach(key => {
       if ((settingsToSave as any)[key] === '') {
@@ -1909,6 +1913,39 @@ export default function AdminSettingsPage() {
                     </div>
                   </div>
                    <p className="text-xs text-muted-foreground">If percentage, it's based on the booking's total amount.</p>
+
+                  <div className="flex items-center justify-between rounded-lg border p-4 mt-6">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="enableFinalCancellationWindow" className="text-base">Enable Final Restricted Cancellation Window</Label>
+                      <p className="text-sm text-muted-foreground">
+                        If enabled, cancellations made within this final restricted window before service start will receive a 100% cancellation charge (no refund).
+                      </p>
+                    </div>
+                    <Switch
+                      id="enableFinalCancellationWindow"
+                      name="enableFinalCancellationWindow" 
+                      checked={settings.enableFinalCancellationWindow}
+                      onCheckedChange={(checked) => handleSwitchChange('enableFinalCancellationWindow', checked)}
+                      disabled={isSaving}
+                    />
+                  </div>
+
+                  {settings.enableFinalCancellationWindow && (
+                    <div className="space-y-4 pl-4 border-l-2 border-destructive ml-2 pt-2 mt-4">
+                      <h4 className="text-md font-semibold text-destructive">Final Restricted Window (before service start)</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label htmlFor="finalCancellationHours">Hours</Label>
+                          <Input id="finalCancellationHours" name="finalCancellationHours" type="number" min="0" max="23" value={settings.finalCancellationHours ?? 0} onChange={handleInputChange} disabled={isSaving} placeholder="e.g., 3"/>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="finalCancellationMinutes">Minutes</Label>
+                          <Input id="finalCancellationMinutes" name="finalCancellationMinutes" type="number" min="0" max="59" value={settings.finalCancellationMinutes ?? 0} onChange={handleInputChange} disabled={isSaving} placeholder="e.g., 0"/>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Timeframe before service start within which cancellation is fully charged (₹0 refund).</p>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

@@ -297,7 +297,12 @@ function buildSystemPrompt(params: {
     const time = `${appConfig.freeCancellationDays || 0}d ${appConfig.freeCancellationHours || 0}h ${appConfig.freeCancellationMinutes || 0}m`;
     const symbol = appConfig.currencySymbol || '₹';
     const fee = appConfig.cancellationFeeType === 'fixed' ? `${symbol}${appConfig.cancellationFeeValue}` : `${appConfig.cancellationFeeValue}%`;
-    cancellationDetails = `Free cancellation is available up to ${time} before the service. After this period, a cancellation fee of ${fee} will apply. Detailed policy: ${baseUrl}/cancellation-policy`;
+    cancellationDetails = `Free cancellation is available up to ${time} before the service. After this period, a cancellation fee of ${fee} will apply.`;
+    if (appConfig.enableFinalCancellationWindow) {
+      const finalTime = `${appConfig.finalCancellationHours || 0}h ${appConfig.finalCancellationMinutes || 0}m`;
+      cancellationDetails += ` Cancellations made within ${finalTime} before the service start time will incur a 100% cancellation charge (no refund).`;
+    }
+    cancellationDetails += ` Detailed policy: ${baseUrl}/cancellation-policy`;
   }
 
   return `

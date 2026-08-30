@@ -1,9 +1,69 @@
-
 import { type NextRequest, NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
 import { nanoid } from 'nanoid';
 
 import { adminDb } from '@/lib/firebaseAdmin';
+
+function calculateServerCancellationFee(bookingData: any, appConfig: any) {
+  if (!appConfig?.enableCancellationPolicy) {
+    return 0;
+  }
+
+  // 1. Calculate time difference
+  if (!bookingData.scheduledDate || !bookingData.scheduledTimeSlot) {
+    const feeValue = appConfig?.cancellationFeeValue || 0;
+    const feeType = appConfig?.cancellationFeeType || 'fixed';
+    return feeType === 'percentage' ? (feeValue / 100) * (bookingData.totalAmount || 0) : feeValue;
+  }
+
+  const [year, month, day] = bookingData.scheduledDate.split('-').map(Number);
+  const serviceDate = new Date(year, month - 1, day);
+
+  const slotTime = bookingData.scheduledTimeSlot;
+  const timeMatch = slotTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!timeMatch) {
+    const feeValue = appConfig?.cancellationFeeValue || 0;
+    const feeType = appConfig?.cancellationFeeType || 'fixed';
+    return feeType === 'percentage' ? (feeValue / 100) * (bookingData.totalAmount || 0) : feeValue;
+  }
+
+  let hours = parseInt(timeMatch[1], 10);
+  const minutes = parseInt(timeMatch[2], 10);
+  const period = timeMatch[3].toUpperCase();
+  if (period === "PM" && hours < 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+
+  const serviceStartTime = new Date(serviceDate);
+  serviceStartTime.setHours(hours, minutes, 0, 0);
+
+  const now = new Date();
+  const diffMs = serviceStartTime.getTime() - now.getTime();
+
+  // 2. Check final restricted window (e.g., 3 hours)
+  const finalHours = appConfig?.finalCancellationHours || 0;
+  const finalMinutes = appConfig?.finalCancellationMinutes || 0;
+  const totalFinalWindowMs = ((finalHours * 60) + finalMinutes) * 60 * 1000;
+
+  if (appConfig?.enableFinalCancellationWindow && diffMs < totalFinalWindowMs) {
+    // Within final window -> 100% cancellation charge
+    return bookingData.totalAmount || 0;
+  }
+
+  // 3. Check free cancellation window
+  const freeWindowDays = appConfig?.freeCancellationDays || 0;
+  const freeWindowHours = appConfig?.freeCancellationHours || 0;
+  const freeWindowMinutes = appConfig?.freeCancellationMinutes || 0;
+  const totalFreeWindowMs = ((freeWindowDays * 24 * 60) + (freeWindowHours * 60) + freeWindowMinutes) * 60 * 1000;
+
+  if (diffMs >= totalFreeWindowMs) {
+    return 0; // Free cancellation
+  }
+
+  // 4. Standard fee
+  const feeValue = appConfig?.cancellationFeeValue || 0;
+  const feeType = appConfig?.cancellationFeeType || 'fixed';
+  return feeType === 'percentage' ? (feeValue / 100) * (bookingData.totalAmount || 0) : feeValue;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,13 +91,7 @@ export async function POST(req: NextRequest) {
       if (type === 'booking') {
         reconciledBaseAmount = bookingData.totalAmount;
       } else if (type === 'cancellation_fee') {
-        const feeValue = appConfig?.cancellationFeeValue || 0;
-        const feeType = appConfig?.cancellationFeeType || 'fixed';
-        if (feeType === 'percentage') {
-          reconciledBaseAmount = (feeValue / 100) * (bookingData.totalAmount || 0);
-        } else {
-          reconciledBaseAmount = feeValue;
-        }
+        reconciledBaseAmount = calculateServerCancellationFee(bookingData, appConfig);
       }
     } else if (type === 'wallet_topup' && providerId) {
       const minDeposit = appConfig?.minDepositAmount || 500;

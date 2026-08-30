@@ -217,7 +217,7 @@ export default function MyBookingsPage() {
 
   const calculateCancellationEligibility = (booking: FirestoreBooking) => {
     if (!appConfig.enableCancellationPolicy) {
-      return { eligibleForFree: true, message: "Cancellation policy is currently disabled. Free cancellation allowed.", fee: 0, feeType: 'fixed' as 'fixed' | 'percentage' };
+      return { eligibleForFree: true, message: "Cancellation policy is currently disabled. Free cancellation allowed.", fee: 0, feeType: 'fixed' as 'fixed' | 'percentage', isFinalWindow: false };
     }
 
     // Assuming booking.scheduledDate is YYYY-MM-DD from Firestore
@@ -229,7 +229,7 @@ export default function MyBookingsPage() {
     const timeParts = parseSlotToHHMM(slotTime);
     if (!timeParts) {
       console.error("Invalid time slot format:", slotTime);
-      return { eligibleForFree: false, message: "Could not parse service time. Please contact support.", fee: appConfig.cancellationFeeValue || 0, feeType: appConfig.cancellationFeeType || 'fixed' };
+      return { eligibleForFree: false, message: "Could not parse service time. Please contact support.", fee: appConfig.cancellationFeeValue || 0, feeType: appConfig.cancellationFeeType || 'fixed', isFinalWindow: false };
     }
 
     const serviceStartTime = new Date(serviceDate);
@@ -238,8 +238,23 @@ export default function MyBookingsPage() {
     const now = new Date();
     const diffMs = serviceStartTime.getTime() - now.getTime();
 
+    // 1. Check final restricted window (e.g., 3 hours before service start)
+    const finalHours = appConfig.finalCancellationHours || 0;
+    const finalMinutes = appConfig.finalCancellationMinutes || 0;
+    const totalFinalWindowMs = ((finalHours * 60) + finalMinutes) * 60 * 1000;
+
+    if (appConfig.enableFinalCancellationWindow && diffMs < totalFinalWindowMs) {
+      return {
+        eligibleForFree: false,
+        message: "You are cancelling within the final restricted window.",
+        fee: 100, // 100% cancellation charge
+        feeType: 'percentage' as 'fixed' | 'percentage',
+        isFinalWindow: true
+      };
+    }
+
     if (diffMs <= 0) { 
-      return { eligibleForFree: false, message: "Service time has already passed or is too soon to cancel.", fee: appConfig.cancellationFeeValue || 0, feeType: appConfig.cancellationFeeType || 'fixed' };
+      return { eligibleForFree: false, message: "Service time has already passed or is too soon to cancel.", fee: appConfig.cancellationFeeValue || 0, feeType: appConfig.cancellationFeeType || 'fixed', isFinalWindow: false };
     }
 
     const freeWindowDays = appConfig.freeCancellationDays || 0;
@@ -258,9 +273,9 @@ export default function MyBookingsPage() {
       if (windowMessage.trim() === "") windowMessage = "the configured window";
       else windowMessage = windowMessage.trim();
       
-      return { eligibleForFree: true, message: `You are eligible for free cancellation as you are cancelling ${windowMessage} before the service.`, fee: 0, feeType };
+      return { eligibleForFree: true, message: `You are eligible for free cancellation as you are cancelling ${windowMessage} before the service.`, fee: 0, feeType, isFinalWindow: false };
     } else {
-      return { eligibleForFree: false, message: "You are outside the free cancellation window.", fee, feeType };
+      return { eligibleForFree: false, message: "You are outside the free cancellation window.", fee, feeType, isFinalWindow: false };
     }
   };
 
@@ -392,7 +407,33 @@ export default function MyBookingsPage() {
         onAction: proceedWithCancellation,
       });
     } else { 
-      if (booking.paymentMethod === 'Pay After Service' || booking.paymentMethod === 'Cash on Delivery' || booking.status === 'Pending Payment') {
+      if (eligibility.isFinalWindow) {
+        if (booking.paymentMethod === 'Pay After Service' || booking.paymentMethod === 'Cash on Delivery' || booking.status === 'Pending Payment') {
+          setCancellationDialogContent({
+            title: "Restricted Cancellation Window",
+            description: (
+              <>
+                <p>Cancellations made within the final restricted window before service start incur a <strong>100% cancellation fee</strong>.</p>
+                <p className="mt-2 text-destructive font-semibold">You must pay the full booking amount of <strong>{feeDisplay}</strong> as a cancellation fee to proceed.</p>
+              </>
+            ),
+            actionText: "Pay Cancellation Fee",
+            onAction: proceedToPayCancellationFee,
+          });
+        } else { // Paid online
+          setCancellationDialogContent({
+            title: "No Refund Allowed",
+            description: (
+              <>
+                <p>Cancellations made within the final restricted window before service start incur a <strong>100% cancellation fee</strong>.</p>
+                <p className="mt-2 text-destructive font-semibold">No refund (₹0) will be returned as the full booking amount has been charged.</p>
+              </>
+            ),
+            actionText: "Confirm Cancellation (No Refund)",
+            onAction: proceedWithCancellation,
+          });
+        }
+      } else if (booking.paymentMethod === 'Pay After Service' || booking.paymentMethod === 'Cash on Delivery' || booking.status === 'Pending Payment') {
         setCancellationDialogContent({
           title: "Cancellation Fee Applies",
           description: (

@@ -60,6 +60,9 @@ export const defaultAppSettings: AppSettings = {
   freeCancellationMinutes: 0,
   cancellationFeeType: 'fixed', // 'fixed' or 'percentage'
   cancellationFeeValue: 100, // e.g., 100 (for fixed) or 10 (for 10%)
+  enableFinalCancellationWindow: false,
+  finalCancellationHours: 3,
+  finalCancellationMinutes: 0,
 
   // Chat setting - default sound URL
   // User needs to place default-notification.mp3 in public/sounds/

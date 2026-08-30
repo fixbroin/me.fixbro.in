@@ -153,6 +153,12 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     return true; // Handled dynamically in components/actions by filtering for providerId/userId
   }
 
+  // 11. Customer Reviews (Public read, authenticated write)
+  if (table === 'adminReviews') {
+    if (action === 'read') return true;
+    return action === 'write' && user !== null;
+  }
+
   // Block everything else by default
   return false;
 }
