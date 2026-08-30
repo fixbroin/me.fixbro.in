@@ -834,7 +834,7 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Cancellations made within{" "}
                         <strong>{finalWindowText}</strong>{" "}
-                        before the scheduled service start time will receive a <strong>100% cancellation charge (No Refund / ₹0 Refund)</strong>.
+                        before the scheduled service start time will receive a <strong>100% cancellation charge (No Refund / {formatCurrency(0, symbol, decimals, code)} Refund)</strong>.
                       </p>
                     </div>
                   </div>
