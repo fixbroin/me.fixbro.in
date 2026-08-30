@@ -114,6 +114,24 @@ export default function PaymentPage() {
   const symbol = appConfig?.currencySymbol || '₹';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
 
+  const freeDays = appConfig?.freeCancellationDays || 0;
+  const freeHours = appConfig?.freeCancellationHours || 0;
+  const freeMins = appConfig?.freeCancellationMinutes || 0;
+
+  let freeWindowText = "";
+  if (freeDays > 0) freeWindowText += `${freeDays} day(s) `;
+  if (freeHours > 0) freeWindowText += `${freeHours} hour(s) `;
+  if (freeMins > 0 || freeWindowText === "") freeWindowText += `${freeMins} minute(s)`;
+  freeWindowText = freeWindowText.trim();
+
+  const finalHours = appConfig?.finalCancellationHours || 0;
+  const finalMins = appConfig?.finalCancellationMinutes || 0;
+
+  let finalWindowText = "";
+  if (finalHours > 0) finalWindowText += `${finalHours} hour(s) `;
+  if (finalMins > 0 || finalWindowText === "") finalWindowText += `${finalMins} minute(s)`;
+  finalWindowText = finalWindowText.trim();
+
   const [subTotal, setSubTotal] = useState(0); 
   const [categoryOverrides, setCategoryOverrides] = useState<{
     visitingChargeAmount?: number;
@@ -996,11 +1014,7 @@ export default function PaymentPage() {
                     <h4 className="font-semibold text-foreground text-sm">Free Cancellation Window</h4>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Cancel at least{" "}
-                      <strong>
-                        {appConfig.freeCancellationDays || 0} day(s),{" "}
-                        {appConfig.freeCancellationHours || 0} hour(s), and{" "}
-                        {appConfig.freeCancellationMinutes || 0} minute(s)
-                      </strong>{" "}
+                      <strong>{freeWindowText}</strong>{" "}
                       before your scheduled service time for a <strong>100% refund</strong>.
                     </p>
                   </div>
@@ -1012,12 +1026,25 @@ export default function PaymentPage() {
                   <div>
                     <h4 className="font-semibold text-foreground text-sm">Standard Cancellation Fee</h4>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Cancellations made after the free window has passed incur a fee of{" "}
-                      <strong>
-                        {appConfig.cancellationFeeType === 'percentage' 
-                          ? `${appConfig.cancellationFeeValue}%` 
-                          : `${appConfig.currencySymbol || '₹'}${appConfig.cancellationFeeValue}`}
-                      </strong>.
+                      {appConfig.enableFinalCancellationWindow ? (
+                        <>
+                          Cancellations made between <strong>{freeWindowText}</strong> and <strong>{finalWindowText}</strong> before the scheduled service start time will incur a fee of{" "}
+                          <strong>
+                            {appConfig.cancellationFeeType === 'percentage' 
+                              ? `${appConfig.cancellationFeeValue}%` 
+                              : `${appConfig.currencySymbol || '₹'}${appConfig.cancellationFeeValue}`}
+                          </strong>.
+                        </>
+                      ) : (
+                        <>
+                          Cancellations made less than <strong>{freeWindowText}</strong> before the scheduled service start time will incur a fee of{" "}
+                          <strong>
+                            {appConfig.cancellationFeeType === 'percentage' 
+                              ? `${appConfig.cancellationFeeValue}%` 
+                              : `${appConfig.currencySymbol || '₹'}${appConfig.cancellationFeeValue}`}
+                          </strong>.
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -1027,13 +1054,10 @@ export default function PaymentPage() {
                   <div className="flex gap-3 items-start border-t pt-3">
                     <div className="h-6 w-6 rounded bg-destructive/10 flex items-center justify-center shrink-0 text-destructive font-bold text-xs">3</div>
                     <div>
-                      <h4 className="font-semibold text-destructive text-sm">Final Restricted Window</h4>
+                      <h4 className="font-semibold text-destructive text-sm">Final Restricted Window (No Refund)</h4>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Cancellations made within{" "}
-                        <strong>
-                          {appConfig.finalCancellationHours || 0} hour(s) and{" "}
-                          {appConfig.finalCancellationMinutes || 0} minute(s)
-                        </strong>{" "}
+                        <strong>{finalWindowText}</strong>{" "}
                         before the scheduled service start time will receive a <strong>100% cancellation charge (No Refund / ₹0 Refund)</strong>.
                       </p>
                     </div>

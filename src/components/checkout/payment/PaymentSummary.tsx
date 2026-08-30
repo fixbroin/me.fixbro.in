@@ -16,7 +16,7 @@ import { doc, getDoc, collection, query, where, getDocs, Timestamp, addDoc } fro
 import type { FirestoreService, AppliedPlatformFeeItem } from '@/types/firestore';
 import { getActiveCheckoutEntries, type CartEntry } from '@/lib/cartManager';
 import TaxBreakdownDisplay from '@/components/shared/TaxBreakdownDisplay';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 declare global {
@@ -94,11 +94,30 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
   const code = appConfig?.currencyCode || 'INR';
   const { settings: globalSettings } = useGlobalSettings();
 
+  const freeDays = appConfig?.freeCancellationDays || 0;
+  const freeHours = appConfig?.freeCancellationHours || 0;
+  const freeMins = appConfig?.freeCancellationMinutes || 0;
+
+  let freeWindowText = "";
+  if (freeDays > 0) freeWindowText += `${freeDays} day(s) `;
+  if (freeHours > 0) freeWindowText += `${freeHours} hour(s) `;
+  if (freeMins > 0 || freeWindowText === "") freeWindowText += `${freeMins} minute(s)`;
+  freeWindowText = freeWindowText.trim();
+
+  const finalHours = appConfig?.finalCancellationHours || 0;
+  const finalMins = appConfig?.finalCancellationMinutes || 0;
+
+  let finalWindowText = "";
+  if (finalHours > 0) finalWindowText += `${finalHours} hour(s) `;
+  if (finalMins > 0 || finalWindowText === "") finalWindowText += `${finalMins} minute(s)`;
+  finalWindowText = finalWindowText.trim();
+
   const [cartEntries, setCartEntries] = useState<CartEntry[]>([]);
   const [serviceDetailsMap, setServiceDetailsMap] = useState<Record<string, FirestoreService>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isGatewayDialogOpen, setIsGatewayDialogOpen] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
 
   const [categoryOverrides, setCategoryOverrides] = useState<{
     visitingChargeAmount?: number;
@@ -648,13 +667,23 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
           </Alert>
         )}
       </CardContent>
-      <CardFooter className="bg-primary/5 py-6">
+      <CardFooter className="bg-primary/5 py-6 flex flex-col gap-4">
+        <p className="text-xs text-muted-foreground text-center w-full">
+          By placing this order, you agree to our{" "}
+          <button 
+            type="button" 
+            onClick={() => setShowPolicyModal(true)} 
+            className="text-primary hover:underline font-semibold focus:outline-none"
+          >
+            Cancellation Policy
+          </button>.
+        </p>
         <Button 
-          className="w-full py-6 text-lg font-bold shadow-lg" 
+          className="w-full py-6 text-lg font-bold shadow-lg text-white" 
           disabled={!canBook || isProcessingPayment}
           onClick={handleBookNow}
         >
-          {isProcessingPayment ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
+          {isProcessingPayment ? <Loader2 className="h-5 w-5 animate-spin mr-2 text-white" /> : null}
           {paymentMethod === 'Pay After Service' ? 'Confirm Booking' : 'Book & Pay Now'}
         </Button>
       </CardFooter>
@@ -734,6 +763,102 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
               <span className="text-xs text-muted-foreground">(Credit/Debit Cards, International)</span>
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancellation Policy Dialog */}
+      <Dialog open={showPolicyModal} onOpenChange={setShowPolicyModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Cancellation Policy</DialogTitle>
+            <DialogDescription>
+              Please review our cancellation and refund guidelines before completing your booking.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 my-2 max-h-[60vh] overflow-y-auto pr-1">
+            {!appConfig?.enableCancellationPolicy ? (
+              <p className="text-sm text-muted-foreground">
+                Cancellation policy is currently disabled. You can cancel any booking at any time for a full 100% refund.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {/* 1. Free Cancellation */}
+                <div className="flex gap-3 items-start">
+                  <div className="h-6 w-6 rounded bg-green-500/10 flex items-center justify-center shrink-0 text-green-600 font-bold text-xs">1</div>
+                  <div>
+                    <h4 className="font-semibold text-foreground text-sm">Free Cancellation Window</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Cancel at least{" "}
+                      <strong>{freeWindowText}</strong>{" "}
+                      before your scheduled service time for a <strong>100% refund</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. Standard Cancellation Fee */}
+                <div className="flex gap-3 items-start border-t pt-3">
+                  <div className="h-6 w-6 rounded bg-amber-500/10 flex items-center justify-center shrink-0 text-amber-600 font-bold text-xs">2</div>
+                  <div>
+                    <h4 className="font-semibold text-foreground text-sm">Standard Cancellation Fee</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {appConfig.enableFinalCancellationWindow ? (
+                        <>
+                          Cancellations made between <strong>{freeWindowText}</strong> and <strong>{finalWindowText}</strong> before the scheduled service start time will incur a fee of{" "}
+                          <strong>
+                            {appConfig.cancellationFeeType === 'percentage' 
+                              ? `${appConfig.cancellationFeeValue}%` 
+                              : `${appConfig.currencySymbol || '₹'}${appConfig.cancellationFeeValue}`}
+                          </strong>.
+                        </>
+                      ) : (
+                        <>
+                          Cancellations made less than <strong>{freeWindowText}</strong> before the scheduled service start time will incur a fee of{" "}
+                          <strong>
+                            {appConfig.cancellationFeeType === 'percentage' 
+                              ? `${appConfig.cancellationFeeValue}%` 
+                              : `${appConfig.currencySymbol || '₹'}${appConfig.cancellationFeeValue}`}
+                          </strong>.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. Final Restricted Window */}
+                {appConfig.enableFinalCancellationWindow && (
+                  <div className="flex gap-3 items-start border-t pt-3">
+                    <div className="h-6 w-6 rounded bg-destructive/10 flex items-center justify-center shrink-0 text-destructive font-bold text-xs">3</div>
+                    <div>
+                      <h4 className="font-semibold text-destructive text-sm">Final Restricted Window (No Refund)</h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Cancellations made within{" "}
+                        <strong>{finalWindowText}</strong>{" "}
+                        before the scheduled service start time will receive a <strong>100% cancellation charge (No Refund / ₹0 Refund)</strong>.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Pay After Service / COD Note */}
+                <div className="flex gap-3 items-start border-t pt-3">
+                  <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center shrink-0 text-primary font-bold text-xs">ℹ</div>
+                  <div>
+                    <h4 className="font-semibold text-foreground text-sm">Pay After Service / Cash on Delivery</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      For bookings scheduled under <strong>Pay After Service</strong> or <strong>Cash on Delivery</strong>, any applicable cancellation fee or charge must be paid securely online before the cancellation request is processed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="sm:justify-end">
+            <Button type="button" onClick={() => setShowPolicyModal(false)}>
+              Close & Go Back
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Card>

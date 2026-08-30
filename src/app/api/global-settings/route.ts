@@ -4,6 +4,8 @@ import { getPool, getDocInternal, setDocInternal } from '@/lib/mysql';
 let settingsCache: { data: any; expiresAt: number } | null = null;
 const CACHE_TTL_MS = 10000; // 10s edge cache
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     if (settingsCache && Date.now() < settingsCache.expiresAt) {

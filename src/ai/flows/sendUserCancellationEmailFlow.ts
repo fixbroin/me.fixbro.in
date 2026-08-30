@@ -126,13 +126,20 @@ const userCancellationEmailFlow = ai.defineFlow(
       
       let paymentInfoHtml = '';
       if (paymentMethod === 'Online' && paidAmount !== undefined && cancellationFee !== undefined && refundableAmount !== undefined) {
+          const isNoRefund = refundableAmount <= 0;
           paymentInfoHtml = `
             <div class="summary-box">
               <h3 style="margin-top: 0;">Refund Details</h3>
               <p>You paid: ${currencySymbol}${paidAmount.toFixed(2)}</p>
               <p>Cancellation fee: ${currencySymbol}${cancellationFee.toFixed(2)}</p>
               <p><strong>Refundable amount: ${currencySymbol}${refundableAmount.toFixed(2)}</strong></p>
-              <p>Your refund will be processed within 7 working days to your original payment method.</p>
+              ${isNoRefund ? `
+                <p style="color: #DC3545; font-weight: bold; margin-top: 10px;">
+                  As you cancelled within the final restricted window close to the service start time, a 100% cancellation charge applies and no refund will be returned.
+                </p>
+              ` : `
+                <p>Your refund of ${currencySymbol}${refundableAmount.toFixed(2)} will be processed within 7 working days to your original payment method.</p>
+              `}
               ${cancellationPaymentId ? `<p style="font-size: 12px; color: #666; margin-top: 8px;">Cancellation Transaction ID: <strong>${cancellationPaymentId}</strong></p>` : ''}
             </div>
           `;
@@ -140,10 +147,19 @@ const userCancellationEmailFlow = ai.defineFlow(
           paymentInfoHtml = `
             <div class="summary-box">
               <h3 style="margin-top: 0;">Cancellation Fee Payment</h3>
-              <p>Original Payment Option: Pay After Service</p>
+              <p>Original Payment Option: Pay After Service / Cash on Delivery</p>
               <p><strong>Cancellation Fee (Paid Online): ${currencySymbol}${cancellationFee.toFixed(2)}</strong></p>
               ${cancellationPaymentId ? `<p style="font-size: 13px; color: #333; margin-top: 8px;">Payment Transaction ID: <strong>${cancellationPaymentId}</strong></p>` : ''}
-              <p>Thank you. Your cancellation payment has been successfully received and the booking is now fully cancelled.</p>
+              <p>Thank you. Your cancellation payment has been successfully received and the booking is now fully cancelled. If you have any concerns, please contact us.</p>
+            </div>
+          `;
+      } else if (paymentMethod !== 'Online' && (cancellationFee === undefined || cancellationFee === 0)) {
+          paymentInfoHtml = `
+            <div class="summary-box">
+              <h3 style="margin-top: 0;">Cancellation Summary</h3>
+              <p>Original Payment Option: Pay After Service / Cash on Delivery</p>
+              <p>As you cancelled within the free cancellation window, <strong>no cancellation fee or charge applies</strong>.</p>
+              <p>Your service booking has been cancelled. Thank you. If you have any concerns, please contact us.</p>
             </div>
           `;
       }

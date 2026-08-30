@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getRemoteCacheVersionsServer } from '@/lib/webServerUtils';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const data = await getRemoteCacheVersionsServer();

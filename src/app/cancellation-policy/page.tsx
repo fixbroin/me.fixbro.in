@@ -89,6 +89,24 @@ export default async function CancellationPolicyPage() {
     const decimals = appConfig?.currencyDecimalPoints ?? 2;
     const code = appConfig?.currencyCode || "INR";
 
+    const freeDays = appConfig?.freeCancellationDays || 0;
+    const freeHours = appConfig?.freeCancellationHours || 0;
+    const freeMins = appConfig?.freeCancellationMinutes || 0;
+
+    let freeWindowText = "";
+    if (freeDays > 0) freeWindowText += `${freeDays} day(s) `;
+    if (freeHours > 0) freeWindowText += `${freeHours} hour(s) `;
+    if (freeMins > 0 || freeWindowText === "") freeWindowText += `${freeMins} minute(s)`;
+    freeWindowText = freeWindowText.trim();
+
+    const finalHours = appConfig?.finalCancellationHours || 0;
+    const finalMins = appConfig?.finalCancellationMinutes || 0;
+
+    let finalWindowText = "";
+    if (finalHours > 0) finalWindowText += `${finalHours} hour(s) `;
+    if (finalMins > 0 || finalWindowText === "") finalWindowText += `${finalMins} minute(s)`;
+    finalWindowText = finalWindowText.trim();
+
     const breadcrumbItems = [
         { label: "Home", href: "/" },
         { label: pageData?.title || "Cancellation Policy" },
@@ -168,11 +186,7 @@ export default async function CancellationPolicyPage() {
                     <h3 className="font-semibold text-foreground">Free Cancellation Window</h3>
                     <p className="text-sm text-muted-foreground mt-0.5">
                       Cancel at least{" "}
-                      <strong>
-                        {appConfig.freeCancellationDays || 0} day(s),{" "}
-                        {appConfig.freeCancellationHours || 0} hour(s), and{" "}
-                        {appConfig.freeCancellationMinutes || 0} minute(s)
-                      </strong>{" "}
+                      <strong>{freeWindowText}</strong>{" "}
                       before your scheduled service time for a <strong>100% refund</strong>.
                     </p>
                   </div>
@@ -184,12 +198,25 @@ export default async function CancellationPolicyPage() {
                   <div>
                     <h3 className="font-semibold text-foreground">Standard Cancellation Fee</h3>
                     <p className="text-sm text-muted-foreground mt-0.5">
-                      Cancellations made after the free cancellation window has passed will incur a fee of{" "}
-                      <strong>
-                        {appConfig.cancellationFeeType === 'percentage' 
-                          ? `${appConfig.cancellationFeeValue}%` 
-                          : formatCurrency(appConfig.cancellationFeeValue || 0, symbol, decimals, code)}
-                      </strong>.
+                      {appConfig.enableFinalCancellationWindow ? (
+                        <>
+                          Cancellations made between <strong>{freeWindowText}</strong> and <strong>{finalWindowText}</strong> before the scheduled service start time will incur a fee of{" "}
+                          <strong>
+                            {appConfig.cancellationFeeType === 'percentage' 
+                              ? `${appConfig.cancellationFeeValue}%` 
+                              : formatCurrency(appConfig.cancellationFeeValue || 0, symbol, decimals, code)}
+                          </strong>.
+                        </>
+                      ) : (
+                        <>
+                          Cancellations made after the free cancellation window has passed (less than <strong>{freeWindowText}</strong> before the scheduled service start time) will incur a fee of{" "}
+                          <strong>
+                            {appConfig.cancellationFeeType === 'percentage' 
+                              ? `${appConfig.cancellationFeeValue}%` 
+                              : formatCurrency(appConfig.cancellationFeeValue || 0, symbol, decimals, code)}
+                          </strong>.
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -199,13 +226,10 @@ export default async function CancellationPolicyPage() {
                   <div className="flex gap-4 items-start border-t pt-4">
                     <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0 text-destructive font-bold text-sm">3</div>
                     <div>
-                      <h3 className="font-semibold text-destructive">Final Restricted Window</h3>
+                      <h3 className="font-semibold text-destructive">Final Restricted Window (No Refund)</h3>
                       <p className="text-sm text-muted-foreground mt-0.5">
                         Cancellations made within{" "}
-                        <strong>
-                          {appConfig.finalCancellationHours || 0} hour(s) and{" "}
-                          {appConfig.finalCancellationMinutes || 0} minute(s)
-                        </strong>{" "}
+                        <strong>{finalWindowText}</strong>{" "}
                         before the scheduled service start time will receive a <strong>100% cancellation charge (No Refund / ₹0 Refund)</strong>.
                       </p>
                     </div>
@@ -227,21 +251,6 @@ export default async function CancellationPolicyPage() {
               </div>
             )}
           </div>
-          
-          {pageData.content ? (
-              <article
-              className="prose prose-quoteless prose-neutral dark:prose-invert max-w-none whitespace-pre-wrap
-                        prose-headings:font-headline prose-headings:text-foreground
-                        prose-p:text-foreground/80
-                        prose-a:text-primary hover:prose-a:text-primary/80
-                        prose-strong:text-foreground
-                        prose-ul:list-disc prose-ol:list-decimal
-                        prose-li:marker:text-primary"
-              dangerouslySetInnerHTML={{ __html: pageData.content }}
-              />
-          ): (
-              <p className="text-muted-foreground">No content available for this page yet.</p>
-          )}
         </div>
       </div>
     );
