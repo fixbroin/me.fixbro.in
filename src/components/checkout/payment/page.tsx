@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/contexts/LoadingContext';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import TaxBreakdownDisplay from '@/components/shared/TaxBreakdownDisplay';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import Breadcrumbs from '@/components/shared/Breadcrumbs';
 import type { BreadcrumbItem } from '@/types/ui';
 import { logUserActivity } from '@/lib/activityLogger';
@@ -104,6 +104,7 @@ export default function PaymentPage() {
   const [isCancellationFeeMode, setIsCancellationFeeMode] = useState(false);
   const [cancellationFeeDetails, setCancellationFeeDetails] = useState<{ bookingId: string; feeAmount: number; humanReadableBookingId?: string } | null>(null);
   const [isGatewayDialogOpen, setIsGatewayDialogOpen] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
 
   const [cartEntries, setCartEntries] = useState<CartEntry[]>([]);
   const [serviceDetailsMap, setServiceDetailsMap] = useState<Record<string, FirestoreService>>({});
@@ -899,22 +900,36 @@ export default function PaymentPage() {
           {(cartEntries.length === 0 && !isLoadingCartDetails && !isLoadingAppSettings && !isCancellationFeeMode) && (<div className="text-center py-6"><p className="text-muted-foreground">Your cart is empty.</p><Link href="/cart" passHref className="mt-4 inline-block"><Button variant="outline">Return to Cart</Button></Link></div>)}
           {policyMessage && !isCancellationFeeMode && cartEntries.length > 0 && (<Alert variant="default" className="text-xs bg-primary/5 border-primary/20 mt-4"><Info className="h-4 w-4 text-primary" /><AlertDescription className="text-primary/90">{policyMessage}</AlertDescription></Alert>)}
         </CardContent>
-        <CardFooter className="flex flex-col sm:flex-row justify-between gap-2 mt-4">
-          <Link href={isCancellationFeeMode ? "/my-bookings" : "/checkout/address"} passHref className="w-full sm:w-auto hidden md:block">
-            <Button variant="outline" disabled={isProcessingPayment} className="w-full sm:w-auto">
-              <ArrowLeft className="mr-2 h-4 w-4" /> {isCancellationFeeMode ? "Back to My Bookings" : "Back to Address"}
+        <CardFooter className="flex flex-col gap-4 mt-4">
+          {!isCancellationFeeMode && cartEntries.length > 0 && (
+            <p className="text-xs text-muted-foreground text-center sm:text-right w-full">
+              By placing this order, you agree to our{" "}
+              <button 
+                type="button" 
+                onClick={() => setShowPolicyModal(true)} 
+                className="text-primary hover:underline font-semibold focus:outline-none"
+              >
+                Cancellation Policy
+              </button>.
+            </p>
+          )}
+          <div className="flex flex-col sm:flex-row justify-between gap-2 w-full">
+            <Link href={isCancellationFeeMode ? "/my-bookings" : "/checkout/address"} passHref className="w-full sm:w-auto hidden md:block">
+              <Button variant="outline" disabled={isProcessingPayment} className="w-full sm:w-auto">
+                <ArrowLeft className="mr-2 h-4 w-4" /> {isCancellationFeeMode ? "Back to My Bookings" : "Back to Address"}
+              </Button>
+            </Link>
+            <Button
+              size="lg"
+              onClick={handlePaymentAction}
+              disabled={ (isCancellationFeeMode ? !cancellationFeeDetails : cartEntries.length === 0) || isLoadingCartDetails || isLoadingAppSettings || currentAvailablePaymentOptions.length === 0 || (!paymentMethod && !isCancellationFeeMode) || isProcessingPayment}
+              className="w-full sm:w-auto text-white"
+            >
+              {isProcessingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin text-white" /> : null}
+              {isProcessingPayment ? 'Processing...' : (isCancellationFeeMode ? 'Pay Cancellation Fee' : (paymentMethod === 'Pay After Service' ? 'Confirm Booking' : 'Confirm Booking & Pay'))}
+              {!isProcessingPayment && <ArrowRight className="ml-2 h-4 w-4" />}
             </Button>
-          </Link>
-          <Button
-            size="lg"
-            onClick={handlePaymentAction}
-            disabled={ (isCancellationFeeMode ? !cancellationFeeDetails : cartEntries.length === 0) || isLoadingCartDetails || isLoadingAppSettings || currentAvailablePaymentOptions.length === 0 || (!paymentMethod && !isCancellationFeeMode) || isProcessingPayment}
-            className="w-full sm:w-auto"
-          >
-            {isProcessingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {isProcessingPayment ? 'Processing...' : (isCancellationFeeMode ? 'Pay Cancellation Fee' : (paymentMethod === 'Pay After Service' ? 'Confirm Booking' : 'Confirm Booking & Pay'))}
-            {!isProcessingPayment && <ArrowRight className="ml-2 h-4 w-4" />}
-          </Button>
+          </div>
         </CardFooter>
       </Card>
 
@@ -954,6 +969,96 @@ export default function PaymentPage() {
               <ArrowRight className="h-5 w-5 text-primary ml-4 shrink-0" />
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancellation Policy Dialog */}
+      <Dialog open={showPolicyModal} onOpenChange={setShowPolicyModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Cancellation Policy</DialogTitle>
+            <DialogDescription>
+              Please review our cancellation and refund guidelines before completing your booking.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 my-2 max-h-[60vh] overflow-y-auto pr-1">
+            {!appConfig?.enableCancellationPolicy ? (
+              <p className="text-sm text-muted-foreground">
+                Cancellation policy is currently disabled. You can cancel any booking at any time for a full 100% refund.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {/* 1. Free Cancellation */}
+                <div className="flex gap-3 items-start">
+                  <div className="h-6 w-6 rounded bg-green-500/10 flex items-center justify-center shrink-0 text-green-600 font-bold text-xs">1</div>
+                  <div>
+                    <h4 className="font-semibold text-foreground text-sm">Free Cancellation Window</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Cancel at least{" "}
+                      <strong>
+                        {appConfig.freeCancellationDays || 0} day(s),{" "}
+                        {appConfig.freeCancellationHours || 0} hour(s), and{" "}
+                        {appConfig.freeCancellationMinutes || 0} minute(s)
+                      </strong>{" "}
+                      before your scheduled service time for a <strong>100% refund</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. Standard Cancellation Fee */}
+                <div className="flex gap-3 items-start border-t pt-3">
+                  <div className="h-6 w-6 rounded bg-amber-500/10 flex items-center justify-center shrink-0 text-amber-600 font-bold text-xs">2</div>
+                  <div>
+                    <h4 className="font-semibold text-foreground text-sm">Standard Cancellation Fee</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Cancellations made after the free window has passed incur a fee of{" "}
+                      <strong>
+                        {appConfig.cancellationFeeType === 'percentage' 
+                          ? `${appConfig.cancellationFeeValue}%` 
+                          : `${appConfig.currencySymbol || '₹'}${appConfig.cancellationFeeValue}`}
+                      </strong>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. Final Restricted Window */}
+                {appConfig.enableFinalCancellationWindow && (
+                  <div className="flex gap-3 items-start border-t pt-3">
+                    <div className="h-6 w-6 rounded bg-destructive/10 flex items-center justify-center shrink-0 text-destructive font-bold text-xs">3</div>
+                    <div>
+                      <h4 className="font-semibold text-destructive text-sm">Final Restricted Window</h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Cancellations made within{" "}
+                        <strong>
+                          {appConfig.finalCancellationHours || 0} hour(s) and{" "}
+                          {appConfig.finalCancellationMinutes || 0} minute(s)
+                        </strong>{" "}
+                        before the scheduled service start time will receive a <strong>100% cancellation charge (No Refund / ₹0 Refund)</strong>.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Pay After Service / COD Note */}
+                <div className="flex gap-3 items-start border-t pt-3">
+                  <div className="h-6 w-6 rounded bg-primary/10 flex items-center justify-center shrink-0 text-primary font-bold text-xs">ℹ</div>
+                  <div>
+                    <h4 className="font-semibold text-foreground text-sm">Pay After Service / Cash on Delivery</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      For bookings scheduled under <strong>Pay After Service</strong> or <strong>Cash on Delivery</strong>, any applicable cancellation fee or charge must be paid securely online before the cancellation request is processed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="sm:justify-end">
+            <Button type="button" onClick={() => setShowPolicyModal(false)}>
+              Close & Go Back
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
