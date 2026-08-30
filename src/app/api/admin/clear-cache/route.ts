@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     
     await triggerRefresh(tagToRefresh);
 
-    console.log(`[Cache] Full system refresh triggered (Tag: ${tagToRefresh}) by admin ${decodedToken.uid}`);
+    console.log(`[Cache] Full system refresh triggered (Tag: ${tagToRefresh}) by admin ${user.uid}`);
 
     return NextResponse.json({ 
       success: true, 
