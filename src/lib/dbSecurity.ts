@@ -148,7 +148,7 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
   }
 
   // 10. Withdrawals & Quotations & Invoices & Referrals & Custom Requests
-  if (['withdrawalRequests', 'quotations', 'invoices', 'referrals', 'leaves', 'customServiceRequests'].includes(table)) {
+  if (['withdrawalRequests', 'quotations', 'invoices', 'referrals', 'leaves', 'customServiceRequests', 'providerWalletTransactions', 'providerComplaints'].includes(table)) {
     return true; // Handled dynamically in components/actions by filtering for providerId/userId
   }
 

@@ -328,9 +328,16 @@ export default function ProviderBookingDetailsPage() {
               )}
             </div>
             {!isJobCompleted && !isLowBalance && isAccepted && booking.latitude && booking.longitude && (
-                <Button variant="link" size="sm" onClick={handleViewOnMap} className="px-0 text-xs mt-1">
-                    View on Google Maps <ExternalLink className="ml-1 h-3 w-3"/>
-                </Button>
+                <div className="pt-2">
+                  <Button 
+                      variant="default" 
+                      size="sm" 
+                      onClick={handleViewOnMap} 
+                      className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white font-semibold flex items-center justify-center gap-2 rounded-xl h-10 px-4 text-xs"
+                  >
+                      View on Google Maps <ExternalLink className="h-3.5 w-3.5"/>
+                  </Button>
+                </div>
             )}
           </section>
           <Separator />
