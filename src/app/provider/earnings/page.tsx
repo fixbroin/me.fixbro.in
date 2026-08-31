@@ -58,6 +58,13 @@ export default function ProviderEarningsPage() {
     const netActivityThisMonth = stats.onlineNet - stats.withdrawals;
     const balanceCarriedForward = currentBalance - netActivityThisMonth;
 
+    const cashNet = stats.cashNet || 0;
+    const cashCommission = stats.cashCommission || 0;
+    const grossCashBookings = cashNet + cashCommission;
+    const grossOnlineBookings = Math.max(0, stats.gross - grossCashBookings);
+    const onlineNet = stats.onlineNet || 0;
+    const onlineCommission = Math.max(0, grossOnlineBookings - onlineNet);
+
     return {
         monthlyGrossEarnings: stats.gross,
         monthlyAdminCommission: stats.commission,
@@ -66,6 +73,8 @@ export default function ProviderEarningsPage() {
         monthlyWithdrawals: stats.withdrawals,
         monthlyCashCommission: stats.cashCommission,
         monthlyOnlineNet: stats.onlineNet,
+        monthlyOnlineGross: grossOnlineBookings,
+        monthlyOnlineCommission: onlineCommission,
         monthlyCashNet: stats.cashNet || 0,
         balanceCarriedForward,
         lifetimePaidOut: firestoreUser?.totalPaidOut || 0,
@@ -233,7 +242,17 @@ export default function ProviderEarningsPage() {
                     </div>
 
                     <div className="flex justify-between items-center py-1 border-b border-dashed text-green-600">
-                        <span>Online Jobs Earnings <span className="text-[10px] text-muted-foreground ml-1">(Your share after fee)</span></span>
+                        <span>Online Jobs Gross Earnings</span>
+                        <span className="font-semibold">+ {symbol}{earningsData.monthlyOnlineGross.toFixed(decimals)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center py-1 border-b border-dashed text-destructive">
+                        <span>Admin Fees for Online Jobs <span className="text-[10px] text-muted-foreground ml-1">(Deducted from gross)</span></span>
+                        <span className="font-semibold">- {symbol}{earningsData.monthlyOnlineCommission.toFixed(decimals)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center py-1 border-b border-dashed text-green-600">
+                        <span>Online Jobs Net Earnings <span className="text-[10px] text-muted-foreground ml-1">(Your share after fee)</span></span>
                         <span className="font-semibold">+ {symbol}{earningsData.monthlyOnlineNet.toFixed(decimals)}</span>
                     </div>
 
