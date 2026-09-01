@@ -88,19 +88,25 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
             const p = doc.data();
             if (!p.workAreaCenter || !p.workAreaRadiusKm) return false;
 
-            // 1. Matches active category
+            // If there are active services in checkout, provider must be able to do EVERY service in the cart:
+            if (activeServiceIds.length > 0) {
+              return activeServiceIds.every(sId => {
+                const hasCategory = currentCategoryId && (
+                  p.workCategoryId === currentCategoryId ||
+                  (Array.isArray(p.allCategoryIds) && p.allCategoryIds.includes(currentCategoryId))
+                );
+                const hasSpecificService = (Array.isArray(p.additionalServiceIds) && p.additionalServiceIds.includes(sId)) ||
+                                           (Array.isArray(p.additionalServices) && p.additionalServices.some((s: any) => s.id === sId));
+                return hasCategory || hasSpecificService;
+              });
+            }
+
+            // Fallback if no specific service IDs are in the cart:
             const matchesCategory = currentCategoryId && (
               p.workCategoryId === currentCategoryId ||
               (Array.isArray(p.allCategoryIds) && p.allCategoryIds.includes(currentCategoryId))
             );
-
-            // 2. Matches active service IDs
-            const matchesService = activeServiceIds.length > 0 && activeServiceIds.some(sId => 
-              (Array.isArray(p.additionalServiceIds) && p.additionalServiceIds.includes(sId)) ||
-              (Array.isArray(p.additionalServices) && p.additionalServices.some((s: any) => s.id === sId))
-            );
-
-            return matchesCategory || matchesService;
+            return matchesCategory;
           });
 
           setProviderZones(matchingDocs.map(doc => {
