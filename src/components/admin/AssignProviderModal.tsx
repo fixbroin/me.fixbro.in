@@ -101,7 +101,13 @@ export default function AssignProviderModal({ isOpen, onClose, booking, onAssign
     providersWithDistance.forEach(p => {
       const hasCategory = (bookingCategoryId && p.workCategoryId === bookingCategoryId) || 
                           (bookingCategoryId && p.allCategoryIds?.includes(bookingCategoryId));
-      if (hasCategory) {
+      const hasAllServices = booking.services && booking.services.length > 0 && booking.services.every(s => {
+        const canDoByCat = hasCategory;
+        const canDoByService = Array.isArray(p.additionalServiceIds) && p.additionalServiceIds.includes(s.serviceId);
+        return canDoByCat || canDoByService;
+      });
+
+      if (hasCategory || hasAllServices) {
         matching.push(p);
       } else {
         other.push(p);

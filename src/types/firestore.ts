@@ -1406,6 +1406,8 @@ export interface ProviderApplication {
   workCategoryName?: string; // Denormalized
   additionalCategories?: { id: string; name: string }[];
   allCategoryIds?: string[];
+  additionalServices?: { id: string; name: string; categoryName?: string }[];
+  additionalServiceIds?: string[];
   experienceLevelId?: string;
   experienceLevelLabel?: string; // Denormalized
   skillLevelId?: string;

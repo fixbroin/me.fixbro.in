@@ -73,30 +73,55 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
         const zonesSnapshot = await getDocs(zonesQuery);
         setAllServiceZones(zonesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ServiceZone)));
 
-        if (currentCategoryId) {
-          const primaryProvidersQuery = query(
-            collection(db, 'providerApplications'), 
-            where('status', '==', 'approved'),
-            where('workCategoryId', '==', currentCategoryId)
-          );
-          const additionalProvidersQuery = query(
-            collection(db, 'providerApplications'), 
-            where('status', '==', 'approved'),
-            where('allCategoryIds', 'array-contains', currentCategoryId)
-          );
+        let activeServiceIds: string[] = [];
+        try {
+          const rawEntries = localStorage.getItem('wecanfixActiveCheckoutEntries') || localStorage.getItem('cart');
+          if (rawEntries) {
+            const parsed = JSON.parse(rawEntries);
+            if (Array.isArray(parsed)) {
+              activeServiceIds = parsed.map((item: any) => item.serviceId || item.id).filter(Boolean);
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
 
-          const [primarySnap, additionalSnap] = await Promise.all([
-            getDocs(primaryProvidersQuery),
-            getDocs(additionalProvidersQuery)
-          ]);
+        if (currentCategoryId || activeServiceIds.length > 0) {
+          const queries = [];
+          if (currentCategoryId) {
+            queries.push(
+              getDocs(query(
+                collection(db, 'providerApplications'), 
+                where('status', '==', 'approved'),
+                where('workCategoryId', '==', currentCategoryId)
+              )),
+              getDocs(query(
+                collection(db, 'providerApplications'), 
+                where('status', '==', 'approved'),
+                where('allCategoryIds', 'array-contains', currentCategoryId)
+              ))
+            );
+          }
+          activeServiceIds.forEach(sId => {
+            queries.push(
+              getDocs(query(
+                collection(db, 'providerApplications'), 
+                where('status', '==', 'approved'),
+                where('additionalServiceIds', 'array-contains', sId)
+              ))
+            );
+          });
 
+          const snapshots = await Promise.all(queries);
           const seenIds = new Set<string>();
           const allDocs: any[] = [];
-          [...primarySnap.docs, ...additionalSnap.docs].forEach(doc => {
-            if (!seenIds.has(doc.id)) {
-              seenIds.add(doc.id);
-              allDocs.push(doc);
-            }
+          snapshots.forEach(snap => {
+            snap.docs.forEach(doc => {
+              if (!seenIds.has(doc.id)) {
+                seenIds.add(doc.id);
+                allDocs.push(doc);
+              }
+            });
           });
 
           setProviderZones(allDocs
