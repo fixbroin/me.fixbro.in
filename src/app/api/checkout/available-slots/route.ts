@@ -626,45 +626,11 @@ export async function POST(req: NextRequest) {
         let eligibleLocalProviders: any[] = [];
         if (latitude !== undefined && longitude !== undefined) {
             try {
-                // 1. Queries for categories
-                const primaryQueries = cartCategoryIds.map(catId => 
-                    adminDb.collection('providerApplications')
-                        .where('status', '==', 'approved')
-                        .where('workCategoryId', '==', catId)
-                        .get()
-                );
-                const additionalCatQueries = cartCategoryIds.map(catId => 
-                    adminDb.collection('providerApplications')
-                        .where('status', '==', 'approved')
-                        .where('allCategoryIds', 'array-contains', catId)
-                        .get()
-                );
-                // 2. Queries for specific services
-                const additionalServiceQueries = cartServiceIds.map((sId: string) => 
-                    adminDb.collection('providerApplications')
-                        .where('status', '==', 'approved')
-                        .where('additionalServiceIds', 'array-contains', sId)
-                        .get()
-                );
+                const providersSnapshot = await adminDb.collection('providerApplications')
+                    .where('status', '==', 'approved')
+                    .get();
 
-                const allSnaps = await Promise.all([
-                    ...primaryQueries,
-                    ...additionalCatQueries,
-                    ...additionalServiceQueries
-                ]);
-
-                const seenDocIds = new Set<string>();
-                const allMatchingDocs: any[] = [];
-                allSnaps.forEach((snap: any) => {
-                    snap.docs.forEach((doc: any) => {
-                        if (!seenDocIds.has(doc.id)) {
-                            seenDocIds.add(doc.id);
-                            allMatchingDocs.push(doc);
-                        }
-                    });
-                });
-                
-                eligibleLocalProviders = allMatchingDocs.map(doc => {
+                eligibleLocalProviders = providersSnapshot.docs.map((doc: any) => {
                     const pData = doc.data() as any;
                     let distance = Infinity;
                     if (pData.workAreaCenter && pData.workAreaRadiusKm) {
@@ -686,7 +652,8 @@ export async function POST(req: NextRequest) {
                             p.workCategoryId === item.categoryId || 
                             (Array.isArray(p.allCategoryIds) && p.allCategoryIds.includes(item.categoryId))
                         );
-                        const hasSpecificService = Array.isArray(p.additionalServiceIds) && p.additionalServiceIds.includes(item.serviceId);
+                        const hasSpecificService = (Array.isArray(p.additionalServiceIds) && p.additionalServiceIds.includes(item.serviceId)) ||
+                                                  (Array.isArray(p.additionalServices) && p.additionalServices.some((s: any) => s.id === item.serviceId));
                         return hasCategory || hasSpecificService;
                     });
                     return canFulfillWholeCart;

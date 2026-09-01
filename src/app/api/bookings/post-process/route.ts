@@ -49,45 +49,11 @@ export async function POST(request: Request) {
     // --- SERVER-SIDE SMART TAGGING & AUTO-DISPATCH ---
     if (!booking.providerId && (booking.workCategoryId || (booking.services && booking.services.length > 0)) && booking.latitude && booking.longitude && currentStatus !== 'Cancelled' && !booking.autoDispatchBypassed) {
         try {
-            const bookingServiceIds = (booking.services || []).map((s: any) => s.serviceId).filter(Boolean);
-            
-            // 1. Queries for categories
-            const categoryQueries = booking.workCategoryId ? [
-                adminDb.collection('providerApplications')
-                    .where('status', '==', 'approved')
-                    .where('workCategoryId', '==', booking.workCategoryId)
-                    .get(),
-                adminDb.collection('providerApplications')
-                    .where('status', '==', 'approved')
-                    .where('allCategoryIds', 'array-contains', booking.workCategoryId)
-                    .get()
-            ] : [];
+            const providersSnapshot = await adminDb.collection('providerApplications')
+                .where('status', '==', 'approved')
+                .get();
 
-            // 2. Queries for specific services
-            const serviceQueries = bookingServiceIds.map((sId: string) => 
-                adminDb.collection('providerApplications')
-                    .where('status', '==', 'approved')
-                    .where('additionalServiceIds', 'array-contains', sId)
-                    .get()
-            );
-
-            const allSnaps = await Promise.all([
-                ...categoryQueries,
-                ...serviceQueries
-            ]);
-
-            const allMatchingDocs: any[] = [];
-            const seenDocIds = new Set<string>();
-            allSnaps.forEach((snap: any) => {
-                snap.docs.forEach((doc: any) => {
-                    if (!seenDocIds.has(doc.id)) {
-                        seenDocIds.add(doc.id);
-                        allMatchingDocs.push(doc);
-                    }
-                });
-            });
-
-            const providersWithDistance = allMatchingDocs.map(doc => {
+            const providersWithDistance = providersSnapshot.docs.map((doc: any) => {
                 const pData = doc.data() as any;
                 let distance = Infinity;
                 if (pData.workAreaCenter && pData.workAreaRadiusKm) {
@@ -110,7 +76,8 @@ export async function POST(request: Request) {
                         p.workCategoryId === booking.workCategoryId ||
                         (Array.isArray(p.allCategoryIds) && p.allCategoryIds.includes(booking.workCategoryId))
                     );
-                    const hasSpecificService = Array.isArray(p.additionalServiceIds) && p.additionalServiceIds.includes(s.serviceId);
+                    const hasSpecificService = (Array.isArray(p.additionalServiceIds) && p.additionalServiceIds.includes(s.serviceId)) ||
+                                              (Array.isArray(p.additionalServices) && p.additionalServices.some((item: any) => item.id === s.serviceId));
                     return hasCategory || hasSpecificService;
                 });
             });

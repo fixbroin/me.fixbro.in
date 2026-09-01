@@ -19,6 +19,7 @@ import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { logUserActivity } from '@/lib/activityLogger';
 import { getGuestId } from '@/lib/guestIdManager';
+import { getActiveCheckoutEntries } from '@/lib/cartManager';
 
 const MapAddressSelector = dynamic(() => import('@/components/checkout/MapAddressSelector'), {
   loading: () => <div className="flex items-center justify-center h-64 bg-muted rounded-md"><Loader2 className="h-8 w-8 animate-spin" /></div>,
@@ -73,70 +74,46 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
         const zonesSnapshot = await getDocs(zonesQuery);
         setAllServiceZones(zonesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ServiceZone)));
 
-        let activeServiceIds: string[] = [];
-        try {
-          const rawEntries = localStorage.getItem('wecanfixActiveCheckoutEntries') || localStorage.getItem('cart');
-          if (rawEntries) {
-            const parsed = JSON.parse(rawEntries);
-            if (Array.isArray(parsed)) {
-              activeServiceIds = parsed.map((item: any) => item.serviceId || item.id).filter(Boolean);
-            }
-          }
-        } catch (e) {
-          // ignore
-        }
+        const activeEntries = getActiveCheckoutEntries();
+        const activeServiceIds = activeEntries.map(e => e.serviceId).filter(Boolean);
 
         if (currentCategoryId || activeServiceIds.length > 0) {
-          const queries = [];
-          if (currentCategoryId) {
-            queries.push(
-              getDocs(query(
-                collection(db, 'providerApplications'), 
-                where('status', '==', 'approved'),
-                where('workCategoryId', '==', currentCategoryId)
-              )),
-              getDocs(query(
-                collection(db, 'providerApplications'), 
-                where('status', '==', 'approved'),
-                where('allCategoryIds', 'array-contains', currentCategoryId)
-              ))
+          const providersQuery = query(
+            collection(db, 'providerApplications'), 
+            where('status', '==', 'approved')
+          );
+          const providersSnapshot = await getDocs(providersQuery);
+
+          const matchingDocs = providersSnapshot.docs.filter(doc => {
+            const p = doc.data();
+            if (!p.workAreaCenter || !p.workAreaRadiusKm) return false;
+
+            // 1. Matches active category
+            const matchesCategory = currentCategoryId && (
+              p.workCategoryId === currentCategoryId ||
+              (Array.isArray(p.allCategoryIds) && p.allCategoryIds.includes(currentCategoryId))
             );
-          }
-          activeServiceIds.forEach(sId => {
-            queries.push(
-              getDocs(query(
-                collection(db, 'providerApplications'), 
-                where('status', '==', 'approved'),
-                where('additionalServiceIds', 'array-contains', sId)
-              ))
+
+            // 2. Matches active service IDs
+            const matchesService = activeServiceIds.length > 0 && activeServiceIds.some(sId => 
+              (Array.isArray(p.additionalServiceIds) && p.additionalServiceIds.includes(sId)) ||
+              (Array.isArray(p.additionalServices) && p.additionalServices.some((s: any) => s.id === sId))
             );
+
+            return matchesCategory || matchesService;
           });
 
-          const snapshots = await Promise.all(queries);
-          const seenIds = new Set<string>();
-          const allDocs: any[] = [];
-          snapshots.forEach(snap => {
-            snap.docs.forEach(doc => {
-              if (!seenIds.has(doc.id)) {
-                seenIds.add(doc.id);
-                allDocs.push(doc);
-              }
-            });
-          });
-
-          setProviderZones(allDocs
-            .filter(doc => doc.data().workAreaCenter && doc.data().workAreaRadiusKm)
-            .map(doc => {
-              const data = doc.data();
-              return {
-                id: `provider_${doc.id}`,
-                name: data.fullName || 'Service Provider',
-                center: { latitude: data.workAreaCenter.latitude, longitude: data.workAreaCenter.longitude },
-                radiusKm: data.workAreaRadiusKm,
-                isActive: true,
-                createdAt: data.createdAt || Timestamp.now(),
-              } as ServiceZone;
-            }));
+          setProviderZones(matchingDocs.map(doc => {
+            const data = doc.data();
+            return {
+              id: `provider_${doc.id}`,
+              name: data.fullName || 'Service Provider',
+              center: { latitude: data.workAreaCenter.latitude, longitude: data.workAreaCenter.longitude },
+              radiusKm: data.workAreaRadiusKm,
+              isActive: true,
+              createdAt: data.createdAt || Timestamp.now(),
+            } as ServiceZone;
+          }));
         }
       } catch (error) {
         console.error("Error fetching serviceability data:", error);
