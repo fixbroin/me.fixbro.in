@@ -49,12 +49,27 @@ export async function POST(request: Request) {
     // --- SERVER-SIDE SMART TAGGING & AUTO-DISPATCH ---
     if (!booking.providerId && booking.workCategoryId && booking.latitude && booking.longitude && currentStatus !== 'Cancelled' && !booking.autoDispatchBypassed) {
         try {
-            const providersSnapshot = await adminDb.collection('providerApplications')
-                .where('status', '==', 'approved')
-                .where('workCategoryId', '==', booking.workCategoryId)
-                .get();
+            const [primarySnap, additionalSnap] = await Promise.all([
+                adminDb.collection('providerApplications')
+                    .where('status', '==', 'approved')
+                    .where('workCategoryId', '==', booking.workCategoryId)
+                    .get(),
+                adminDb.collection('providerApplications')
+                    .where('status', '==', 'approved')
+                    .where('allCategoryIds', 'array-contains', booking.workCategoryId)
+                    .get()
+            ]);
 
-            const providersWithDistance = providersSnapshot.docs.map(doc => {
+            const allMatchingDocs: any[] = [];
+            const seenDocIds = new Set<string>();
+            [...primarySnap.docs, ...additionalSnap.docs].forEach(doc => {
+                if (!seenDocIds.has(doc.id)) {
+                    seenDocIds.add(doc.id);
+                    allMatchingDocs.push(doc);
+                }
+            });
+
+            const providersWithDistance = allMatchingDocs.map(doc => {
                 const pData = doc.data() as any;
                 let distance = Infinity;
                 if (pData.workAreaCenter && pData.workAreaRadiusKm) {

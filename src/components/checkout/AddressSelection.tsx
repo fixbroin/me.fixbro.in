@@ -74,13 +74,32 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
         setAllServiceZones(zonesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ServiceZone)));
 
         if (currentCategoryId) {
-          const providersQuery = query(
+          const primaryProvidersQuery = query(
             collection(db, 'providerApplications'), 
             where('status', '==', 'approved'),
             where('workCategoryId', '==', currentCategoryId)
           );
-          const providersSnapshot = await getDocs(providersQuery);
-          setProviderZones(providersSnapshot.docs
+          const additionalProvidersQuery = query(
+            collection(db, 'providerApplications'), 
+            where('status', '==', 'approved'),
+            where('allCategoryIds', 'array-contains', currentCategoryId)
+          );
+
+          const [primarySnap, additionalSnap] = await Promise.all([
+            getDocs(primaryProvidersQuery),
+            getDocs(additionalProvidersQuery)
+          ]);
+
+          const seenIds = new Set<string>();
+          const allDocs: any[] = [];
+          [...primarySnap.docs, ...additionalSnap.docs].forEach(doc => {
+            if (!seenIds.has(doc.id)) {
+              seenIds.add(doc.id);
+              allDocs.push(doc);
+            }
+          });
+
+          setProviderZones(allDocs
             .filter(doc => doc.data().workAreaCenter && doc.data().workAreaRadiusKm)
             .map(doc => {
               const data = doc.data();

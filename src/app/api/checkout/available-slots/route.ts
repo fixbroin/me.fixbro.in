@@ -624,12 +624,27 @@ export async function POST(req: NextRequest) {
             let providersList: any[] = [];
             if (latitude !== undefined && longitude !== undefined) {
                 try {
-                    const providersSnapshot = await adminDb.collection('providerApplications')
-                        .where('status', '==', 'approved')
-                        .where('workCategoryId', '==', catId)
-                        .get();
+                    const [primarySnap, additionalSnap] = await Promise.all([
+                        adminDb.collection('providerApplications')
+                            .where('status', '==', 'approved')
+                            .where('workCategoryId', '==', catId)
+                            .get(),
+                        adminDb.collection('providerApplications')
+                            .where('status', '==', 'approved')
+                            .where('allCategoryIds', 'array-contains', catId)
+                            .get()
+                    ]);
+
+                    const allMatchingDocs: any[] = [];
+                    const seenDocIds = new Set<string>();
+                    [...primarySnap.docs, ...additionalSnap.docs].forEach(doc => {
+                        if (!seenDocIds.has(doc.id)) {
+                            seenDocIds.add(doc.id);
+                            allMatchingDocs.push(doc);
+                        }
+                    });
                     
-                    providersList = providersSnapshot.docs.map(doc => {
+                    providersList = allMatchingDocs.map(doc => {
                         const pData = doc.data() as any;
                         let distance = Infinity;
                         if (pData.workAreaCenter && pData.workAreaRadiusKm) {

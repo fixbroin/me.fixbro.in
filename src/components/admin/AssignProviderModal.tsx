@@ -99,7 +99,9 @@ export default function AssignProviderModal({ isOpen, onClose, booking, onAssign
     const other: typeof providersWithDistance = [];
 
     providersWithDistance.forEach(p => {
-      if (bookingCategoryId && p.workCategoryId === bookingCategoryId) {
+      const hasCategory = (bookingCategoryId && p.workCategoryId === bookingCategoryId) || 
+                          (bookingCategoryId && p.allCategoryIds?.includes(bookingCategoryId));
+      if (hasCategory) {
         matching.push(p);
       } else {
         other.push(p);

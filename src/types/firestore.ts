@@ -1404,6 +1404,8 @@ export interface ProviderApplication {
   // Step 1: Client Category & Skills
   workCategoryId?: string;
   workCategoryName?: string; // Denormalized
+  additionalCategories?: { id: string; name: string }[];
+  allCategoryIds?: string[];
   experienceLevelId?: string;
   experienceLevelLabel?: string; // Denormalized
   skillLevelId?: string;

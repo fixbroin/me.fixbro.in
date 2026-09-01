@@ -8,7 +8,7 @@ import type { ProviderApplication, KycDocument, BankDetails, ProviderApplication
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserCircle, Briefcase, FileText, Banknote, MapPin, Image as ImageIcon, ShieldCheck, CheckCircle, AlertTriangle, XCircle, Loader2, Download, Edit as EditIcon, ExternalLink, Copy, Mail, Phone } from "lucide-react";
+import { UserCircle, Briefcase, FileText, Banknote, MapPin, Image as ImageIcon, ShieldCheck, CheckCircle, AlertTriangle, XCircle, Loader2, Download, Edit as EditIcon, ExternalLink, Copy, Mail, Phone, Plus, X, Tag } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useState, useEffect } from "react";
 import NextImage from 'next/image';
@@ -21,7 +21,8 @@ import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { Separator } from "@/components/ui/separator";
 import { cn, getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from "@/lib/utils";
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, Timestamp } from '@/lib/mysqlDb';
+import { doc, updateDoc, Timestamp, collection, query, where, orderBy, getDocs } from '@/lib/mysqlDb';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from 'next/navigation';
 
 const PROVIDER_APPLICATION_COLLECTION = "providerApplications";
@@ -181,13 +182,94 @@ export default function ProviderApplicationDetailsModal({
   const [verifyingDocType, setVerifyingDocType] = useState<string | null>(null);
   const router = useRouter();
 
+  const [allAdminCategories, setAllAdminCategories] = useState<{ id: string; name: string }[]>([]);
+  const [additionalCats, setAdditionalCats] = useState<{ id: string; name: string }[]>([]);
+  const [selectedCatToAdd, setSelectedCatToAdd] = useState<string>("");
+  const [isUpdatingCategories, setIsUpdatingCategories] = useState(false);
+
   useEffect(() => {
     if (application) {
       setAdminNotes(application.adminReviewNotes || "");
+      setAdditionalCats(application.additionalCategories || []);
     } else {
       setAdminNotes("");
+      setAdditionalCats([]);
     }
   }, [application]);
+
+  useEffect(() => {
+    if (isOpen) {
+      const fetchCategories = async () => {
+        try {
+          const q = query(collection(db, "adminCategories"), where("isActive", "==", true), orderBy("name"));
+          const snap = await getDocs(q);
+          setAllAdminCategories(snap.docs.map(d => ({ id: d.id, name: d.data().name || d.id })));
+        } catch (e) {
+          console.error("Error fetching admin categories for provider modal:", e);
+        }
+      };
+      fetchCategories();
+    }
+  }, [isOpen]);
+
+  const handleAddCategory = async () => {
+    if (!application?.id || !selectedCatToAdd) return;
+    const catObj = allAdminCategories.find(c => c.id === selectedCatToAdd);
+    if (!catObj) return;
+
+    setIsUpdatingCategories(true);
+    try {
+      const newAdditional = [...additionalCats.filter(c => c.id !== catObj.id), catObj];
+      const newAllCategoryIds = Array.from(new Set([
+        application.workCategoryId,
+        ...newAdditional.map(c => c.id)
+      ].filter(Boolean) as string[]));
+
+      const appDocRef = doc(db, PROVIDER_APPLICATION_COLLECTION, application.id);
+      await updateDoc(appDocRef, {
+        additionalCategories: newAdditional,
+        allCategoryIds: newAllCategoryIds,
+        updatedAt: Timestamp.now()
+      });
+
+      setAdditionalCats(newAdditional);
+      setSelectedCatToAdd("");
+      toast({ title: "Category Added", description: `Added "${catObj.name}" to provider's categories.` });
+    } catch (e: any) {
+      console.error("Error adding category to provider:", e);
+      toast({ title: "Error", description: e.message || "Failed to add category.", variant: "destructive" });
+    } finally {
+      setIsUpdatingCategories(false);
+    }
+  };
+
+  const handleRemoveCategory = async (catIdToRemove: string) => {
+    if (!application?.id) return;
+
+    setIsUpdatingCategories(true);
+    try {
+      const newAdditional = additionalCats.filter(c => c.id !== catIdToRemove);
+      const newAllCategoryIds = Array.from(new Set([
+        application.workCategoryId,
+        ...newAdditional.map(c => c.id)
+      ].filter(Boolean) as string[]));
+
+      const appDocRef = doc(db, PROVIDER_APPLICATION_COLLECTION, application.id);
+      await updateDoc(appDocRef, {
+        additionalCategories: newAdditional,
+        allCategoryIds: newAllCategoryIds,
+        updatedAt: Timestamp.now()
+      });
+
+      setAdditionalCats(newAdditional);
+      toast({ title: "Category Removed", description: "Category removed from provider." });
+    } catch (e: any) {
+      console.error("Error removing category from provider:", e);
+      toast({ title: "Error", description: e.message || "Failed to remove category.", variant: "destructive" });
+    } finally {
+      setIsUpdatingCategories(false);
+    }
+  };
 
   if (!application) return null;
 
@@ -296,7 +378,68 @@ export default function ProviderApplicationDetailsModal({
             {/* Scrollable Tab Content Wrapper */}
             <div className="flex-grow overflow-y-auto min-h-0 p-4 sm:p-3 w-full">
               <TabsContent value="work" className="space-y-1 focus-visible:outline-none focus-visible:ring-0 mt-0 w-full">
-                <DetailRow label="Category" value={application.workCategoryName || 'N/A'} />
+                <DetailRow label="Primary Category" value={application.workCategoryName || 'N/A'} />
+
+                <div className="py-3 border-b border-border/40 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <span className="font-semibold text-muted-foreground text-xs uppercase tracking-wider block">Additional Categories</span>
+                    <span className="text-[11px] text-muted-foreground">Provider can receive bookings in these categories too</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 items-center min-h-[32px]">
+                    {additionalCats.length === 0 ? (
+                      <span className="text-xs text-muted-foreground italic">No additional categories assigned.</span>
+                    ) : (
+                      additionalCats.map(cat => (
+                        <Badge key={cat.id} variant="secondary" className="px-2.5 py-1 text-xs flex items-center gap-1.5 bg-primary/10 text-primary border border-primary/20 font-medium">
+                          <span>{cat.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCategory(cat.id)}
+                            disabled={isUpdatingCategories}
+                            className="hover:text-destructive hover:bg-destructive/10 rounded p-0.5 transition-colors"
+                            title={`Remove ${cat.name}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))
+                    )}
+                  </div>
+
+                  {allAdminCategories.filter(c => c.id !== application.workCategoryId && !additionalCats.some(a => a.id === c.id)).length > 0 && (
+                    <div className="flex items-center gap-2 max-w-sm pt-1">
+                      <Select
+                        value={selectedCatToAdd}
+                        onValueChange={(val) => setSelectedCatToAdd(val)}
+                        disabled={isUpdatingCategories}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Add another category..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allAdminCategories
+                            .filter(c => c.id !== application.workCategoryId && !additionalCats.some(a => a.id === c.id))
+                            .map(cat => (
+                              <SelectItem key={cat.id} value={cat.id} className="text-xs">
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        className="h-8 text-xs shrink-0"
+                        onClick={handleAddCategory}
+                        disabled={!selectedCatToAdd || isUpdatingCategories}
+                      >
+                        {isUpdatingCategories ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+                        Add
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
                 <DetailRow label="Experience" value={application.experienceLevelLabel || 'N/A'} />
                 <DetailRow label="Skill Level" value={application.skillLevelLabel || 'N/A'} />
                 <div className="pt-4">
