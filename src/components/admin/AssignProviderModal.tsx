@@ -114,13 +114,14 @@ export default function AssignProviderModal({ isOpen, onClose, booking, onAssign
       }
     });
 
-    matching.sort((a, b) => a.distance - b.distance);
-    other.sort((a, b) => a.distance - b.distance);
+    matching.sort((a, b) => (Number(b.isOnline !== false) - Number(a.isOnline !== false)) || (a.distance - b.distance));
+    other.sort((a, b) => (Number(b.isOnline !== false) - Number(a.isOnline !== false)) || (a.distance - b.distance));
 
     return { matchingProviders: matching, otherProviders: other };
   }, [providersWithDistance, bookingCategoryId]);
 
   const renderProviderItem = (provider: typeof providersWithDistance[0]) => {
+    const isOnline = provider.isOnline !== false;
     return (
       <Label
         key={provider.id}
@@ -140,7 +141,17 @@ export default function AssignProviderModal({ isOpen, onClose, booking, onAssign
         <div className="flex-grow min-w-0 space-y-0.5">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline gap-1 sm:gap-2">
             <div className="flex flex-col min-w-0">
-              <p className="font-bold text-sm truncate">{provider.fullName}</p>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="font-bold text-sm truncate">{provider.fullName}</p>
+                <span className={cn(
+                  "text-[9px] font-bold px-1.5 py-0.5 rounded-full border leading-none",
+                  isOnline 
+                    ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30 dark:text-emerald-400" 
+                    : "bg-muted text-muted-foreground border-border"
+                )}>
+                  {isOnline ? "Online" : "Offline"}
+                </span>
+              </div>
               {booking.suggestedProviderIds?.includes(provider.id!) && (
                 <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Suggested Match</span>
               )}

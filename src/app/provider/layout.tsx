@@ -42,6 +42,7 @@ import ProviderBottomNavigationBar from '@/components/provider/ProviderBottomNav
 import { useIsMobile } from '@/hooks/use-mobile'; 
 import { cn } from '@/lib/utils';
 import NewJobProviderPopup from '@/components/provider/NewJobProviderPopup'; // Added
+import { Switch } from '@/components/ui/switch';
 
 const ProviderPageLoader = () => (
   <div className="flex justify-center items-center min-h-[calc(100vh-120px)]">
@@ -120,6 +121,49 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
     });
     return () => unsubscribe();
   }, [providerUser?.uid]);
+
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [isTogglingOnline, setIsTogglingOnline] = useState(false);
+
+  useEffect(() => {
+    if (!providerUser?.uid || !isProviderApproved) return;
+    const appDocRef = doc(db, PROVIDER_APPLICATION_COLLECTION, providerUser.uid);
+    const unsub = onSnapshot(appDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as ProviderApplication;
+        setIsOnline(data.isOnline !== false);
+      }
+    });
+    return () => unsub();
+  }, [providerUser?.uid, isProviderApproved]);
+
+  const handleToggleOnlineStatus = async () => {
+    if (!providerUser?.uid || isTogglingOnline) return;
+    setIsTogglingOnline(true);
+    const newStatus = !isOnline;
+    try {
+      await updateDoc(doc(db, PROVIDER_APPLICATION_COLLECTION, providerUser.uid), {
+        isOnline: newStatus,
+        updatedAt: Timestamp.now()
+      });
+      setIsOnline(newStatus);
+      toast({
+        title: newStatus ? "You are Online" : "You are Offline",
+        description: newStatus 
+          ? "You are now visible to customers and accepting new bookings." 
+          : "Bookings paused. You will not receive new bookings or show on map until turned back online."
+      });
+    } catch (e: any) {
+      console.error("Error toggling online status:", e);
+      toast({
+        title: "Error",
+        description: e.message || "Failed to update online status.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTogglingOnline(false);
+    }
+  };
 
   useEffect(() => {
     if (!providerUser?.uid || authIsLoading || !isProviderApproved) return;
@@ -416,6 +460,33 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
               </div>
 
               <div className="flex items-center gap-2">
+                {providerUser && isProviderApproved && (
+                  <div
+                    onClick={() => !isTogglingOnline && handleToggleOnlineStatus()}
+                    className={cn(
+                      "hidden md:flex items-center gap-2 px-3 py-1 rounded-full border transition-all duration-300 shadow-sm select-none cursor-pointer h-10",
+                      isOnline 
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400" 
+                        : "bg-muted/80 border-border text-muted-foreground hover:bg-muted"
+                    )}
+                    title={isOnline ? "You are Online (Accepting Bookings). Click to switch Offline." : "You are Offline (Bookings Paused). Click to switch Online."}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn("h-2 w-2 rounded-full", isOnline ? "bg-emerald-500 animate-pulse" : "bg-zinc-400")} />
+                      <span className="text-xs font-bold leading-none">{isOnline ? "Online" : "Offline"}</span>
+                    </div>
+                    {isTogglingOnline ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground ml-1" />
+                    ) : (
+                      <Switch
+                        checked={isOnline}
+                        onCheckedChange={handleToggleOnlineStatus}
+                        className="scale-75 origin-center data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-zinc-300 dark:data-[state=unchecked]:bg-zinc-700 pointer-events-none"
+                      />
+                    )}
+                  </div>
+                )}
+
                 <ThemeToggle />
                 
                 {providerUser && isProviderApproved && (

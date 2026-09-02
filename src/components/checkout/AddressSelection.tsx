@@ -86,6 +86,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
 
           const matchingDocs = providersSnapshot.docs.filter(doc => {
             const p = doc.data();
+            if (p.isOnline === false) return false;
             if (!p.workAreaCenter || !p.workAreaRadiusKm) return false;
 
             // If there are active services in checkout, provider must be able to do EVERY service in the cart:

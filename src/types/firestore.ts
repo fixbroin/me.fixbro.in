@@ -1400,6 +1400,7 @@ export interface ProviderApplication {
   id?: string; // Firestore document ID (same as userId)
   userId: string; // Firebase Auth UID of the applicant
   status: ProviderApplicationStatus;
+  isOnline?: boolean; // Availability toggle (true = online/accepting bookings, false = offline)
 
   // Step 1: Client Category & Skills
   workCategoryId?: string;

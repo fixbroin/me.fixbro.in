@@ -66,6 +66,9 @@ export async function POST(request: Request) {
                 }
                 return { id: doc.id, ...pData, distance };
             }).filter(p => {
+                // Availability check: Provider must be online
+                if (p.isOnline === false) return false;
+
                 // Distance check
                 if (p.distance > (p.workAreaRadiusKm || 0)) return false;
 

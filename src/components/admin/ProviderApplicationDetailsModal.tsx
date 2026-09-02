@@ -24,6 +24,7 @@ import { cn, getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } fr
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, Timestamp, collection, query, where, orderBy, getDocs } from '@/lib/mysqlDb';
 import { useRouter } from 'next/navigation';
+import { Switch } from '@/components/ui/switch';
 
 const PROVIDER_APPLICATION_COLLECTION = "providerApplications";
 
@@ -196,17 +197,47 @@ export default function ProviderApplicationDetailsModal({
   const [serviceSearchQuery, setServiceSearchQuery] = useState("");
   const [isUpdatingServices, setIsUpdatingServices] = useState(false);
 
+  const [isOnlineStatus, setIsOnlineStatus] = useState<boolean>(true);
+  const [isUpdatingOnline, setIsUpdatingOnline] = useState(false);
+
   useEffect(() => {
     if (application) {
       setAdminNotes(application.adminReviewNotes || "");
       setAdditionalCats(application.additionalCategories || []);
       setAdditionalServicesList(application.additionalServices || []);
+      setIsOnlineStatus(application.isOnline !== false);
     } else {
       setAdminNotes("");
       setAdditionalCats([]);
       setAdditionalServicesList([]);
+      setIsOnlineStatus(true);
     }
   }, [application]);
+
+  const handleToggleOnlineAdmin = async () => {
+    if (!application?.id || isUpdatingOnline) return;
+    setIsUpdatingOnline(true);
+    const newStatus = !isOnlineStatus;
+    try {
+      const appDocRef = doc(db, PROVIDER_APPLICATION_COLLECTION, application.id);
+      await updateDoc(appDocRef, {
+        isOnline: newStatus,
+        updatedAt: Timestamp.now()
+      });
+      setIsOnlineStatus(newStatus);
+      toast({
+        title: newStatus ? "Provider Set to Online" : "Provider Set to Offline",
+        description: newStatus 
+          ? `Provider "${application.fullName || 'Provider'}" is now Online and receiving bookings.`
+          : `Provider "${application.fullName || 'Provider'}" is now Offline (paused from bookings & map).`
+      });
+    } catch (e: any) {
+      console.error("Error updating online status:", e);
+      toast({ title: "Error", description: e.message || "Failed to update availability status.", variant: "destructive" });
+    } finally {
+      setIsUpdatingOnline(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -451,6 +482,30 @@ export default function ProviderApplicationDetailsModal({
               <div className="flex items-center gap-2 sm:gap-3 flex-wrap mt-1 sm:mt-0">
                 <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded border border-border/40">ID: {application.id}</span>
                 <Badge variant="outline" className="text-xs capitalize bg-background shrink-0">{application.status.replace(/_/g, ' ')}</Badge>
+                {application.status === 'approved' && (
+                  <div
+                    onClick={() => !isUpdatingOnline && handleToggleOnlineAdmin()}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-xs font-semibold transition-all cursor-pointer select-none",
+                      isOnlineStatus
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400"
+                        : "bg-muted/80 border-border text-muted-foreground hover:bg-muted"
+                    )}
+                    title={isOnlineStatus ? "Click switch to set provider Offline" : "Click switch to set provider Online"}
+                  >
+                    <span className={cn("h-2 w-2 rounded-full", isOnlineStatus ? "bg-emerald-500 animate-pulse" : "bg-zinc-400")} />
+                    <span>{isOnlineStatus ? "Online" : "Offline"}</span>
+                    {isUpdatingOnline ? (
+                      <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                    ) : (
+                      <Switch
+                        checked={isOnlineStatus}
+                        onCheckedChange={handleToggleOnlineAdmin}
+                        className="scale-[0.65] origin-center data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-zinc-300 dark:data-[state=unchecked]:bg-zinc-700 pointer-events-none"
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -752,6 +807,35 @@ export default function ProviderApplicationDetailsModal({
               </TabsContent>
 
               <TabsContent value="confirmation" className="space-y-4 focus-visible:outline-none focus-visible:ring-0 mt-0 w-full">
+                {application.status === 'approved' && (
+                  <div className="space-y-2 border p-4 rounded-xl bg-muted/10 border-border/60">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h4 className="font-bold text-sm text-primary">Availability Status (Online / Offline)</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {isOnlineStatus 
+                            ? "Provider is currently Online and active for customer bookings, map coverage, and auto-dispatch."
+                            : "Provider is currently Offline (paused). Excluded from map serviceability, time slots, and auto-dispatch."}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto">
+                        <span className={cn("text-xs font-bold", isOnlineStatus ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
+                          {isOnlineStatus ? "Online" : "Offline"}
+                        </span>
+                        {isUpdatingOnline ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        ) : (
+                          <Switch
+                            checked={isOnlineStatus}
+                            onCheckedChange={handleToggleOnlineAdmin}
+                            className="data-[state=checked]:bg-emerald-600 data-[state=unchecked]:bg-zinc-300 dark:data-[state=unchecked]:bg-zinc-700 cursor-pointer"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-1">
                   <h4 className="font-bold text-sm text-primary uppercase tracking-wider mb-2">Terms Confirmation</h4>
                   <DetailRow 

@@ -643,6 +643,9 @@ export async function POST(req: NextRequest) {
                     }
                     return { id: doc.id, ...pData, distance };
                 }).filter(p => {
+                    // Availability check: Provider must be online
+                    if (p.isOnline === false) return false;
+
                     // Distance radius check
                     if (p.distance > (p.workAreaRadiusKm || 0)) return false;
 
