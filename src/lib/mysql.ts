@@ -59,7 +59,10 @@ const TABLES = [
   'indexingProgress',
   'promoCodeUsage',
   'providerWalletTransactions',
-  'providerComplaints'
+  'providerComplaints',
+  'providerControlOptions',
+  'adminCoupons',
+  'services'
 ];
 
 /**
@@ -800,7 +803,7 @@ function resolveFieldValues(target: any, source: any): any {
   }
 
   if (Array.isArray(source)) {
-    return source.map((item, idx) => resolveFieldValues(Array.isArray(target) ? target[idx] : undefined, item));
+    return source.map((item) => resolveFieldValues(undefined, item));
   }
 
   if (typeof source === 'object' && !isTimestamp(source)) {

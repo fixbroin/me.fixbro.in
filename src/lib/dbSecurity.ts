@@ -34,9 +34,22 @@ export async function verifyRequest(req: NextRequest): Promise<RequestUser> {
     const uid = decodedToken.uid;
     const email = decodedToken.email;
 
-    // Fetch user role from database
+    // Fetch user role from database (check both users and admins collection)
+    let role: string | undefined = undefined;
     const userDoc = await adminDb.collection('users').doc(uid).get();
-    const role = userDoc.exists ? userDoc.data()?.role : undefined;
+    if (userDoc.exists) {
+      role = userDoc.data()?.role;
+    }
+
+    if (!role || (role !== 'super_admin' && role !== 'finance_admin')) {
+      const adminDoc = await adminDb.collection('admins').doc(uid).get();
+      if (adminDoc.exists) {
+        const adminData = adminDoc.data();
+        if (adminData?.status === 'active' || adminData?.role) {
+          role = adminData.role || 'super_admin';
+        }
+      }
+    }
 
     return { uid, email, role, isInternal: false };
   } catch (error) {
@@ -50,11 +63,17 @@ export async function verifyRequest(req: NextRequest): Promise<RequestUser> {
  */
 export function isUserAdmin(user: RequestUser): boolean {
   const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
+  const userEmail = (user.email || '').toLowerCase();
   return (
     user.isInternal ||
     user.role === 'super_admin' ||
+    user.role === 'superadmin' ||
     user.role === 'finance_admin' ||
-    (user.email && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) ||
+    user.role === 'admin' ||
+    user.role === 'staff' ||
+    userEmail === ADMIN_EMAIL.toLowerCase() ||
+    userEmail === 'wecanfix.in@gmail.com' ||
+    userEmail === 'fixbro.in@gmail.com' ||
     false
   );
 }
