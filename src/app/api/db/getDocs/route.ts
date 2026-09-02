@@ -54,6 +54,19 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      if (path === 'providerApplications') {
+        let hasApprovedFilter = false;
+        for (const c of constraints) {
+          if (c && c.type === 'where' && c.field === 'status' && c.value === 'approved') {
+            hasApprovedFilter = true;
+            break;
+          }
+        }
+        if (!hasApprovedFilter) {
+          constraints.push({ type: 'where', field: 'status', op: '==', value: 'approved' });
+        }
+      }
+
       if (path === 'users') {
         const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
         const isAdminQuery = constraints.some((c: any) => 
@@ -87,6 +100,27 @@ export async function POST(request: NextRequest) {
 
     const pool = await getPool();
     const result = await getDocsInternal(pool, path, constraints);
+
+    // Sanitize sensitive provider details for non-admin queries (e.g. checkout zone queries)
+    if (path === 'providerApplications' && !isUserAdmin(user) && Array.isArray(result?.docs)) {
+      result.docs = result.docs.map((d: any) => {
+        if (!d?.data) return d;
+        const {
+          bankAccount,
+          bankDetails,
+          kycDocuments,
+          aadhaarNumber,
+          panNumber,
+          adminReviewNotes,
+          signatureUrl,
+          ...safeData
+        } = d.data;
+        return {
+          ...d,
+          data: safeData
+        };
+      });
+    }
 
     if (isCacheable) {
       queryCache.set(cacheKey, { data: result, expiresAt: Date.now() + CACHE_TTL_MS });

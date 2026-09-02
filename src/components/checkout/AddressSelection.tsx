@@ -56,7 +56,15 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
   const [providerZones, setProviderZones] = useState<ServiceZone[]>([]);
   const [isLoadingZones, setIsLoadingZones] = useState(true);
 
-  const currentCategoryId = typeof window !== 'undefined' ? localStorage.getItem('wecanfixActiveCheckoutCategory') : null;
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setActiveCategoryId(localStorage.getItem('wecanfixActiveCheckoutCategory'));
+    }
+  }, []);
+
+  const currentCategoryId = activeCategoryId || (typeof window !== 'undefined' ? localStorage.getItem('wecanfixActiveCheckoutCategory') : null);
 
   const applicableServiceZones = useMemo(() => {
     const adminZones = allServiceZones.filter(zone => {
@@ -76,8 +84,9 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
 
         const activeEntries = getActiveCheckoutEntries();
         const activeServiceIds = activeEntries.map(e => e.serviceId).filter(Boolean);
+        const effectiveCategoryId = activeCategoryId || (typeof window !== 'undefined' ? localStorage.getItem('wecanfixActiveCheckoutCategory') : null);
 
-        if (currentCategoryId || activeServiceIds.length > 0) {
+        if (effectiveCategoryId || activeServiceIds.length > 0) {
           const providersQuery = query(
             collection(db, 'providerApplications'), 
             where('status', '==', 'approved')
@@ -92,9 +101,9 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
             // If there are active services in checkout, provider must be able to do EVERY service in the cart:
             if (activeServiceIds.length > 0) {
               return activeServiceIds.every(sId => {
-                const hasCategory = currentCategoryId && (
-                  p.workCategoryId === currentCategoryId ||
-                  (Array.isArray(p.allCategoryIds) && p.allCategoryIds.includes(currentCategoryId))
+                const hasCategory = effectiveCategoryId && (
+                  p.workCategoryId === effectiveCategoryId ||
+                  (Array.isArray(p.allCategoryIds) && p.allCategoryIds.includes(effectiveCategoryId))
                 );
                 const hasSpecificService = (Array.isArray(p.additionalServiceIds) && p.additionalServiceIds.includes(sId)) ||
                                            (Array.isArray(p.additionalServices) && p.additionalServices.some((s: any) => s.id === sId));
@@ -103,9 +112,9 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
             }
 
             // Fallback if no specific service IDs are in the cart:
-            const matchesCategory = currentCategoryId && (
-              p.workCategoryId === currentCategoryId ||
-              (Array.isArray(p.allCategoryIds) && p.allCategoryIds.includes(currentCategoryId))
+            const matchesCategory = effectiveCategoryId && (
+              p.workCategoryId === effectiveCategoryId ||
+              (Array.isArray(p.allCategoryIds) && p.allCategoryIds.includes(effectiveCategoryId))
             );
             return matchesCategory;
           });
@@ -129,7 +138,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
       }
     };
     fetchZonesAndProviders();
-  }, [currentCategoryId]);
+  }, [activeCategoryId]);
 
   useEffect(() => {
     if (!user) {

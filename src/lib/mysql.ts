@@ -518,6 +518,7 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
   const orderByClauses: string[] = [];
   let limitClause = '';
   let offsetClause = '';
+  const limitParams: any[] = [];
 
   const parseConstraint = (c: any) => {
     if (!c) return;
@@ -648,6 +649,7 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
       if (field && !/^[a-zA-Z0-9_$.*\[\]\-]+$/.test(field)) {
         throw new Error(`Access denied: Unsafe order field name "${field}"`);
       }
+
       if (!['asc', 'desc'].includes(direction.toLowerCase())) {
         throw new Error(`Access denied: Invalid sorting direction "${direction}"`);
       }
@@ -661,10 +663,10 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
       }
     } else if (c.type === 'limit') {
       limitClause = ` LIMIT ?`;
-      params.push(c.value);
+      limitParams.push(Number(c.value));
     } else if (c.type === 'offset') {
       offsetClause = ` OFFSET ?`;
-      params.push(c.value);
+      limitParams.push(Number(c.value));
     } else if (c.type === 'and') {
       if (Array.isArray(c.conditions)) {
         c.conditions.forEach(parseConstraint);
@@ -735,6 +737,10 @@ export async function getDocsInternal(conn: mysql.PoolConnection | mysql.Pool, p
     if (offsetClause) sql += offsetClause;
   } else if (offsetClause) {
     sql += ` LIMIT 18446744073709551615${offsetClause}`;
+  }
+
+  if (limitParams.length > 0) {
+    params.push(...limitParams);
   }
 
   let rows: any = [];
