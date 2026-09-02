@@ -119,7 +119,8 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     'seoSettings',
     'cityCategorySeoSettings',
     'areaCategorySeoSettings',
-    'areaServiceSeoSettings'
+    'areaServiceSeoSettings',
+    'adminTaxes'
   ];
 
   if (PUBLIC_READ_TABLES.includes(table)) {

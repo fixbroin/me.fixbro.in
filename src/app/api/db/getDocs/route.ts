@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     // Enforce ownership filters for non-admin requests to private tables
     if (!isUserAdmin(user)) {
       const privateTablesToFilter: Record<string, string> = {
-        'bookings': 'customerId',
+        'bookings': 'userId',
         'userNotifications': 'userId',
         'withdrawalRequests': 'providerId',
         'quotations': 'providerId',

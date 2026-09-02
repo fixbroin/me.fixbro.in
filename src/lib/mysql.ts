@@ -62,7 +62,8 @@ const TABLES = [
   'providerComplaints',
   'providerControlOptions',
   'adminCoupons',
-  'services'
+  'services',
+  'adminTaxes'
 ];
 
 /**
