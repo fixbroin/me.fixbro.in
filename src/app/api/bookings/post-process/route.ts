@@ -269,7 +269,10 @@ export async function POST(request: Request) {
                             body: `Booking ${booking.bookingId} is assigned to you. Check details now.`, 
                             href: `/provider/booking/${bookingDocId}`,
                             variables: {
-                                bookingId: booking.bookingId || ""
+                                bookingId: booking.bookingId || "",
+                                providerName: pData.fullName || "Service Provider",
+                                customerName: booking.customerName || "Customer",
+                                siteName: seoSettings?.websiteName || "Fixbro"
                             }
                         }),
                     });

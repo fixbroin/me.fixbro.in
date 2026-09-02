@@ -261,7 +261,12 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
         userId: selectedUser.id,
         title: `Message from ${supportAdminProfile.displayName || "Support"}`,
         body: tempNewMessage,
-        href: '/chat'
+        href: '/chat',
+        variables: {
+          senderName: supportAdminProfile.displayName || "Support",
+          messageText: tempNewMessage,
+          siteName: "Fixbro"
+        }
       });
     } catch (error) {
       console.error("Error sending message:", error);

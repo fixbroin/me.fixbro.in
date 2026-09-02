@@ -1,7 +1,7 @@
 import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 import { NextRequest } from 'next/server';
 
-const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET || "default_internal_secret_key_123456";
+const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET || "fixbro_internal_secret_j7K9R2pX_2026";
 
 export interface RequestUser {
   uid: string;
@@ -94,6 +94,9 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     'serviceZones',
     'adminPromoCodes',
     'adminCoupons',
+    'providerControlOptions',
+    'timeSlotCategoryLimits',
+    'services',
     'seoSettings',
     'cityCategorySeoSettings',
     'areaCategorySeoSettings',

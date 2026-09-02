@@ -303,7 +303,12 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
           userId: adminProfile.uid,
           title: `Message from ${currentUser.displayName || currentUser.email}`,
           body: tempNewMessage,
-          href: '/admin/chat'
+          href: '/admin/chat',
+          variables: {
+            senderName: currentUser.displayName || currentUser.email || 'Customer',
+            messageText: tempNewMessage,
+            siteName: 'Fixbro'
+          }
         });
       }
       

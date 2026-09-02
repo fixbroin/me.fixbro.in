@@ -17,7 +17,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   };
 
   if (typeof window === 'undefined') {
-    const secret = process.env.INTERNAL_API_SECRET || "default_internal_secret_key_123456";
+    const secret = process.env.INTERNAL_API_SECRET || "fixbro_internal_secret_j7K9R2pX_2026";
     headers['x-internal-token'] = secret;
   } else {
     try {
