@@ -148,9 +148,26 @@ function getClientSideDateFormat(): string | undefined {
   return undefined;
 }
 
+export function getClientSideTimezone(): string | undefined {
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('wecanfix_cache_app-config');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.data?.timezone) {
+          return parsed.data.timezone;
+        }
+      }
+    } catch (e) {}
+  }
+  return undefined;
+}
+
 export function formatCustomDate(date: Date, formatStr: string, timeZone: string = 'Asia/Kolkata'): string {
   try {
-    const validTz = (timeZone && typeof timeZone === 'string' && timeZone.trim()) ? timeZone.trim() : 'Asia/Kolkata';
+    const clientTz = getClientSideTimezone();
+    const effectiveTz = (timeZone && timeZone !== 'Asia/Kolkata') ? timeZone.trim() : (clientTz || timeZone || 'Asia/Kolkata');
+    const validTz = effectiveTz.trim() || 'Asia/Kolkata';
     const dtf = new Intl.DateTimeFormat('en-US', {
       timeZone: validTz,
       year: 'numeric',
@@ -214,7 +231,9 @@ export function formatDateInTimezone(
     try {
       const d = new Date(date);
       if (isNaN(d.getTime())) return String(date);
-      const validTz = (timeZone && typeof timeZone === 'string' && timeZone.trim()) ? timeZone.trim() : 'Asia/Kolkata';
+      const clientTz = getClientSideTimezone();
+      const effectiveTz = (timeZone && timeZone !== 'Asia/Kolkata') ? timeZone.trim() : (clientTz || timeZone || 'Asia/Kolkata');
+      const validTz = effectiveTz.trim() || 'Asia/Kolkata';
 
       if (typeof optionsOrFormat === 'string') {
         return formatCustomDate(d, optionsOrFormat, validTz);
@@ -252,7 +271,9 @@ export function formatTimeInTimezone(date: Date | string | number | undefined, t
     try {
       const d = new Date(date);
       if (isNaN(d.getTime())) return String(date);
-      const validTz = (timeZone && typeof timeZone === 'string' && timeZone.trim()) ? timeZone.trim() : 'Asia/Kolkata';
+      const clientTz = getClientSideTimezone();
+      const effectiveTz = (timeZone && timeZone !== 'Asia/Kolkata') ? timeZone.trim() : (clientTz || timeZone || 'Asia/Kolkata');
+      const validTz = effectiveTz.trim() || 'Asia/Kolkata';
       return new Intl.DateTimeFormat('en-IN', { ...options, timeZone: validTz }).format(d);
     } catch (e) {
       return String(date);

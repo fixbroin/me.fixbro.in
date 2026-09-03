@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { AppSettings, FirestoreService, FirestoreSubCategory, TimeSlotCategoryLimit, FirestoreBooking, LeaveRequest } from '@/types/firestore';
 import { defaultAppSettings } from '@/config/appDefaults';
-import { getZonedDate, formatZonedDateToISO, convertWallClockToUTC } from '@/lib/utils';
+import { getZonedDate, formatZonedDateToISO, convertWallClockToUTC, getTimestampMillis } from '@/lib/utils';
 import { getHaversineDistance } from '@/lib/locationUtils';
 
 export const dynamic = 'force-dynamic';
@@ -519,7 +519,10 @@ export async function POST(req: NextRequest) {
 
         // --- Cache Logic Start ---
         const bookingsHash = bookingsSnap.docs
-            .map(doc => `${doc.id}_${doc.updateTime?.toMillis() || 0}`)
+            .map(doc => {
+                const updateMs = doc.updateTime ? getTimestampMillis(doc.updateTime) : (doc.data()?.updatedAt ? getTimestampMillis(doc.data().updatedAt) : 0);
+                return `${doc.id}_${updateMs}`;
+            })
             .sort()
             .join('|');
             
@@ -528,7 +531,8 @@ export async function POST(req: NextRequest) {
             .sort()
             .join('|');
             
-        const cacheKey = `${lookBackISO}_${dateISO}_${bookingsHash}_${limitsHash}_${appConfig.updatedAt?.toMillis() || 0}_${breakTimeMinutes}_${latitude || 0}_${longitude || 0}`;
+        const configUpdatedMs = getTimestampMillis(appConfig?.updatedAt);
+        const cacheKey = `${lookBackISO}_${dateISO}_${bookingsHash}_${limitsHash}_${configUpdatedMs}_${breakTimeMinutes}_${latitude || 0}_${longitude || 0}`;
         
         let cacheData: {
             globalBusyMap: Map<string, Record<string, number>>;
