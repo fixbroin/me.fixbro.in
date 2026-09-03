@@ -301,9 +301,16 @@ export default function AdminUserListForChat({
                                 </span>
                             </div>
                             <div className="flex items-center justify-between mt-0.5">
-                              <p className={cn("text-[11px] truncate max-w-[150px]", isSelected ? "text-primary-foreground/80" : "text-muted-foreground")}>
-                                {lastMsg || user.mobileNumber || user.email}
-                              </p>
+                              {session?.isUserTyping ? (
+                                <p className={cn("text-[11px] font-bold animate-pulse flex items-center gap-1", isSelected ? "text-primary-foreground" : "text-primary")}>
+                                  <span className="h-1.5 w-1.5 rounded-full bg-current animate-ping" />
+                                  typing...
+                                </p>
+                              ) : (
+                                <p className={cn("text-[11px] truncate max-w-[150px]", isSelected ? "text-primary-foreground/80" : "text-muted-foreground")}>
+                                  {lastMsg || user.mobileNumber || user.email}
+                                </p>
+                              )}
                               {adminUnreadCount > 0 && !isSelected && (
                                 <div className="h-2 w-2 rounded-full bg-primary animate-pulse ml-2" />
                               )}

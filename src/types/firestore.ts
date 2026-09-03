@@ -1080,6 +1080,10 @@ export interface ChatSession {
   adminUnreadCount: number; // Messages sent by user that admin hasn't read
   participants: (string | null | undefined)[]; // Array containing UIDs of participants (e.g., [userId, adminId])
   aiAgentActive?: boolean; 
+  isUserTyping?: boolean;
+  isAdminTyping?: boolean;
+  userTypingAt?: Timestamp | number | null;
+  adminTypingAt?: Timestamp | number | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
