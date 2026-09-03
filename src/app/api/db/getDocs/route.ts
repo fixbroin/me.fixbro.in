@@ -33,7 +33,9 @@ export async function POST(request: NextRequest) {
         'userActivities': 'userId',
         'visitorInfoLogs': 'userId',
         'leaves': 'providerId',
-        'customServiceRequests': 'userId'
+        'customServiceRequests': 'userId',
+        'providerWalletTransactions': 'providerId',
+        'providerComplaints': 'providerId'
       };
 
       const filterField = privateTablesToFilter[path];
