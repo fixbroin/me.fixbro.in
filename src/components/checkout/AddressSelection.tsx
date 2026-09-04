@@ -206,7 +206,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
           logUserActivity(
             'checkoutStep',
             {
-              checkoutStepName: 'out_of_coverage',
+              checkoutStepName: applicableServiceZones.length === 0 ? 'providers_unavailable' : 'out_of_coverage',
               addressId: selectedAddress.id,
               fullName: selectedAddress.fullName,
               city: selectedAddress.city,
@@ -222,7 +222,7 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
     } else if (isServiceable === true) {
       lastLoggedOutOfCoverageIdRef.current = null;
     }
-  }, [isServiceable, selectedAddressId, savedAddresses, user, firestoreUser]);
+  }, [isServiceable, selectedAddressId, savedAddresses, user, firestoreUser, applicableServiceZones]);
 
   const handleOpenMapClick = useCallback(async () => {
     setEditingAddress(null);
@@ -401,9 +401,15 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
       {isServiceable === false && selectedAddressId && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Area Not Serviceable</AlertTitle>
+          <AlertTitle>
+            {applicableServiceZones.length === 0
+              ? "Providers Currently Unavailable"
+              : "Area Not Serviceable"}
+          </AlertTitle>
           <AlertDescription>
-            Sorry, the selected address is outside our current service zones.
+            {applicableServiceZones.length === 0
+              ? "All service providers for this service are currently offline or fully busy. We will be back online soon! Please check back later."
+              : "Sorry, the selected address is outside our current service zones. Please select a different location."}
           </AlertDescription>
         </Alert>
       )}

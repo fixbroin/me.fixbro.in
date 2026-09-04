@@ -243,11 +243,19 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
       return;
     }
     if (isServiceable === false) {
-      toast({
-        title: "Area Not Serviceable",
-        description: "This address is outside our service area. Please select a different location.",
-        variant: "destructive",
-      });
+      if (serviceZones.length === 0) {
+        toast({
+          title: "Providers Currently Unavailable",
+          description: "All service providers are currently offline or fully busy. We will be back online soon! Please check back later.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Area Not Serviceable",
+          description: "This address is outside our service area. Please select a different location.",
+          variant: "destructive",
+        });
+      }
       if (selectedAddress && onOutOfCoverage) {
         onOutOfCoverage(selectedAddress);
       }
@@ -516,6 +524,8 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
             }`}>
               {isServiceable ? (
                 <span className="flex items-center gap-1.5"><CheckCircle className="h-4 w-4"/> Serviceable Area</span>
+              ) : serviceZones.length === 0 ? (
+                <span className="flex items-center gap-1.5"><XCircle className="h-4 w-4"/> Providers Currently Unavailable</span>
               ) : (
                 <span className="flex items-center gap-1.5"><XCircle className="h-4 w-4"/> Not a Serviceable Area</span>
               )}
