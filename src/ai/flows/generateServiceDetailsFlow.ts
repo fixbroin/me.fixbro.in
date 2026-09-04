@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview AI flow to generate comprehensive, realistic and
- * service-specific details for FixBro services.
+ * service-specific details for Wecanfix services.
  *
  * The AI dynamically understands the service name, category and
  * sub-category instead of blindly applying one generic template.
@@ -138,25 +138,25 @@ const GenerateServiceDetailsOutputSchema = z.object({
     h1_title: z
       .string()
       .describe(
-        'H1 using the service name and target city naturally.'
+        "An H1 title with the exact format '{{serviceName}} Service Near You'."
       ),
 
     seo_title: z
       .string()
       .describe(
-        'SEO title. Maximum 48 characters. Do not include FixBro because the website adds the brand automatically.'
+        "An SEO-optimized meta title, under 60 characters, with the format '{{serviceName}} Near Me | {{categoryName}} Near Me'."
       ),
 
     seo_description: z
       .string()
       .describe(
-        'SEO meta description under 155 characters with natural local intent and booking intent.'
+        "An SEO-optimized meta description, under 160 characters. Should be a compelling summary that encourages clicks."
       ),
 
     seo_keywords: z
       .string()
       .describe(
-        '8 to 10 comma-separated high-intent search phrases.'
+        "A comma-separated string of 10 relevant SEO keywords. Must include variations like '{{serviceName}} near me', '{{serviceName}} near you', '{{categoryName}} near me', '{{categoryName}} near you'."
       ),
   }),
 
@@ -201,7 +201,7 @@ const prompt = ai.definePrompt({
   },
 
   prompt: `
-You are the **FixBro Service Content Engine**.
+You are the **Wecanfix Service Content Engine**.
 
 You are an expert in:
 - Home-service operations
@@ -217,7 +217,7 @@ You are an expert in:
 - Local SEO
 - Customer-focused service descriptions
 
-Your task is to generate complete service-page content for FixBro.
+Your task is to generate complete service-page content for Wecanfix.
 
 ============================================================
 INPUT
@@ -268,7 +268,7 @@ WRITING STYLE
 
 Use simple, professional Indian English.
 
-Write like an experienced FixBro service operations manager explaining the service to a real customer.
+Write like an experienced Wecanfix service operations manager explaining the service to a real customer.
 
 The writing should be:
 
@@ -327,7 +327,7 @@ Do not invent:
 
 IMPORTANT:
 
-The rating and reviewCount fields ARE intentionally generated because FixBro's admin can manually change them later.
+The rating and reviewCount fields ARE intentionally generated because Wecanfix's admin can manually change them later.
 
 Generate realistic values between the schema limits.
 
@@ -904,167 +904,33 @@ Focus on:
 SEO
 ============================================================
 
-SEO must be written for REAL customer search behaviour.
+Generate high-intent, SEO-optimized metadata following this exact structure:
 
-The AI must NOT always use "[Service] in [City]".
+1. **h1_title**:
+   Format: "{{serviceName}} Service Near You"
+   (If the service name already includes "Service", do not duplicate it. For example, use "Carpenter Daily Service Near You", NOT "Carpenter Daily Service Service Near You").
 
-Use a natural mixture of local-search phrases depending on the service.
+2. **seo_title**:
+   Format: "{{serviceName}} Near Me | {{categoryName}} Near Me"
+   MUST be under 60 characters.
+   Use the natural trade name for the category when applicable (e.g., use "Carpenter Near Me" for Carpentry, "Plumber Near Me" for Plumbing, "Electrician Near Me" for Electrical).
+   Do NOT include Wecanfix in the meta title because the website adds the brand name automatically.
 
-H1 TITLE:
+3. **seo_description**:
+   SEO meta description under 160 characters.
+   A compelling, click-worthy summary that encourages bookings.
+   Pattern: "Book professional {{serviceName}} near me by skilled {{category/trade}}. [Scope/Benefit]. [Key condition/Labour only]."
+   Example: "Book professional digital or electronic lock installation near me by skilled carpenters. Secure fitting on wooden doors for enhanced safety. Labour only, lock provided by customer."
 
-Normally use:
-
-"[Service Name] in [City]"
-
-But when appropriate, a natural variation may be used, such as:
-
-"[Service Name] Near Me"
-"[Service Name] Near You"
-"Book [Service Name] in [City]"
-
-The H1 must still clearly describe the exact service.
-
-Do not force "Near Me" or "Near You" when it sounds unnatural.
-
-------------------------------------------------------------
-META TITLE
-------------------------------------------------------------
-
-Maximum 48 characters.
-
-The Meta Title should target real customer search intent.
-
-Do NOT always use:
-
-"[Service] in [City]"
-
-Choose the most natural variation from patterns such as:
-
-"[Service] Near Me"
-"[Service] Near You"
-"[Service] in [City]"
-"Book [Service] Near Me"
-"[Service] Service Near Me"
-"[Service] at Home"
-"[Service] at Home in [City]"
-"Book [Service] in [City]"
-"[Service] [City]"
-
-IMPORTANT:
-
-Use "Near Me" and "Near You" naturally where appropriate.
-
-Do not use both in the same title.
-
-Do not force "Near Me" into every service.
-
-Select the wording that best matches how a customer would actually search for this particular service.
-
-Examples:
-
-Carpenter Daily Service:
-- Carpenter Near Me
-- Daily Carpenter Near Me
-- Carpenter Service Near Me
-- Carpenter in Bangalore
-- Book Carpenter Near Me
-
-TV Installation:
-- TV Installation Near Me
-- TV Installation Near You
-- TV Installation in Bangalore
-- TV Installation at Home
-
-Washing Machine Installation:
-- Washing Machine Installation Near Me
-- Washing Machine Installation Near You
-- Washing Machine Installation in Bangalore
-
-Water Purifier Installation:
-- RO Installation Near Me
-- Water Purifier Installation Near Me
-- RO Installation in Bangalore
-
-Website services:
-- Website Designer Near Me
-- Website Development Near Me
-- Business Website Design in Bangalore
-
-Do NOT include FixBro in the Meta Title because the website adds the brand automatically.
-
-------------------------------------------------------------
-META DESCRIPTION
-------------------------------------------------------------
-
-Maximum 155 characters.
-
-Write naturally for customers.
-
-Include:
-- Exact or natural service name
-- Local intent
-- Main service benefit
-- Booking intent
-
-You may naturally use phrases such as:
-
-"near me"
-"near you"
-"in Bangalore"
-"at home"
-"book online"
-
-Examples:
-
-"Need a carpenter near you? Book daily carpenter service in Bangalore for furniture assembly, repairs and other carpentry work."
-
-"Looking for TV installation near me? Get professional TV mounting and basic setup at home in Bangalore."
-
-"Book washing machine installation near you in Bangalore for safe positioning, connections and basic functionality checks."
-
-Do not keyword stuff.
-
-Do not repeat the same phrase unnecessarily.
-
-------------------------------------------------------------
-SEO KEYWORDS
-------------------------------------------------------------
-
-Generate 8 to 10 realistic, high-intent search phrases.
-
-Include a natural mixture of:
-
-- Exact service
-- Service + city
-- Service + near me
-- Service + near you
-- Service + at home
-- Book + service
-- Common customer wording
-- Service variation
-- Local search wording
-
-Examples for Carpenter Daily Service:
-
-carpenter near me,
-carpenter near you,
-daily carpenter service,
-daily carpenter Bangalore,
-daily carpenter in Bangalore,
-carpenter service Bangalore,
-book carpenter near me,
-carpenter at home,
-full day carpenter,
-carpenter for furniture work,
-carpenter service near me
-
-IMPORTANT:
-
-Do not force "near me" and "near you" into every keyword list.
-
-Use them when they are relevant to the service and customer search intent.
-
-Avoid duplicate or unnatural keywords.
+4. **seo_keywords**:
+   A comma-separated string of 10 relevant SEO keywords.
+   MUST include variations like:
+   - '{{serviceName}} near me'
+   - '{{serviceName}} near you'
+   - '{{categoryName}} near me'
+   - '{{categoryName}} near you'
+   - natural local search terms and common customer phrasing for this service.
+   Example: "digital lock installation near me, electronic lock fitting near me, carpenter near me, carpenter near you, smart lock installation near me, wooden door lock installation near me"
 
 ============================================================
 QUALITY CONTROL BEFORE OUTPUT
@@ -1184,12 +1050,12 @@ const generateServiceDetailsFlow = ai.defineFlow(
 
         seo_title: truncateSeoString(
           cleanTitle,
-          48
+          60
         ),
 
         seo_description: truncateSeoString(
           cleanSeoString(output.seo.seo_description),
-          155
+          160
         ),
 
         seo_keywords: cleanSeoString(
