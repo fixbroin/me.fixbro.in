@@ -176,15 +176,19 @@ export default function AddressSelection({ onSelect, initialAddressId }: Address
 
   const checkServiceability = useCallback((address: Address | Partial<AddressFormData>) => {
     if (isLoadingZones) return; 
-    if (allServiceZones.length === 0) { setIsServiceable(true); return; }
     if (!address.latitude || !address.longitude) { setIsServiceable(null); return; }
+
+    if (applicableServiceZones.length === 0) {
+      setIsServiceable(false);
+      return;
+    }
 
     const serviceable = applicableServiceZones.some(zone => {
       const distance = getHaversineDistance(address.latitude!, address.longitude!, zone.center.latitude, zone.center.longitude);
       return distance <= zone.radiusKm;
     });
     setIsServiceable(serviceable);
-  }, [allServiceZones, applicableServiceZones, isLoadingZones]);
+  }, [applicableServiceZones, isLoadingZones]);
 
   useEffect(() => {
     const selectedAddress = savedAddresses.find(a => a.id === selectedAddressId);

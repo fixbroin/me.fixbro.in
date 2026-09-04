@@ -63,7 +63,7 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
 
   const checkServiceability = useCallback((lat: number, lng: number) => {
     if (serviceZones.length === 0) {
-      setIsServiceable(true); // If no zones are defined, assume all areas are serviceable.
+      setIsServiceable(false); // If no zones or providers are online, it is NOT serviceable.
       return;
     }
     const serviceable = serviceZones.some(zone => {
@@ -425,6 +425,42 @@ const MapAddressSelector: React.FC<MapAddressSelectorProps> = ({ apiKey, onAddre
   useEffect(() => {
     initMapAndControls();
   }, [initMapAndControls]);
+
+  // Sync service zones and re-check serviceability dynamically whenever serviceZones prop changes
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.google?.maps) return;
+
+    // Clear old circles
+    serviceZoneCirclesRef.current.forEach(circle => circle.setMap(null));
+    serviceZoneCirclesRef.current = [];
+
+    // Draw updated circles
+    serviceZones.forEach(zone => {
+      const circle = new window.google.maps.Circle({
+        strokeColor: "#45A0A2",
+        strokeOpacity: 0.7,
+        strokeWeight: 1,
+        fillColor: "#45A0A2",
+        fillOpacity: 0.15,
+        map: mapInstanceRef.current,
+        center: { lat: zone.center.latitude, lng: zone.center.longitude },
+        radius: zone.radiusKm * 1000,
+      });
+      serviceZoneCirclesRef.current.push(circle);
+    });
+
+    // Re-check serviceability with current marker position
+    if (markerRef.current) {
+      const currentPos = markerRef.current.getPosition();
+      if (currentPos) {
+        checkServiceability(currentPos.lat(), currentPos.lng());
+      }
+    } else if (initialCenter) {
+      checkServiceability(initialCenter.lat, initialCenter.lng);
+    } else {
+      checkServiceability(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng);
+    }
+  }, [serviceZones, checkServiceability, initialCenter]);
 
 
   if (isLoading) {
