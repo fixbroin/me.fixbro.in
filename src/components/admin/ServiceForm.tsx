@@ -457,19 +457,15 @@ export default function ServiceForm({ onSubmit: onSubmitProp, initialData, onCan
 
       if (result) {
         form.setValue('description', result.shortDescription, { shouldValidate: true });
-        form.setValue('shortDescription', result.shortDescription, { shouldValidate: true });
-        const detailedText = [
-          result.fullDescription,
-          result.pleaseNote?.length ? `Important Notes:\n${result.pleaseNote.map(n => `• ${n}`).join('\n')}` : ''
-        ].filter(Boolean).join('\n\n');
-        form.setValue('fullDescription', detailedText, { shouldValidate: true });
+        form.setValue('shortDescription', result.fullDescription, { shouldValidate: true });
+        form.setValue('fullDescription', (result.pleaseNote || []).join('\n'), { shouldValidate: true });
         form.setValue('imageHint', result.imageHint, { shouldValidate: true });
-        replaceHighlights(result.serviceHighlights.map(h => ({ value: h })) || []);
-        replaceIncluded(result.includedItems.map(i => ({ value: i })) || []);
-        replaceExcluded(result.excludedItems.map(e => ({ value: e })) || []);
+        replaceHighlights((result.serviceHighlights || []).map(h => ({ value: h })));
+        replaceIncluded((result.includedItems || []).map(i => ({ value: i })));
+        replaceExcluded((result.excludedItems || []).map(e => ({ value: e })));
         form.setValue('taskTimeValue', result.taskTime.value, { shouldValidate: true });
         form.setValue('taskTimeUnit', result.taskTime.unit, { shouldValidate: true });
-        const faqsWithIds = result.serviceFaqs.map(faq => ({...faq, id: nanoid() }));
+        const faqsWithIds = (result.serviceFaqs || []).map(faq => ({ ...faq, id: nanoid() }));
         replaceFaqs(faqsWithIds);
         form.setValue('h1_title', result.seo.h1_title, { shouldValidate: true });
         form.setValue('seo_title', stripBrandSuffix(result.seo.seo_title), { shouldValidate: true });
