@@ -110,6 +110,13 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, './'),
+  serverExternalPackages: [
+    'genkit',
+    '@genkit-ai/core',
+    '@genkit-ai/googleai',
+    '@opentelemetry/sdk-node',
+    '@opentelemetry/instrumentation',
+  ],
   images: {
     unoptimized: false,
     formats: ["image/avif", "image/webp"],

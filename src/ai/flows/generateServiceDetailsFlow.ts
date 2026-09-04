@@ -70,8 +70,9 @@ const GenerateServiceDetailsOutputSchema = z.object({
 
   imageHint: z
     .string()
+    .max(50)
     .describe(
-      'Realistic 4 to 8 word description of the service being performed.'
+      'Realistic 3 to 6 word description of the service being performed. Maximum 50 characters.'
     ),
 
   serviceHighlights: z
@@ -903,52 +904,167 @@ Focus on:
 SEO
 ============================================================
 
-SEO must be natural.
+SEO must be written for REAL customer search behaviour.
 
-H1:
+The AI must NOT always use "[Service] in [City]".
 
-Use:
+Use a natural mixture of local-search phrases depending on the service.
+
+H1 TITLE:
+
+Normally use:
 
 "[Service Name] in [City]"
 
-Meta title:
+But when appropriate, a natural variation may be used, such as:
+
+"[Service Name] Near Me"
+"[Service Name] Near You"
+"Book [Service Name] in [City]"
+
+The H1 must still clearly describe the exact service.
+
+Do not force "Near Me" or "Near You" when it sounds unnatural.
+
+------------------------------------------------------------
+META TITLE
+------------------------------------------------------------
 
 Maximum 48 characters.
 
-Use local search intent such as:
+The Meta Title should target real customer search intent.
 
-"[Service] Near Me | [City]"
+Do NOT always use:
 
-Shorten naturally when necessary.
+"[Service] in [City]"
 
-NEVER include FixBro in the meta title.
+Choose the most natural variation from patterns such as:
 
-The website automatically adds the company name.
+"[Service] Near Me"
+"[Service] Near You"
+"[Service] in [City]"
+"Book [Service] Near Me"
+"[Service] Service Near Me"
+"[Service] at Home"
+"[Service] at Home in [City]"
+"Book [Service] in [City]"
+"[Service] [City]"
 
-Meta description:
+IMPORTANT:
+
+Use "Near Me" and "Near You" naturally where appropriate.
+
+Do not use both in the same title.
+
+Do not force "Near Me" into every service.
+
+Select the wording that best matches how a customer would actually search for this particular service.
+
+Examples:
+
+Carpenter Daily Service:
+- Carpenter Near Me
+- Daily Carpenter Near Me
+- Carpenter Service Near Me
+- Carpenter in Bangalore
+- Book Carpenter Near Me
+
+TV Installation:
+- TV Installation Near Me
+- TV Installation Near You
+- TV Installation in Bangalore
+- TV Installation at Home
+
+Washing Machine Installation:
+- Washing Machine Installation Near Me
+- Washing Machine Installation Near You
+- Washing Machine Installation in Bangalore
+
+Water Purifier Installation:
+- RO Installation Near Me
+- Water Purifier Installation Near Me
+- RO Installation in Bangalore
+
+Website services:
+- Website Designer Near Me
+- Website Development Near Me
+- Business Website Design in Bangalore
+
+Do NOT include FixBro in the Meta Title because the website adds the brand automatically.
+
+------------------------------------------------------------
+META DESCRIPTION
+------------------------------------------------------------
 
 Maximum 155 characters.
 
+Write naturally for customers.
+
 Include:
-- Service
+- Exact or natural service name
 - Local intent
-- Main benefit
-- Booking intent such as "Book online"
+- Main service benefit
+- Booking intent
+
+You may naturally use phrases such as:
+
+"near me"
+"near you"
+"in Bangalore"
+"at home"
+"book online"
+
+Examples:
+
+"Need a carpenter near you? Book daily carpenter service in Bangalore for furniture assembly, repairs and other carpentry work."
+
+"Looking for TV installation near me? Get professional TV mounting and basic setup at home in Bangalore."
+
+"Book washing machine installation near you in Bangalore for safe positioning, connections and basic functionality checks."
 
 Do not keyword stuff.
 
-SEO keywords:
+Do not repeat the same phrase unnecessarily.
 
-Generate 8 to 10 realistic search phrases.
+------------------------------------------------------------
+SEO KEYWORDS
+------------------------------------------------------------
+
+Generate 8 to 10 realistic, high-intent search phrases.
 
 Include a natural mixture of:
 
 - Exact service
 - Service + city
 - Service + near me
+- Service + near you
+- Service + at home
+- Book + service
 - Common customer wording
 - Service variation
-- Relevant local search intent
+- Local search wording
+
+Examples for Carpenter Daily Service:
+
+carpenter near me,
+carpenter near you,
+daily carpenter service,
+daily carpenter Bangalore,
+daily carpenter in Bangalore,
+carpenter service Bangalore,
+book carpenter near me,
+carpenter at home,
+full day carpenter,
+carpenter for furniture work,
+carpenter service near me
+
+IMPORTANT:
+
+Do not force "near me" and "near you" into every keyword list.
+
+Use them when they are relevant to the service and customer search intent.
+
+Avoid duplicate or unnatural keywords.
 
 ============================================================
 QUALITY CONTROL BEFORE OUTPUT
@@ -1089,6 +1205,11 @@ const generateServiceDetailsFlow = ai.defineFlow(
       fullDescription: truncateSeoString(
         cleanSeoString(output.fullDescription),
         300
+      ),
+
+      imageHint: truncateSeoString(
+        cleanSeoString(output.imageHint),
+        50
       ),
 
       pleaseNote: (output.pleaseNote || []).map(
