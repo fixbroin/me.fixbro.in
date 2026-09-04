@@ -13,6 +13,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
+import { CANONICAL_SUPPORT_ADMIN_UID } from '@/components/admin/AdminUserListForChat';
 import { chatWithAgent, type ChatHistoryItem } from '@/ai/flows/chatWithAgentFlow';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { cn, getTimestampMillis } from '@/lib/utils';
@@ -24,13 +25,28 @@ interface ChatWindowProps {
 const ADMIN_FALLBACK_NAME = "Support";
 const ADMIN_FALLBACK_AVATAR_INITIAL = "S";
 
-// Function to find URLs in text and wrap them in anchor tags
-const linkify = (text: string) => {
-    const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\bwww\.[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
-    return text.replace(urlRegex, (url) => {
-        const fullUrl = url.startsWith('www.') ? `http://${url}` : url;
-        return `<a href="${fullUrl}" target="_blank" rel="noopener noreferrer" class="text-primary font-medium underline hover:text-primary/80 transition-colors">${url}</a>`;
-    });
+// Function to format chat messages with clean markdown links, bold text, and clickable URLs
+const formatChatMessage = (text: string) => {
+  if (!text) return '';
+  // 1. Convert Markdown links: [Title](url) -> <a href="url">Title</a>
+  const mdLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+  let formatted = text.replace(mdLinkRegex, (_, title, url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-semibold underline text-primary hover:text-primary/80 transition-colors">${title}</a>`;
+  });
+
+  // 2. Convert Bold: **text** -> <strong>text</strong>
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+  // 3. Convert Strikethrough: ~~text~~ -> <del class="opacity-75">text</del>
+  formatted = formatted.replace(/~~([^~]+)~~/g, '<del class="opacity-75">$1</del>');
+
+  // 4. Auto-link remaining raw URLs that are not already inside href
+  const rawUrlRegex = /(?<!href="|href='|">)(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gi;
+  formatted = formatted.replace(rawUrlRegex, (url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-medium underline text-primary hover:text-primary/80 transition-colors">${url}</a>`;
+  });
+
+  return formatted;
 };
 
 
@@ -108,6 +124,8 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
     }
   }, [globalSettings?.chatNotificationSoundUrl]);
 
+
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
   const getChatSessionId = useCallback((userId1: string, userId2: string): string => {
     return [userId1, userId2].sort().join('_');
@@ -228,6 +246,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
       setDoc(sessionDocRef, {
         isUserTyping: isTyping,
         userTypingAt: isTyping ? Date.now() : null,
+        updatedAt: serverTimestamp(),
       }, { merge: true });
     } catch (e) {
       console.error("ChatWindow: Error reporting user typing:", e);
@@ -261,7 +280,35 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
   };
 
   useEffect(() => {
+    const handleLeave = () => {
+      if (userTypingTimeoutRef.current) clearTimeout(userTypingTimeoutRef.current);
+      if (chatSessionId && currentUser) {
+        reportUserTyping(false);
+        try {
+          fetch('/api/db/mutate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'setDoc',
+              path: 'chats',
+              id: chatSessionId,
+              data: { isUserTyping: false, userTypingAt: null },
+              options: { merge: true }
+            }),
+            keepalive: true
+          });
+        } catch (e) {
+          // ignore unload error
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleLeave);
+    window.addEventListener('pagehide', handleLeave);
+
     return () => {
+      window.removeEventListener('beforeunload', handleLeave);
+      window.removeEventListener('pagehide', handleLeave);
       if (userTypingTimeoutRef.current) clearTimeout(userTypingTimeoutRef.current);
       if (chatSessionId && currentUser) {
         reportUserTyping(false);
@@ -622,7 +669,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
                         {msg.text && (
                           <div 
                             className="whitespace-pre-wrap leading-relaxed" 
-                            dangerouslySetInnerHTML={{ __html: linkify(msg.text) }} 
+                            dangerouslySetInnerHTML={{ __html: formatChatMessage(msg.text) }} 
                           />
                         )}
                       </div>

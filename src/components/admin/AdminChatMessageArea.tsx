@@ -31,18 +31,37 @@ import { useToast } from "@/hooks/use-toast";
 import { cn, getTimestampMillis } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { CANONICAL_SUPPORT_ADMIN_UID } from './AdminUserListForChat';
+
 interface AdminChatMessageAreaProps {
   selectedUser: FirestoreUser | null;
+  selectedSessionId?: string | null;
 }
 
 const ADMIN_FALLBACK_AVATAR_INITIAL_CHAT_AREA = "S";
 
-const linkify = (text: string) => {
-    const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\bwww\.[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
-    return text.replace(urlRegex, (url) => {
-        const fullUrl = url.startsWith('www.') ? `http://${url}` : url;
-        return `<a href="${fullUrl}" target="_blank" rel="noopener noreferrer" class="text-primary font-medium underline hover:text-primary/80 transition-colors">${url}</a>`;
-    });
+// Function to format chat messages with clean markdown links, bold text, and clickable URLs
+const formatChatMessage = (text: string) => {
+  if (!text) return '';
+  // 1. Convert Markdown links: [Title](url) -> <a href="url">Title</a>
+  const mdLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+  let formatted = text.replace(mdLinkRegex, (_, title, url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-semibold underline text-primary hover:text-primary/80 transition-colors">${title}</a>`;
+  });
+
+  // 2. Convert Bold: **text** -> <strong>text</strong>
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+  // 3. Convert Strikethrough: ~~text~~ -> <del class="opacity-75">text</del>
+  formatted = formatted.replace(/~~([^~]+)~~/g, '<del class="opacity-75">$1</del>');
+
+  // 4. Auto-link remaining raw URLs that are not already inside href
+  const rawUrlRegex = /(?<!href="|href='|">)(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gi;
+  formatted = formatted.replace(rawUrlRegex, (url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-medium underline text-primary hover:text-primary/80 transition-colors">${url}</a>`;
+  });
+
+  return formatted;
 };
 
 export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageAreaProps) {
@@ -168,6 +187,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
       setDoc(sessionDocRef, {
         isAdminTyping: isTyping,
         adminTypingAt: isTyping ? Date.now() : null,
+        updatedAt: serverTimestamp(),
       }, { merge: true });
     } catch (e) {
       console.error("AdminChatMessageArea: Error reporting admin typing:", e);
@@ -201,7 +221,35 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
   };
 
   useEffect(() => {
+    const handleLeave = () => {
+      if (adminTypingTimeoutRef.current) clearTimeout(adminTypingTimeoutRef.current);
+      if (currentChatSessionId) {
+        reportAdminTyping(false);
+        try {
+          fetch('/api/db/mutate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'setDoc',
+              path: 'chats',
+              id: currentChatSessionId,
+              data: { isAdminTyping: false, adminTypingAt: null },
+              options: { merge: true }
+            }),
+            keepalive: true
+          });
+        } catch (e) {
+          // ignore unload error
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleLeave);
+    window.addEventListener('pagehide', handleLeave);
+
     return () => {
+      window.removeEventListener('beforeunload', handleLeave);
+      window.removeEventListener('pagehide', handleLeave);
       if (adminTypingTimeoutRef.current) clearTimeout(adminTypingTimeoutRef.current);
       if (currentChatSessionId) {
         reportAdminTyping(false);
@@ -511,7 +559,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
                         {msg.text && (
                           <div 
                             className="text-sm leading-relaxed whitespace-pre-wrap" 
-                            dangerouslySetInnerHTML={{ __html: linkify(msg.text) }}
+                            dangerouslySetInnerHTML={{ __html: formatChatMessage(msg.text) }}
                           />
                         )}
                         <span className={cn(
