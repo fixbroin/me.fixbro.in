@@ -198,7 +198,7 @@ export default function ProviderWalletPage() {
         key: appConfig.razorpayKeyId,
         amount: orderData.amount,
         currency: orderData.currency,
-        name: "FixBro",
+        name: "Wecanfix",
         description: "Provider Prepaid Wallet Top-up",
         order_id: orderData.id,
         handler: async function (response: any) {

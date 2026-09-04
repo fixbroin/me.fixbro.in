@@ -85,7 +85,7 @@ export default function ContactUsForm() {
               email: data.email,
               subject: data.phone ? `Phone: ${data.phone}` : 'Website Inquiry',
               message: data.message,
-              siteName: 'Fixbro'
+              siteName: 'Wecanfix'
             }
           }).catch(err => console.error("Error sending admin inquiry push:", err));
         }

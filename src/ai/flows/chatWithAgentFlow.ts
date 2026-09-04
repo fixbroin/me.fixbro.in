@@ -376,7 +376,7 @@ async function getGlobalSettings(): Promise<{ websiteName?: string }> {
     const docSnap = await adminDb.collection('webSettings').doc('global').get();
     if (docSnap.exists) return docSnap.data() as any;
   } catch (e) {}
-  return { websiteName: "Fixbro" };
+  return { websiteName: "Wecanfix" };
 }
 
 /* -------------------------
@@ -471,7 +471,7 @@ const chatAgentFlow = ai.defineFlow(
 
     const { name, email, bookings, adminId } = userData;
     const { categories, flatServiceList } = data;
-    const websiteName = globalSettings.websiteName || "Fixbro";
+    const websiteName = globalSettings.websiteName || "Wecanfix";
     const currencySymbol = appConfig?.currencySymbol || '₹';
 
     // 0) Check if AI Agent should be silent (Admin Takeover)
@@ -494,7 +494,7 @@ const chatAgentFlow = ai.defineFlow(
         await sendHumanSupportRequestEmail({
           userId,
           userName: name,
-          userEmail: email || 'not-provided@fixbro.in',
+          userEmail: email || 'wecanfix.in@gmail.com',
           lastMessage: msg,
           chatUrl: `${baseUrl}/admin/chat`,
           smtpHost: appConfig?.smtpHost,

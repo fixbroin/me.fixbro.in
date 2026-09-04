@@ -422,7 +422,7 @@ export default function ChatWindow({ onClose }: ChatWindowProps) {
           variables: {
             senderName: currentUser.displayName || currentUser.email || 'Customer',
             messageText: tempNewMessage,
-            siteName: 'Fixbro'
+            siteName: 'Wecanfix'
           }
         });
       }

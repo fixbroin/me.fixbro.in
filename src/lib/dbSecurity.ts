@@ -1,7 +1,7 @@
 import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 import { NextRequest } from 'next/server';
 
-const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET || "fixbro_internal_secret_j7K9R2pX_2026";
+const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET || "wecanfix_internal_secret_j7K9R2pX_2026";
 
 export interface RequestUser {
   uid: string;
@@ -73,7 +73,7 @@ export function isUserAdmin(user: RequestUser): boolean {
     user.role === 'staff' ||
     userEmail === ADMIN_EMAIL.toLowerCase() ||
     userEmail === 'wecanfix.in@gmail.com' ||
-    userEmail === 'fixbro.in@gmail.com' ||
+    userEmail === 'Wecanfix.in@gmail.com' ||
     false
   );
 }

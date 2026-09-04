@@ -145,7 +145,7 @@ export default function ReviewSubmissionModal({ booking, isOpen, onReviewSubmitt
                     serviceName: serviceToReview.name,
                     rating: data.rating,
                     comment: data.comment || '',
-                    siteName: 'Fixbro'
+                    siteName: 'Wecanfix'
                 }
             });
 

@@ -413,7 +413,7 @@ export default function CustomServiceRequestForm({
             customerName: user.displayName || user.email || 'Customer',
             serviceName: data.serviceTitle,
             preferredDate: data.preferredStartDate ? data.preferredStartDate.toLocaleDateString() : 'As soon as possible',
-            siteName: 'Fixbro'
+            siteName: 'Wecanfix'
           }
         });
 

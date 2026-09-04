@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
             });
 
             // Trigger post-processing (emails, stats, auto-dispatch, WhatsApp)
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://fixbro.in';
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://me.fixbro.in';
             fetch(`${appUrl}/api/bookings/post-process`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },

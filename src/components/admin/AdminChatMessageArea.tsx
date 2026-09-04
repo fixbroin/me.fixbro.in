@@ -375,7 +375,7 @@ export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageA
         variables: {
           senderName: supportAdminProfile.displayName || "Support",
           messageText: tempNewMessage,
-          siteName: "Fixbro"
+          siteName: "Wecanfix"
         }
       });
     } catch (error) {

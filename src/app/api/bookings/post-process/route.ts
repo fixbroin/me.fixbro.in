@@ -272,7 +272,7 @@ export async function POST(request: Request) {
                                 bookingId: booking.bookingId || "",
                                 providerName: pData.fullName || "Service Provider",
                                 customerName: booking.customerName || "Customer",
-                                siteName: seoSettings?.websiteName || "Fixbro"
+                                siteName: seoSettings?.websiteName || "Wecanfix"
                             }
                         }),
                     });
