@@ -20,9 +20,9 @@ export type GenerateBulkReviewsInput = z.infer<typeof GenerateBulkReviewsInputSc
 
 // Schema for a single generated review
 const GeneratedReviewSchema = z.object({
-  userName: z.string().describe("A realistic, common Indian name (e.g.,Srikanth Sachin Priya Sharma, Rohan Kumar)."),
+  userName: z.string().describe("A realistic Indian full name (e.g. Srikanth, Priya Sharma, Rohan Kumar)."),
   rating: z.number().min(3).max(5).describe("A rating between 4 and 5."),
-  comment: z.string().describe("A realistic, concise review comment (10-80 words). Comments should be a mix of very positive, moderately positive, and neutral tones. They should sound natural and authentic."),
+  comment: z.string().describe("A concise review comment (15-40 words) sounding natural and authentic."),
 });
 
 // Output schema for the flow
@@ -46,30 +46,21 @@ const generateReviewsPrompt = ai.definePrompt({
       }) 
     },
     output: { schema: GenerateBulkReviewsOutputSchema },
-    prompt: `You are an expert content generator for a home services website called "Wecanfix".
-Your task is to generate a batch of realistic customer reviews for a specific service.
-The reviews should sound authentic, use common Indian names, and have a mix of positive tones.
-
-Service Name: {{serviceName}}
-Category: {{categoryName}}
-Sub-Category: {{subCategoryName}}
+    prompt: `Expert review generator for home doorstep services.
+Generate authentic customer reviews for: {{serviceName}} ({{categoryName}} / {{subCategoryName}}).
 
 {{#if existingNames}}
-The following names are already used for existing reviews of this service. DO NOT use any of these names:
+Avoid these already used names:
 {{#each existingNames}}
 - {{this}}
 {{/each}}
 {{/if}}
 
-Please generate exactly {{numberOfReviews}} unique reviews with NEW, DIFFERENT common Indian names.
+Generate {{numberOfReviews}} unique reviews with common Indian names (mix of male and female).
+Ratings: mostly 4-5 stars.
+Comments: concise, natural (15-40 words).
 
-For each review, provide:
-1.  **userName**: A plausible, common Indian name (mix of male and female names). Ensure it is NOT in the excluded list above.
-2.  **rating**: An integer rating between 4 and 5. The distribution should be mostly 4s and 5s, with a few 3s.
-3.  **comment**: A short, natural-sounding review comment between 10 and 80 words. The tone should vary (e.g., "Good work.", "Very professional and quick service!", "Satisfied with the job, but was a bit late.").
-
-Return the entire response as a single, valid JSON object that adheres to the defined output schema.
-`,
+Return ONLY valid JSON.`,
 });
 
 const generateBulkReviewsFlow = ai.defineFlow(

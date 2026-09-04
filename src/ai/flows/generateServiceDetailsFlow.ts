@@ -10,41 +10,42 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { cleanSeoString, truncateSeoString } from '@/lib/seoAdvancedUtils';
+import { cleanSeoString, truncateSeoString, stripBrandSuffix } from '@/lib/seoAdvancedUtils';
 
 const GenerateServiceDetailsInputSchema = z.object({
-  serviceName: z.string().describe("The name of the home service, e.g., 'AC Deep Cleaning' or 'Leaky Faucet Repair'."),
-  categoryName: z.string().describe("The main category the service belongs to, e.g., 'Appliance Repair' or 'Plumbing'."),
-  subCategoryName: z.string().describe("The specific sub-category, e.g., 'AC Repair' or 'Bathroom Fittings'."),
+  serviceName: z.string().describe("The name of the home service, e.g., 'AC Deep Cleaning' or 'Door Lock Repair'."),
+  categoryName: z.string().describe("The main category the service belongs to, e.g., 'Carpentry' or 'Plumbing'."),
+  subCategoryName: z.string().describe("The specific sub-category, e.g., 'Door Fittings'."),
+  cityName: z.string().optional().describe("City name for localized SEO. Defaults to 'Bangalore' if not provided."),
 });
 export type GenerateServiceDetailsInput = z.infer<typeof GenerateServiceDetailsInputSchema>;
 
 const GenerateServiceDetailsOutputSchema = z.object({
-  shortDescription: z.string().describe("A concise, one-sentence description for the service card. Max 200 characters."),
-  fullDescription: z.string().describe("A slightly longer, one-paragraph marketing description for the service detail page. Highlight key benefits like speed, quality, and professionalism. MUST BE UNDER 300 characters."),
-  pleaseNote: z.array(z.string()).describe("An array of 2-4 important notes or disclaimers for the customer."),
-  imageHint: z.string().describe("One or two keywords for an AI image search for the service's main image. E.g., 'plumber fixing' or 'clean kitchen'. Max 50 characters."),
-  serviceHighlights: z.array(z.string()).describe("An array of 3-5 short, punchy strings highlighting key features or benefits of the service."),
-  includedItems: z.array(z.string()).describe("An array of 3-5 strings listing what is included in the service package."),
-  excludedItems: z.array(z.string()).describe("An array of 2-4 strings listing what is NOT included in the service package."),
+  shortDescription: z.string().describe("A concise, one-sentence description for the service card. Max 180 characters."),
+  fullDescription: z.string().describe("A comprehensive marketing description for the service detail page highlighting benefits, verified experts, and quality guarantee. Under 280 characters."),
+  pleaseNote: z.array(z.string()).describe("2-3 important notes or disclaimers for the customer."),
+  imageHint: z.string().describe("One or two keywords for image search. Max 40 characters."),
+  serviceHighlights: z.array(z.string()).describe("3-4 punchy strings highlighting key benefits."),
+  includedItems: z.array(z.string()).describe("3-4 strings listing what is included in the service."),
+  excludedItems: z.array(z.string()).describe("2-3 strings listing what is NOT included in the service."),
   taskTime: z.object({
-    value: z.number().describe("The estimated time value to complete the task."),
-    unit: z.enum(['minutes', 'hours']).describe("The unit of time for the value."),
-  }).describe("An estimated time for how long the service task takes."),
+    value: z.number().describe("Estimated task time value."),
+    unit: z.enum(['minutes', 'hours']).describe("Time unit."),
+  }),
   serviceFaqs: z.array(
     z.object({
-      question: z.string().describe("A frequently asked question about the service. Frame it to capture voice search intent (e.g., 'How much does it cost to...')."),
-      answer: z.string().describe("A clear, helpful, and localized answer to the question."),
+      question: z.string().describe("Voice-search question about price, timeframe, or doorstep availability."),
+      answer: z.string().describe("Clear, helpful localized answer."),
     })
-  ).describe("An array of 3-4 frequently asked questions. These are crucial for 'People Also Ask' rich snippets on Google."),
+  ).describe("3-4 high-intent local FAQs for Google 'People Also Ask' snippets."),
   seo: z.object({
-    h1_title: z.string().describe("An H1 title for the service page."),
-    seo_title: z.string().describe("An SEO-optimized meta title, under 60 characters."),
-    seo_description: z.string().describe("An SEO-optimized meta description, under 160 characters."),
-    seo_keywords: z.string().describe("A comma-separated string of 10 relevant SEO keywords."),
-  }).describe("SEO related content for the service page."),
-  rating: z.coerce.number().min(4.5).max(5).describe("A random rating between 4.5 and 5.0, with one decimal place (e.g., 4.8, 4.9) to boost click-through rates."),
-  reviewCount: z.coerce.number().int().min(150).max(1500).describe("A random integer review count between 150 and 1500."),
+    h1_title: z.string().describe("H1 title, e.g. '{{serviceName}} in {{cityName}}'."),
+    seo_title: z.string().describe("Meta title strictly 35-48 characters. NEVER include company name (template appends it). Use '{{serviceName}} in {{cityName}} | Near Me'."),
+    seo_description: z.string().describe("Meta description under 155 characters featuring '{{serviceName}} in {{cityName}} near you', verified pros, and 'Book online!'."),
+    seo_keywords: z.string().describe("10 comma-separated keywords with city and 'near me' intent."),
+  }),
+  rating: z.coerce.number().min(4.7).max(5).describe("Rating between 4.7 and 5.0."),
+  reviewCount: z.coerce.number().int().min(120).max(950).describe("Realistic review count."),
 });
 export type GenerateServiceDetailsOutput = z.infer<typeof GenerateServiceDetailsOutputSchema>;
 
@@ -56,29 +57,22 @@ const prompt = ai.definePrompt({
   name: 'generateServiceDetailsPrompt',
   input: { schema: GenerateServiceDetailsInputSchema },
   output: { schema: GenerateServiceDetailsOutputSchema },
-  prompt: `You are an expert Local SEO copywriter for "Wecanfix", Bangalore's leading home services company.
-Your goal is to generate high-conversion content and SEO metadata for a specific service.
+  prompt: `Expert Local SEO Copywriter for Home Services.
+Generate high-conversion content and local SEO metadata.
 
-Service Name: {{serviceName}}
+Service: {{serviceName}}
 Category: {{categoryName}}
 Sub-Category: {{subCategoryName}}
+Target City: {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}}
 
-**STRATEGIC SEO GUIDELINES:**
-1. **Avoid Repetitive Phrasing**: Do not use "{{serviceName}}" excessively. If the service name is "AC Repair", avoid "Professional AC Repair Services for AC Repair". Use "Expert AC Maintenance" or "Trusted Cooling Solutions".
-2. **Local Authority**: Naturally integrate "Bangalore" and neighborhoods like Indiranagar, HSR Layout, or Electronic City.
-3. **Rich Snippets**: FAQs should be phrased for voice search (e.g., "How long does AC service take in Bangalore?").
-4. **Aggressive SEO**: Use high-intent modifiers: "Best", "Top-Rated", "Verified Pros", "Upfront Pricing", "Same-Day Service".
+RULES:
+1. NEVER include brand/company names (like "Wecanfix", "Fixbro") in seo.seo_title. The website template automatically appends it.
+2. seo.seo_title MUST be strictly between 35 and 48 characters. Structure: "{{serviceName}} in {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}} | Near Me".
+3. seo.seo_description MUST be under 155 characters: "Book trusted {{serviceName}} in {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}} near you. Verified pros, upfront pricing & same-day visit. Book now!".
+4. seo.seo_keywords MUST be 10 high-intent phrases: "{{serviceName}} near me, {{serviceName}} {{#if cityName}}{{cityName}}{{else}}Bangalore{{/if}}, best {{serviceName}} near me, doorstep {{serviceName}} near you, etc.".
+5. FAQs must address realistic customer questions: visiting charges, service warranty, same-day doorstep availability.
 
-**OUTPUT INSTRUCTIONS:**
-- **shortDescription**: Concise, mentions Bangalore.
-- **fullDescription**: Marketing-heavy, highlights reliability and Bangalore coverage. Under 300 chars.
-- **serviceFaqs**: 3-4 Q&As localized for Bangalore.
-- **seo.h1_title**: Dynamic and strong. E.g., "Expert {{serviceName}} Services in Bangalore".
-- **seo.seo_title**: Catchy, under 60 chars. E.g., "{{serviceName}} in Bangalore | Best Prices & Verified Pros".
-- **seo.seo_description**: Compelling summary under 160 chars.
-
-Return the entire response as a single, valid JSON object.
-`,
+Return ONLY valid JSON.`,
 });
 
 const generateServiceDetailsFlow = ai.defineFlow(
@@ -88,22 +82,24 @@ const generateServiceDetailsFlow = ai.defineFlow(
     outputSchema: GenerateServiceDetailsOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
+    const cityName = input.cityName || 'Bangalore';
+    const { output } = await prompt({ ...input, cityName });
     if (!output) {
       throw new Error("AI failed to generate a valid response.");
     }
 
-    // Clean SEO strings to ensure no redundant words
+    const cleanTitle = stripBrandSuffix(cleanSeoString(output.seo.seo_title));
+
     return {
       ...output,
       seo: {
         h1_title: cleanSeoString(output.seo.h1_title),
-        seo_title: truncateSeoString(cleanSeoString(output.seo.seo_title), 60),
-        seo_description: truncateSeoString(cleanSeoString(output.seo.seo_description), 160),
-        seo_keywords: output.seo.seo_keywords,
+        seo_title: truncateSeoString(cleanTitle, 48),
+        seo_description: truncateSeoString(cleanSeoString(output.seo.seo_description), 155),
+        seo_keywords: cleanSeoString(output.seo.seo_keywords),
       },
-      shortDescription: truncateSeoString(cleanSeoString(output.shortDescription), 200),
-      fullDescription: truncateSeoString(cleanSeoString(output.fullDescription), 300),
+      shortDescription: truncateSeoString(cleanSeoString(output.shortDescription), 180),
+      fullDescription: truncateSeoString(cleanSeoString(output.fullDescription), 280),
     };
   }
 );
