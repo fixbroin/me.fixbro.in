@@ -408,6 +408,7 @@ export async function POST(request: Request) {
                     stats.cashCollected += extraCharges;
                     stats.cashCommission += extraCommission;
                     stats.cashNet = (stats.cashNet || 0) + Math.max(0, extraCharges - extraCommission);
+                    stats.extraCharges = (stats.extraCharges || 0) + extraCharges;
                 }
             }
             

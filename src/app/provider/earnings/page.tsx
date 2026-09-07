@@ -50,7 +50,7 @@ export default function ProviderEarningsPage() {
     // Default to zero if stats don't exist yet
     const stats = (firestoreUser?.monthlyStats?.monthKey === monthKey) 
         ? firestoreUser.monthlyStats 
-        : { gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0, cashNet: 0, onlineGross: 0, onlineCommission: 0 };
+        : { gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0, cashNet: 0, onlineGross: 0, onlineCommission: 0, extraCharges: 0 };
 
     const currentBalance = firestoreUser?.withdrawableBalance || 0;
     
@@ -113,7 +113,8 @@ export default function ProviderEarningsPage() {
             cashCommission: 0, 
             cashNet: 0,
             onlineGross: 0,
-            onlineCommission: 0
+            onlineCommission: 0,
+            extraCharges: 0
         };
         
         bookingsSnap.docs.forEach(d => {
@@ -160,6 +161,7 @@ export default function ProviderEarningsPage() {
                         mStats.cashCollected += extraCharges;
                         mStats.cashCommission += extraCommission;
                         mStats.cashNet += Math.max(0, extraCharges - extraCommission);
+                        mStats.extraCharges = (mStats.extraCharges || 0) + extraCharges;
                     }
                 }
             }
@@ -226,16 +228,7 @@ export default function ProviderEarningsPage() {
               <CardDescription>Performance summary for {earningsData.monthName}.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-8 text-xs flex items-center gap-1.5 hover:bg-primary/10 border-primary/20 text-primary"
-                  onClick={handleSyncBalance}
-                  disabled={isSyncing}
-                >
-                  <RefreshCw className={cn("h-3.5 w-3.5", isSyncing && "animate-spin")} />
-                  <span>{isSyncing ? "Syncing..." : "Sync Balance"}</span>
-                </Button>
+                
                 <Badge variant="outline" className="px-3 py-1 bg-primary/5 text-primary border-primary/20 font-bold uppercase tracking-tighter">
                 {earningsData.monthName}
                 </Badge>
