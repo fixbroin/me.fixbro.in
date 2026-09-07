@@ -518,6 +518,7 @@ export default function ProviderBookingDetailsPage() {
           isOpen={isCompleteDialogOpen}
           onClose={() => setIsCompleteDialogOpen(false)}
           onConfirm={(charges, pMethod) => updateBookingStatus('Completed', charges, pMethod)}
+          booking={booking}
           originalAmount={booking.totalAmount}
           currentPaymentMethod={booking.paymentMethod || "Cash"}
           isProcessing={isProcessingAction}

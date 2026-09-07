@@ -14,6 +14,7 @@ import { Plus, Trash2, IndianRupee, CheckCircle2, Loader2, CreditCard } from "lu
 import { Separator } from "@/components/ui/separator";
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { formatCurrency } from '@/lib/utils';
+import type { FirestoreBooking } from '@/types/firestore';
 
 interface AdditionalCharge {
   name: string;
@@ -24,6 +25,7 @@ interface CompleteBookingDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (charges: AdditionalCharge[], paymentMethod: string) => void;
+  booking?: FirestoreBooking | null;
   originalAmount: number;
   currentPaymentMethod: string;
   isProcessing: boolean;
@@ -34,6 +36,7 @@ export default function CompleteBookingDialog({
   isOpen, 
   onClose, 
   onConfirm, 
+  booking,
   originalAmount,
   currentPaymentMethod,
   isProcessing,
@@ -44,7 +47,9 @@ export default function CompleteBookingDialog({
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? appConfig.currencyDecimalPoints : 2;
   const code = appConfig?.currencyCode || 'INR';
   const [charges, setCharges] = useState<AdditionalCharge[]>([]);
-  const isPrepaidOnline = currentPaymentMethod?.toLowerCase() === 'online';
+  
+  const paymentMethodName = booking?.paymentMethod || currentPaymentMethod || 'Cash';
+  const isPrepaidOnline = paymentMethodName.toLowerCase() === 'online';
   const [paymentMethod, setPaymentMethod] = useState(isPrepaidOnline ? "Online" : "Cash");
 
   const addCharge = () => {
@@ -66,7 +71,22 @@ export default function CompleteBookingDialog({
   };
 
   const additionalTotal = charges.reduce((sum, c) => sum + c.amount, 0);
-  const finalTotal = originalAmount + additionalTotal;
+
+  // Financial components from booking (matching ProviderJobCard logic)
+  const subTotal = booking ? (booking.subTotal || 0) : originalAmount;
+  const visitingCharge = booking?.visitingCharge || 0;
+  const discountAmount = booking?.discountAmount || 0;
+  const platformFeeTotal = booking?.platformFeeTotal || 0;
+  const taxAmount = booking?.taxAmount || 0;
+
+  // Gross service amount for provider (Service + Visiting - Discount)
+  const providerGross = subTotal + visitingCharge - discountAmount;
+
+  // Total cash to collect
+  // For online paid: Customer already paid online, so provider collects ONLY additional extra charges!
+  // For cash: Provider collects full total (booking totalAmount + additional extra charges)
+  const finalCashTotal = isPrepaidOnline ? additionalTotal : ((booking?.totalAmount || originalAmount) + additionalTotal);
+  const adminFinalTotal = (booking?.totalAmount || originalAmount) + additionalTotal;
 
   const handleConfirm = () => {
     const validCharges = charges.filter(c => c.name.trim() !== "" && c.amount > 0);
@@ -147,21 +167,124 @@ export default function CompleteBookingDialog({
 
           {/* Summary Box */}
           <div className="bg-primary/5 p-4 rounded-2xl space-y-2 border border-primary/10">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Original Booking:</span>
-              <span className="font-semibold text-foreground">{formatCurrency(originalAmount, symbol, decimals, code)}</span>
-            </div>
-            {additionalTotal > 0 && (
+            {isAdmin ? (
+              // Admin View
+              <>
                 <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Original Booking:</span>
+                  <span className="font-semibold text-foreground">{formatCurrency(originalAmount, symbol, decimals, code)}</span>
+                </div>
+                {additionalTotal > 0 && (
+                  <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Extra Charges:</span>
                     <span className="font-semibold text-green-600">+ {formatCurrency(additionalTotal, symbol, decimals, code)}</span>
+                  </div>
+                )}
+                <Separator className="my-1 opacity-50" />
+                <div className="flex justify-between text-xl font-black text-primary">
+                  <span>Final Total:</span>
+                  <span>{formatCurrency(adminFinalTotal, symbol, decimals, code)}</span>
                 </div>
+              </>
+            ) : isPrepaidOnline ? (
+              // Online Paid Provider View (Zero platform fee, original already paid, collect only extra charges)
+              <div className="space-y-1.5 text-xs sm:text-sm">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Service Amount:</span>
+                  <span className="font-medium text-foreground">
+                    {formatCurrency(booking ? providerGross : originalAmount, symbol, decimals, code)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-green-700 font-semibold bg-green-50 p-2 rounded-lg border border-green-200">
+                  <span>Payment Status:</span>
+                  <span>✓ Paid Online by Customer</span>
+                </div>
+
+                {additionalTotal > 0 && (
+                  <div className="flex justify-between text-green-600 font-semibold pt-1 border-t border-dashed">
+                    <span>Extra Charges Added:</span>
+                    <span>+ {formatCurrency(additionalTotal, symbol, decimals, code)}</span>
+                  </div>
+                )}
+
+                <Separator className="my-1.5 opacity-50" />
+                <div className="flex justify-between text-base sm:text-lg font-black text-primary">
+                  <span>Total Cash to Collect:</span>
+                  <span>{formatCurrency(additionalTotal, symbol, decimals, code)}</span>
+                </div>
+                {additionalTotal > 0 ? (
+                  <p className="text-[11px] text-muted-foreground leading-tight pt-1">
+                    Collect only the extra charges from the customer. Applicable platform commission on extra work will be auto-deducted from your wallet.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-green-700 font-medium leading-tight">
+                    Entire payment completed online. No cash collection required from customer.
+                  </p>
+                )}
+              </div>
+            ) : (
+              // Cash / Pay After Service Provider View (Separated itemized breakdown matching Job Card)
+              <div className="space-y-1 text-xs sm:text-sm">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Service Charge:</span>
+                  <span className="font-semibold text-foreground">
+                    {formatCurrency(booking ? subTotal : originalAmount, symbol, decimals, code)}
+                  </span>
+                </div>
+
+                {booking && visitingCharge > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Visiting Charge:</span>
+                    <span className="font-semibold text-foreground">
+                      + {formatCurrency(visitingCharge, symbol, decimals, code)}
+                    </span>
+                  </div>
+                )}
+
+                {booking && platformFeeTotal > 0 && (
+                  <div className="flex justify-between text-amber-600">
+                    <span>Platform Fee (Collect in Cash):</span>
+                    <span className="font-bold">
+                      + {formatCurrency(platformFeeTotal, symbol, decimals, code)}
+                    </span>
+                  </div>
+                )}
+
+                {booking && taxAmount > 0 && (
+                  <div className="flex justify-between text-amber-600">
+                    <span>Tax (Collect in Cash):</span>
+                    <span className="font-bold">
+                      + {formatCurrency(taxAmount, symbol, decimals, code)}
+                    </span>
+                  </div>
+                )}
+
+                {booking && discountAmount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Discount:</span>
+                    <span className="font-semibold">
+                      - {formatCurrency(discountAmount, symbol, decimals, code)}
+                    </span>
+                  </div>
+                )}
+
+                {additionalTotal > 0 && (
+                  <div className="flex justify-between text-green-600 font-semibold pt-1 border-t border-dashed">
+                    <span>Extra Charges:</span>
+                    <span>+ {formatCurrency(additionalTotal, symbol, decimals, code)}</span>
+                  </div>
+                )}
+
+                <Separator className="my-1.5 opacity-50" />
+                <div className="flex justify-between text-base sm:text-lg font-black text-primary">
+                  <span>Total Cash to Collect:</span>
+                  <span>{formatCurrency(finalCashTotal, symbol, decimals, code)}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-tight pt-0.5">
+                  Collect total cash from the customer. Platform fee, tax, and commission will be settled via your wallet.
+                </p>
+              </div>
             )}
-            <Separator className="my-1 opacity-50" />
-            <div className="flex justify-between text-xl font-black text-primary">
-              <span>Final Total:</span>
-              <span>{formatCurrency(finalTotal, symbol, decimals, code)}</span>
-            </div>
           </div>
         </div>
 
