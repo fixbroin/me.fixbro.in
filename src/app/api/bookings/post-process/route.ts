@@ -8,7 +8,7 @@ import { sendProviderBookingAssignmentEmail } from '@/ai/flows/sendProviderBooki
 import { getBaseUrl } from '@/lib/config';
 import { generateInvoicePdf } from '@/lib/invoiceGenerator';
 import { triggerRefresh } from '@/lib/revalidateUtils';
-import { getZonedDate, formatScheduledDate } from '@/lib/utils';
+import { getZonedDate, formatScheduledDate, isCashPayment } from '@/lib/utils';
 import { getHaversineDistance } from '@/lib/locationUtils';
 
 // Define ADMIN_EMAIL - should match your AuthContext
@@ -322,15 +322,6 @@ export async function POST(request: Request) {
     }
 
     // --- NEW: Update Provider's withrawableBalance and System Stats on Completion ---
-    const isCashPayment = (method: string) => {
-        if (!method) return true;
-        const lower = method.toLowerCase();
-        return lower === 'cash' || 
-               lower === 'pay after service' || 
-               lower === 'cash on delivery' || 
-               lower === 'cod' || 
-               lower === 'offline';
-    };
     if (isCompleted && booking.providerId) {
         const calculateProviderFee = (bookingAmount: number, feeType?: string, feeValue?: number): number => {
             if (!feeType || !feeValue || feeValue <= 0) return 0;
@@ -364,11 +355,11 @@ export async function POST(request: Request) {
             const timezone = appConfig.timezone || 'Asia/Kolkata';
             const now = getZonedDate(new Date(), timezone);
             const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            let stats = providerData?.monthlyStats || { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0, cashNet: 0, onlineGross: 0, onlineCommission: 0 };
+            let stats = providerData?.monthlyStats || { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0, cashNet: 0, onlineGross: 0, onlineCommission: 0, extraCharges: 0 };
             
             // Reset if it's a new month
             if (stats.monthKey !== monthKey) {
-                stats = { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0, cashNet: 0, onlineGross: 0, onlineCommission: 0 };
+                stats = { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0, cashNet: 0, onlineGross: 0, onlineCommission: 0, extraCharges: 0 };
             }
 
             let balanceChange = 0;
@@ -382,6 +373,9 @@ export async function POST(request: Request) {
                 stats.cashCollected += (booking.totalAmount || totalBookingGross);
                 stats.cashCommission += commission;
                 stats.cashNet = (stats.cashNet || 0) + cashNet;
+                if (extraCharges > 0) {
+                    stats.extraCharges = (stats.extraCharges || 0) + extraCharges;
+                }
             } else {
                 // Customer prepaid online for base service
                 const onlineGross = baseGross;

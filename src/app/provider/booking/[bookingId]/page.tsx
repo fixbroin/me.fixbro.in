@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useLoading } from '@/contexts/LoadingContext';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
-import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, cn } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, cn, isCashPayment } from '@/lib/utils';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import { logUserActivity } from '@/lib/activityLogger';
@@ -64,8 +64,8 @@ export default function ProviderBookingDetailsPage() {
     if (feeType === 'percentage') return (amount * feeVal) / 100;
     return feeVal;
   };
-  const paymentMethod = booking?.paymentMethod || 'Cash';
-  const isCash = paymentMethod.toLowerCase() === 'pay after service';
+  const paymentMethod = booking?.paymentMethod || 'Pay After Service';
+  const isCash = isCashPayment(paymentMethod);
   const providerGross = (booking?.subTotal || 0) + (booking?.visitingCharge || 0) - (booking?.discountAmount || 0);
   const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (booking?.platformFeeTotal || 0) + (booking?.taxAmount || 0)) : 0;
   const isLowBalance = booking && providerWalletBalance !== null && minBalanceForJobs !== null ? (booking.status === 'AssignedToProvider' || booking.status === 'Rescheduled') && 
@@ -437,7 +437,7 @@ export default function ProviderBookingDetailsPage() {
                       </p>
                     ) : (
                       <p>
-                        <strong>Cash Collection:</strong> Total <strong>{symbol}{displayTotal.toFixed(decimals)}</strong> (including {symbol}{extraChargesTotal.toFixed(decimals)} additional charges) collected in cash by you.
+                        <strong>Pay After Service:</strong> Total <strong>{symbol}{displayTotal.toFixed(decimals)}</strong> (including {symbol}{extraChargesTotal.toFixed(decimals)} additional charges) collected by you.
                       </p>
                     )}
                   </div>
@@ -534,7 +534,7 @@ export default function ProviderBookingDetailsPage() {
           onConfirm={(charges, pMethod) => updateBookingStatus('Completed', charges, pMethod)}
           booking={booking}
           originalAmount={booking.totalAmount}
-          currentPaymentMethod={booking.paymentMethod || "Cash"}
+          currentPaymentMethod={booking.paymentMethod || "Pay After Service"}
           isProcessing={isProcessingAction}
         />
       )}

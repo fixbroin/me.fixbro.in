@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Loader2, DollarSign, PackageSearch, HandCoins, Banknote, AlertTriangle, RefreshCw } from "lucide-react";
-import { cn, getTimestampMillis } from '@/lib/utils';
+import { cn, getTimestampMillis, isCashPayment } from '@/lib/utils';
 import type { FirestoreBooking, ProviderFeeType, FirestoreUser, WithdrawalRequest } from '@/types/firestore';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, orderBy, doc, getDoc, getDocs, Timestamp } from '@/lib/mysqlDb';
@@ -22,12 +22,6 @@ const calculateProviderFee = (bookingAmount: number, feeType?: ProviderFeeType, 
     if (feeType === 'fixed') return feeValue;
     if (feeType === 'percentage') return (bookingAmount * feeValue) / 100;
     return 0;
-};
-
-const isCashPayment = (method: string) => {
-    if (!method) return false;
-    const lower = method.toLowerCase();
-    return lower === 'pay after service';
 };
 
 export default function ProviderEarningsPage() {
@@ -78,6 +72,7 @@ export default function ProviderEarningsPage() {
         monthlyOnlineGross: onlineGross,
         monthlyOnlineCommission: onlineCommission,
         monthlyCashNet: stats.cashNet || 0,
+        monthlyExtraCharges: stats.extraCharges || 0,
         balanceCarriedForward,
         lifetimePaidOut: firestoreUser?.totalPaidOut || 0,
         withdrawableBalance: currentBalance,
@@ -135,6 +130,9 @@ export default function ProviderEarningsPage() {
                     mStats.cashCollected += (b.totalAmount || totalBookingGross);
                     mStats.cashCommission += commission;
                     mStats.cashNet += cashNet;
+                    if (extraCharges > 0) {
+                        mStats.extraCharges = (mStats.extraCharges || 0) + extraCharges;
+                    }
                 }
             } else {
                 // Online Payment: baseGross was paid online, extraCharges collected in cash on-site
@@ -292,6 +290,13 @@ export default function ProviderEarningsPage() {
                         <span>Online Jobs Net Earnings <span className="text-[10px] text-muted-foreground ml-1">(Your share after fee)</span></span>
                         <span className="font-semibold">+ {symbol}{earningsData.monthlyOnlineNet.toFixed(decimals)}</span>
                     </div>
+
+                    {earningsData.monthlyExtraCharges > 0 && (
+                        <div className="flex justify-between items-center py-1 border-b border-dashed text-amber-600">
+                            <span>Additional Charges <span className="text-[10px] text-muted-foreground ml-1">(Collected in cash by you)</span></span>
+                            <span className="font-semibold">+ {symbol}{earningsData.monthlyExtraCharges.toFixed(decimals)}</span>
+                        </div>
+                    )}
 
                     <div className="flex justify-between items-center py-1 border-b border-dashed text-destructive">
                         <span>Payouts requested this month</span>

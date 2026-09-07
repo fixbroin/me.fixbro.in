@@ -10,7 +10,7 @@ import type { FirestoreBooking } from '@/types/firestore';
 import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/contexts/LoadingContext';
 import AppImage from '@/components/ui/AppImage';
-import { formatDateInTimezone, formatTimeInTimezone, cn } from '@/lib/utils';
+import { formatDateInTimezone, formatTimeInTimezone, cn, isCashPayment } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 interface ProviderJobCardProps {
@@ -98,8 +98,8 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
     return feeVal;
   };
 
-  const paymentMethod = job.paymentMethod || 'Cash';
-  const isCash = paymentMethod.toLowerCase() === 'pay after service';
+  const paymentMethod = job.paymentMethod || 'Pay After Service';
+  const isCash = isCashPayment(paymentMethod);
   const providerGross = (job.subTotal || 0) + (job.visitingCharge || 0) - (job.discountAmount || 0);
   const requiredCommission = isCash ? (getCommission(providerGross, providerFeeType, providerFeeValue) + (job.platformFeeTotal || 0) + (job.taxAmount || 0)) : 0;
   const isLowBalance = (type === 'new' || job.status === 'AssignedToProvider') && 
@@ -216,13 +216,13 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
           )}
           {isCash && job.platformFeeTotal !== undefined && job.platformFeeTotal > 0 && (
             <p className="text-xs text-muted-foreground flex justify-between text-amber-600">
-              <span>Platform Fee (Collect in Cash):</span>
+              <span>Platform Fee (Collect from Customer):</span>
               <span className="font-bold">+{symbol}{(job.platformFeeTotal || 0).toFixed(decimals)}</span>
             </p>
           )}
           {isCash && job.taxAmount !== undefined && job.taxAmount > 0 && (
             <p className="text-xs text-muted-foreground flex justify-between text-amber-600">
-              <span>Tax (Collect in Cash):</span>
+              <span>Tax (Collect from Customer):</span>
               <span className="font-bold">+{symbol}{(job.taxAmount || 0).toFixed(decimals)}</span>
             </p>
           )}
@@ -242,7 +242,7 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
                 </span>
               ) : (
                 <span>
-                  <strong>Cash Collection:</strong> Total <strong>{symbol}{displayTotal.toFixed(decimals)}</strong> (including {symbol}{extraChargesTotal.toFixed(decimals)} additional charges) collected in cash by you.
+                  <strong>Pay After Service:</strong> Total <strong>{symbol}{displayTotal.toFixed(decimals)}</strong> (including {symbol}{extraChargesTotal.toFixed(decimals)} additional charges) collected by you.
                 </span>
               )}
             </div>

@@ -48,6 +48,21 @@ export function getTimestampMillis(ts: any): number {
 }
 
 /**
+ * Checks whether a booking payment method represents Pay After Service
+ * (collected directly by the provider on-site).
+ * FixBro has only two payment methods:
+ * 1. "Online" (Customer paid online via Razorpay/Stripe)
+ * 2. "Pay After Service" (Provider collects payment on-site)
+ */
+export function isCashPayment(method?: string): boolean {
+  if (!method) return true;
+  const lower = method.toLowerCase().trim();
+  return lower !== 'online';
+}
+
+export const isPayAfterService = isCashPayment;
+
+/**
  * Returns a Date object shifted to represent the target timezone's local time.
  * Useful for "now" calculations on servers with different default timezones.
  * It uses a component-based approach which is much more reliable than string parsing.
