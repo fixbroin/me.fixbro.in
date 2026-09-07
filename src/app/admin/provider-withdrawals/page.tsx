@@ -726,7 +726,7 @@ export default function ProviderWithdrawalsPage() {
               ) : (                <>
                   <div className="hidden lg:block overflow-x-auto">
                     <Table>
-                      <TableHeader><TableRow><TableHead>Provider</TableHead><TableHead>Month Gross</TableHead><TableHead>Month Net (Online)</TableHead><TableHead>Additional Charges</TableHead><TableHead>Withdrawable Balance</TableHead><TableHead>Lifetime Paid</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                      <TableHeader><TableRow><TableHead>Provider</TableHead><TableHead>Month Gross</TableHead><TableHead>Month Net (Online)</TableHead><TableHead>Cash Collected</TableHead><TableHead>Additional Charges</TableHead><TableHead>Withdrawable Balance</TableHead><TableHead>Lifetime Paid</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                       <TableBody>
                         {providers.map(p => {
                            const now = new Date();
@@ -735,16 +735,18 @@ export default function ProviderWithdrawalsPage() {
                            const onlineNet = stats?.onlineNet !== undefined 
                              ? stats.onlineNet 
                              : Math.max(0, (stats?.gross || 0) - (stats?.commission || 0) - (stats?.cashCollected || 0));
+                           const cashCollected = stats?.cashCollected || 0;
                            const extraCharges = stats?.extraCharges !== undefined 
                              ? stats.extraCharges 
-                             : (stats?.cashCollected || 0);
+                             : 0;
 
                            return (
                            <TableRow key={p.uid}>
                               <TableCell><div className="font-medium">{p.displayName}</div><div className="text-xs text-muted-foreground">{p.email}</div></TableCell>
                               <TableCell className="text-xs font-semibold">{formatCurrency(stats?.gross || 0, symbol, decimals, code)}</TableCell>
                               <TableCell className="text-xs font-bold text-green-600">{formatCurrency(onlineNet, symbol, decimals, code)}</TableCell>
-                              <TableCell className="text-xs font-semibold text-amber-600">
+                              <TableCell className="text-xs font-semibold text-amber-600">{formatCurrency(cashCollected, symbol, decimals, code)}</TableCell>
+                              <TableCell className="text-xs font-semibold text-purple-600">
                                 {extraCharges > 0 ? `+${formatCurrency(extraCharges, symbol, decimals, code)}` : formatCurrency(0, symbol, decimals, code)}
                               </TableCell>
                               <TableCell>
@@ -819,9 +821,10 @@ export default function ProviderWithdrawalsPage() {
                       const onlineNet = stats?.onlineNet !== undefined 
                         ? stats.onlineNet 
                         : Math.max(0, (stats?.gross || 0) - (stats?.commission || 0) - (stats?.cashCollected || 0));
+                      const cashCollected = stats?.cashCollected || 0;
                       const extraCharges = stats?.extraCharges !== undefined 
                         ? stats.extraCharges 
-                        : (stats?.cashCollected || 0);
+                        : 0;
                       const balance = p.withdrawableBalance || 0;
 
                       return (
@@ -850,8 +853,12 @@ export default function ProviderWithdrawalsPage() {
                               <span className="font-bold text-green-600">{formatCurrency(onlineNet, symbol, decimals, code)}</span>
                             </div>
                             <div className="text-left">
+                              <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">Cash Collected</span>
+                              <span className="font-semibold text-amber-600">{formatCurrency(cashCollected, symbol, decimals, code)}</span>
+                            </div>
+                            <div className="text-left">
                               <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">Additional Charges</span>
-                              <span className="font-semibold text-amber-600">
+                              <span className="font-semibold text-purple-600">
                                 {extraCharges > 0 ? `+${formatCurrency(extraCharges, symbol, decimals, code)}` : formatCurrency(0, symbol, decimals, code)}
                               </span>
                             </div>
