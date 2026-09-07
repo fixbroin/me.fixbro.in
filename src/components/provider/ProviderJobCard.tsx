@@ -107,7 +107,8 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
   const isAccepted = job.status !== 'AssignedToProvider' && job.status !== 'Rescheduled';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
   const symbol = appConfig?.currencySymbol || "₹";
-  const displayTotal = isCash ? (job.totalAmount || 0) : providerGross;
+  const extraChargesTotal = (job.additionalCharges || []).reduce((sum, c) => sum + Number(c.amount || 0), 0);
+  const displayTotal = isCash ? (job.totalAmount || 0) : (providerGross + extraChargesTotal);
 
   const handleViewDetailsClick = async (e: React.MouseEvent) => {
     if (type === 'new' && onAccept) {
@@ -201,6 +202,18 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
               <span className="font-bold text-foreground">+{symbol}{(job.visitingCharge || 0).toFixed(decimals)}</span>
             </p>
           )}
+          {job.discountAmount !== undefined && job.discountAmount > 0 && (
+            <p className="text-xs text-muted-foreground flex justify-between text-emerald-600 font-semibold">
+              <span>Discount:</span>
+              <span className="font-bold">-{symbol}{job.discountAmount.toFixed(decimals)}</span>
+            </p>
+          )}
+          {extraChargesTotal > 0 && (
+            <p className="text-xs text-muted-foreground flex justify-between text-emerald-600 font-semibold">
+              <span>Extra Charges Added:</span>
+              <span className="font-bold">+{symbol}{extraChargesTotal.toFixed(decimals)}</span>
+            </p>
+          )}
           {isCash && job.platformFeeTotal !== undefined && job.platformFeeTotal > 0 && (
             <p className="text-xs text-muted-foreground flex justify-between text-amber-600">
               <span>Platform Fee (Collect in Cash):</span>
@@ -221,6 +234,19 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
             <span>Payment Method:</span>
             <span className="font-semibold text-foreground">{paymentMethod}</span>
           </p>
+          {extraChargesTotal > 0 && (
+            <div className="mt-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px] leading-snug">
+              {!isCash ? (
+                <span>
+                  <strong>Online Payment:</strong> {symbol}{providerGross.toFixed(decimals)} paid online. Additional charges of <strong>{symbol}{extraChargesTotal.toFixed(decimals)}</strong> collected in cash by you.
+                </span>
+              ) : (
+                <span>
+                  <strong>Cash Collection:</strong> Total <strong>{symbol}{displayTotal.toFixed(decimals)}</strong> (including {symbol}{extraChargesTotal.toFixed(decimals)} additional charges) collected in cash by you.
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {isLowBalance && (

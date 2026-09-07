@@ -356,41 +356,59 @@ export async function POST(request: Request) {
             const providerDoc = await transaction.get(providerDocRef);
             const providerData = providerDoc.exists ? providerDoc.data() : {};
             const currentWithdrawableBalance = providerData?.withdrawableBalance || 0;
-            const providerGross = (booking.subTotal || 0) + (booking.visitingCharge || 0) - (booking.discountAmount || 0);
-            const commission = calculateProviderFee(providerGross, appConfig.providerFeeType, appConfig.providerFeeValue);
+            const baseGross = (booking.subTotal || 0) + (booking.visitingCharge || 0) - (booking.discountAmount || 0);
+            const extraCharges = (booking.additionalCharges || []).reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
+            const totalBookingGross = baseGross + extraCharges;
             
             // Monthly Stats Logic using Configured Timezone
             const timezone = appConfig.timezone || 'Asia/Kolkata';
             const now = getZonedDate(new Date(), timezone);
             const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            let stats = providerData?.monthlyStats || { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
+            let stats = providerData?.monthlyStats || { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0, cashNet: 0, onlineGross: 0, onlineCommission: 0 };
             
             // Reset if it's a new month
             if (stats.monthKey !== monthKey) {
-                stats = { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0 };
+                stats = { monthKey, gross: 0, commission: 0, cashCollected: 0, withdrawals: 0, onlineNet: 0, cashCommission: 0, cashNet: 0, onlineGross: 0, onlineCommission: 0 };
             }
 
             let balanceChange = 0;
-            stats.gross += providerGross;
-            stats.commission += commission;
-
-            const extraCharges = (booking.additionalCharges || []).reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
-            const originalAmount = providerGross - extraCharges;
 
             if (isCashPayment(booking.paymentMethod)) {
+                const commission = calculateProviderFee(totalBookingGross, appConfig.providerFeeType, appConfig.providerFeeValue);
+                const cashNet = totalBookingGross - commission;
                 balanceChange = booking.commissionPaidFromWallet ? 0 : -commission;
-                stats.cashCollected += booking.totalAmount;
+                stats.gross += totalBookingGross;
+                stats.commission += commission;
+                stats.cashCollected += (booking.totalAmount || totalBookingGross);
                 stats.cashCommission += commission;
+                stats.cashNet = (stats.cashNet || 0) + cashNet;
             } else {
-                // Customer prepaid online, but extra charges are collected by provider on-site (Pay After Service)
-                const originalCommission = calculateProviderFee(originalAmount, appConfig.providerFeeType, appConfig.providerFeeValue);
-                const extraCommission = appConfig.providerFeeType === 'percentage' 
-                    ? calculateProviderFee(extraCharges, appConfig.providerFeeType, appConfig.providerFeeValue) 
-                    : (extraCharges * (appConfig.providerExtraFeePercentage || 0)) / 100;
-                balanceChange = originalAmount - originalCommission;
-                stats.cashCollected += extraCharges;
-                stats.cashCommission += extraCommission;
-                stats.onlineNet += (originalAmount - originalCommission);
+                // Customer prepaid online for base service
+                const onlineGross = baseGross;
+                const onlineCommission = calculateProviderFee(onlineGross, appConfig.providerFeeType, appConfig.providerFeeValue);
+                const onlineNet = onlineGross - onlineCommission;
+
+                const extraCommission = extraCharges > 0 
+                    ? (appConfig.providerFeeType === 'percentage' 
+                        ? calculateProviderFee(extraCharges, appConfig.providerFeeType, appConfig.providerFeeValue) 
+                        : (extraCharges * (appConfig.providerExtraFeePercentage || 0)) / 100)
+                    : 0;
+
+                // Withdrawable balance increases by provider's net share of the online payment
+                balanceChange = onlineNet;
+
+                // Monthly stats
+                stats.gross += totalBookingGross;
+                stats.commission += (onlineCommission + extraCommission);
+                stats.onlineGross = (stats.onlineGross || 0) + onlineGross;
+                stats.onlineCommission = (stats.onlineCommission || 0) + onlineCommission;
+                stats.onlineNet += onlineNet;
+
+                if (extraCharges > 0) {
+                    stats.cashCollected += extraCharges;
+                    stats.cashCommission += extraCommission;
+                    stats.cashNet = (stats.cashNet || 0) + Math.max(0, extraCharges - extraCommission);
+                }
             }
             
             transaction.set(providerDocRef, { 

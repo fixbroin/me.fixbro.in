@@ -72,7 +72,8 @@ export default function ProviderBookingDetailsPage() {
     providerWalletBalance < Math.max(minBalanceForJobs || 0, requiredCommission) : false;
   const isAccepted = booking?.status !== 'AssignedToProvider' && booking?.status !== 'Rescheduled';
   const decimals = appConfig?.currencyDecimalPoints !== undefined ? Number(appConfig.currencyDecimalPoints) : 2;
-  const displayTotal = isCash ? (booking?.totalAmount || 0) : providerGross;
+  const extraChargesTotal = (booking?.additionalCharges || []).reduce((sum, c) => sum + Number(c.amount || 0), 0);
+  const displayTotal = isCash ? (booking?.totalAmount || 0) : (providerGross + extraChargesTotal);
 
 
   const updateBookingStatus = async (newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
@@ -428,6 +429,19 @@ export default function ProviderBookingDetailsPage() {
                 {isCash && booking.taxAmount && booking.taxAmount > 0 && <p><strong>Tax:</strong> + {symbol}{booking.taxAmount.toFixed(decimals)}</p>}
                 <p className="font-bold text-lg text-primary mt-2"><strong>Total Amount:</strong> {symbol}{displayTotal.toFixed(decimals)}</p>
                 <p><strong>Payment Method:</strong> {booking.paymentMethod}</p>
+                {extraChargesTotal > 0 && (
+                  <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed">
+                    {!isCash ? (
+                      <p>
+                        <strong>Online Payment:</strong> {symbol}{providerGross.toFixed(decimals)} was paid online. Additional charges of <strong>{symbol}{extraChargesTotal.toFixed(decimals)}</strong> collected in cash by you.
+                      </p>
+                    ) : (
+                      <p>
+                        <strong>Cash Collection:</strong> Total <strong>{symbol}{displayTotal.toFixed(decimals)}</strong> (including {symbol}{extraChargesTotal.toFixed(decimals)} additional charges) collected in cash by you.
+                      </p>
+                    )}
+                  </div>
+                )}
              </div>
            </section>
 
