@@ -63,7 +63,8 @@ const TABLES = [
   'providerControlOptions',
   'adminCoupons',
   'services',
-  'adminTaxes'
+  'adminTaxes',
+  'adminCustomImages'
 ];
 
 /**
