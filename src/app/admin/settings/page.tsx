@@ -196,6 +196,8 @@ export default function AdminSettingsPage() {
   const [leaveReason, setLeaveReason] = useState("");
   const [leaveScope, setLeaveScope] = useState<'platform' | 'provider'>('platform');
   const [selectedLeaveProviderId, setSelectedLeaveProviderId] = useState("");
+  const [isProviderPickerOpen, setIsProviderPickerOpen] = useState(false);
+  const [providerSearch, setProviderSearch] = useState("");
   const [leavesFilterTab, setLeavesFilterTab] = useState<'all' | 'platform' | 'provider'>('all');
   const [approvedProviders, setApprovedProviders] = useState<{ id: string; fullName: string; workCategoryName?: string }[]>([]);
   const [isSavingLeave, setIsSavingLeave] = useState(false);
@@ -229,6 +231,19 @@ export default function AdminSettingsPage() {
     const search = currencySearch.toLowerCase().trim();
     return currenciesList.filter(c => c.code.toLowerCase().includes(search) || c.name.toLowerCase().includes(search));
   }, [currencySearch]);
+
+  const filteredApprovedProviders = useMemo(() => {
+    if (!providerSearch.trim()) return approvedProviders;
+    const q = providerSearch.toLowerCase().trim();
+    return approvedProviders.filter(p => 
+      p.fullName.toLowerCase().includes(q) || 
+      (p.workCategoryName && p.workCategoryName.toLowerCase().includes(q))
+    );
+  }, [approvedProviders, providerSearch]);
+
+  const selectedLeaveProvider = useMemo(() => {
+    return approvedProviders.find(p => p.id === selectedLeaveProviderId);
+  }, [approvedProviders, selectedLeaveProviderId]);
 
   // Scroll selected timezone into view when dialog opens
   useEffect(() => {
@@ -385,6 +400,8 @@ export default function AdminSettingsPage() {
       setLeaveStartTime("09:00");
       setLeaveEndTime("17:00");
     }
+    setProviderSearch("");
+    setIsProviderPickerOpen(false);
     setIsAddLeaveDialogOpen(true);
   };
 
@@ -448,6 +465,8 @@ export default function AdminSettingsPage() {
       setLeaveReason("");
       setLeaveScope('platform');
       setSelectedLeaveProviderId("");
+      setProviderSearch("");
+      setIsProviderPickerOpen(false);
       setIsAddLeaveDialogOpen(false);
       
       loadLeavesFromFirestore();
@@ -2099,6 +2118,8 @@ export default function AdminSettingsPage() {
                     setLeaveReason("");
                     setLeaveScope('platform');
                     setSelectedLeaveProviderId("");
+                    setProviderSearch("");
+                    setIsProviderPickerOpen(false);
                   }
                 }}>
                   <Button 
@@ -2115,6 +2136,8 @@ export default function AdminSettingsPage() {
                       setLeaveReason("");
                       setLeaveScope('platform');
                       setSelectedLeaveProviderId("");
+                      setProviderSearch("");
+                      setIsProviderPickerOpen(false);
                       setIsAddLeaveDialogOpen(true);
                     }}
                   >
@@ -2164,24 +2187,101 @@ export default function AdminSettingsPage() {
                       </div>
 
                       {leaveScope === 'provider' && (
-                        <div className="space-y-1.5">
-                          <Label htmlFor="leaveProviderSelect">Select Provider</Label>
-                          <Select value={selectedLeaveProviderId} onValueChange={setSelectedLeaveProviderId}>
-                            <SelectTrigger id="leaveProviderSelect" className="w-full">
-                              <SelectValue placeholder="Choose an approved provider..." />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-60">
-                              {approvedProviders.length === 0 ? (
-                                <SelectItem value="none" disabled>No approved providers found</SelectItem>
-                              ) : (
-                                approvedProviders.map(p => (
-                                  <SelectItem key={p.id} value={p.id}>
-                                    {p.fullName} {p.workCategoryName ? `(${p.workCategoryName})` : ''}
-                                  </SelectItem>
-                                ))
-                              )}
-                            </SelectContent>
-                          </Select>
+                        <div className="space-y-1.5 flex flex-col">
+                          <Label>Select Provider</Label>
+                          <Dialog open={isProviderPickerOpen} onOpenChange={setIsProviderPickerOpen}>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className={cn(
+                                  "w-full justify-between text-left font-normal h-10",
+                                  !selectedLeaveProvider && "text-muted-foreground"
+                                )}
+                                type="button"
+                              >
+                                {selectedLeaveProvider ? (
+                                  <div className="flex items-center gap-2 truncate">
+                                    <User className="h-4 w-4 text-primary shrink-0" />
+                                    <span className="font-medium text-foreground truncate">
+                                      {selectedLeaveProvider.fullName}
+                                    </span>
+                                    {selectedLeaveProvider.workCategoryName && (
+                                      <span className="text-xs text-muted-foreground truncate">
+                                        ({selectedLeaveProvider.workCategoryName})
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <SearchIcon className="h-4 w-4 shrink-0 opacity-60" />
+                                    <span>Search and select provider...</span>
+                                  </div>
+                                )}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="w-[calc(100%-2rem)] sm:max-w-[425px]">
+                              <DialogHeader>
+                                <DialogTitle>Select Provider</DialogTitle>
+                                <DialogDescription>
+                                  Search and select an approved provider by name or category.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 py-3">
+                                <div className="relative">
+                                  <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                  <Input
+                                    placeholder="Type provider name or category..."
+                                    className="pl-9 h-9"
+                                    value={providerSearch}
+                                    onChange={(e) => setProviderSearch(e.target.value)}
+                                    autoFocus
+                                  />
+                                </div>
+                                <ScrollArea className="h-[250px] rounded-md border p-1">
+                                  <div className="space-y-1">
+                                    {filteredApprovedProviders.length === 0 ? (
+                                      <p className="text-center py-8 text-sm text-muted-foreground">
+                                        No providers found.
+                                      </p>
+                                    ) : (
+                                      filteredApprovedProviders.map((p) => {
+                                        const isSelected = selectedLeaveProviderId === p.id;
+                                        return (
+                                          <Button
+                                            key={p.id}
+                                            variant={isSelected ? "secondary" : "ghost"}
+                                            className="w-full justify-start text-left h-auto py-2.5 px-3 relative whitespace-normal"
+                                            onClick={() => {
+                                              setSelectedLeaveProviderId(p.id);
+                                              setIsProviderPickerOpen(false);
+                                              setProviderSearch("");
+                                            }}
+                                            type="button"
+                                          >
+                                            <div className="flex flex-col gap-0.5 pr-6 text-left">
+                                              <span className="font-semibold text-sm leading-tight">
+                                                {p.fullName}
+                                              </span>
+                                              {p.workCategoryName && (
+                                                <span className="text-xs text-muted-foreground">
+                                                  {p.workCategoryName}
+                                                </span>
+                                              )}
+                                            </div>
+                                            {isSelected && (
+                                              <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-600" />
+                                            )}
+                                          </Button>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                </ScrollArea>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
                         </div>
                       )}
 
