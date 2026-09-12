@@ -120,7 +120,7 @@ function getDayActiveIntervals(
     }];
   }
   
-  const activeLeaves = leaves.filter(leave => leave.startDate <= dateISO && leave.endDate >= dateISO);
+  const activeLeaves = leaves.filter(leave => !leave.providerId && leave.startDate <= dateISO && leave.endDate >= dateISO);
   for (const leave of activeLeaves) {
     if (leave.leaveType === 'full_day') {
       return [];
@@ -611,11 +611,11 @@ export async function POST(req: NextRequest) {
         const { globalBusyMap, providerBusyMap, adminBusyMap } = cacheData;
         // --- Cache Logic End ---
 
-        // Check if selected date is fully blocked by a leave
-        const selectedDateActiveLeaves = leavesData.filter(l => l.startDate <= dateISO && l.endDate >= dateISO);
-        const hasFullDayLeave = selectedDateActiveLeaves.some(l => l.leaveType === 'full_day');
+        // Check if selected date is fully blocked by a GLOBAL platform leave/holiday
+        const selectedDateGlobalLeaves = leavesData.filter(l => !l.providerId && l.startDate <= dateISO && l.endDate >= dateISO);
+        const hasFullDayLeave = selectedDateGlobalLeaves.some(l => l.leaveType === 'full_day');
         if (hasFullDayLeave) {
-            const leaveReason = selectedDateActiveLeaves.find(l => l.leaveType === 'full_day')?.reason || "Provider Leave / Holiday";
+            const leaveReason = selectedDateGlobalLeaves.find(l => l.leaveType === 'full_day')?.reason || "Platform Holiday";
             return NextResponse.json({ isLeave: true, leaveReason, availableTimeSlots: [], totalCartDuration });
         }
 
@@ -649,6 +649,17 @@ export async function POST(req: NextRequest) {
                 }).filter(p => {
                     // Availability check: Provider must be online
                     if (p.isOnline === false) return false;
+
+                    // Check if this provider has an active FULL DAY leave on the requested date
+                    const providerOnFullDayLeave = leavesData.find(l => 
+                        l.providerId === p.id && 
+                        l.startDate <= dateISO && 
+                        l.endDate >= dateISO && 
+                        l.leaveType === 'full_day'
+                    );
+                    if (providerOnFullDayLeave) {
+                        return false; // Provider is taking this full day off
+                    }
 
                     // Distance radius check
                     if (p.distance > (p.workAreaRadiusKm || 0)) return false;
@@ -729,6 +740,21 @@ export async function POST(req: NextRequest) {
                     if (busySet) {
                         busySet.forEach(id => busyProviderIds.add(id));
                     }
+
+                    // Also mark provider as busy if they have a leave (full or partial) covering this specific step
+                    leavesData.forEach(l => {
+                        if (l.providerId && l.startDate <= step.dateISO && l.endDate >= step.dateISO) {
+                            if (l.leaveType === 'full_day') {
+                                busyProviderIds.add(l.providerId);
+                            } else if (l.leaveType === 'partial_day') {
+                                const leaveStart = parseTimeToMinutes(l.startTime || "09:00");
+                                const leaveEnd = parseTimeToMinutes(l.endTime || "17:00");
+                                if (step.minutes >= leaveStart && step.minutes < leaveEnd) {
+                                    busyProviderIds.add(l.providerId);
+                                }
+                            }
+                        }
+                    });
                 }
                 
                 for (const step of pathSteps) {

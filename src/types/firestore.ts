@@ -570,11 +570,13 @@ export interface DayAvailability {
 
 export interface LeaveRequest {
     id?: string;
-    startDate: string; // YYYY-MM-DD
-    endDate: string;   // YYYY-MM-DD
+    providerId?: string;       // Optional: Set for individual provider leave. Null/undefined for global platform holiday.
+    providerName?: string;     // Provider's full name for quick display in Admin
+    startDate: string;         // YYYY-MM-DD
+    endDate: string;           // YYYY-MM-DD
     leaveType: 'full_day' | 'partial_day';
-    startTime?: string; // HH:MM (if partial_day)
-    endTime?: string;   // HH:MM (if partial_day)
+    startTime?: string;        // HH:MM (if partial_day)
+    endTime?: string;          // HH:MM (if partial_day)
     reason: string;
     createdAt: any;
 }

@@ -13,7 +13,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import Logo from '@/components/shared/Logo';
-import { LayoutDashboard, UserCog, Briefcase, DollarSign, Star, Bell, ReceiptText, Banknote, ChevronRight, Wallet, Loader2 } from 'lucide-react';
+import { LayoutDashboard, UserCog, Briefcase, DollarSign, Star, Bell, ReceiptText, Banknote, ChevronRight, Wallet, Loader2, CalendarOff } from 'lucide-react';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
 import { useLoading } from '@/contexts/LoadingContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -30,6 +30,7 @@ const navItems = [
   { href: '/provider/profile', label: 'Profile & Settings', icon: UserCog },
   { type: 'separator', label: 'Work & Billing' },
   { href: '/provider/my-jobs', label: 'My Jobs', icon: Briefcase },
+  { href: '/provider/leaves', label: 'Leaves & Time Off', icon: CalendarOff },
   { href: '/provider/quotation-invoice', label: 'Billing', icon: ReceiptText },
   { href: '/provider/earnings', label: 'Earnings', icon: DollarSign },
   { href: '/provider/wallet', label: 'Wallet', icon: Wallet },

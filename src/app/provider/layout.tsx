@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from '@/components/ui/button';
-import { UserCircle, KeyRound, LogOut, Loader2, Bell, ChevronDown, Wallet } from 'lucide-react';
+import { UserCircle, KeyRound, LogOut, Loader2, Bell, ChevronDown, Wallet, CalendarOff } from 'lucide-react';
 import { auth, db } from '@/lib/firebase'; 
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
@@ -491,6 +491,18 @@ export default function ProviderLayout({ children }: PropsWithChildren) {
                 
                 {providerUser && isProviderApproved && (
                   <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="hidden md:inline-flex items-center gap-1.5 h-10 px-3 rounded-full border border-border/40 bg-card hover:bg-muted/50 hover:border-emerald-500/30 transition-all duration-300 shadow-sm"
+                      asChild
+                    >
+                      <Link href="/provider/leaves" className="flex items-center gap-1.5" title="Manage your leaves and scheduled time off">
+                        <CalendarOff className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        <span className="font-bold text-xs">Time Off</span>
+                      </Link>
+                    </Button>
+
                     <Button
                       variant="outline"
                       size="sm"

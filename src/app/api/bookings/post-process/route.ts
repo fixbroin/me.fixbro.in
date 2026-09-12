@@ -93,6 +93,20 @@ export async function POST(request: Request) {
                 let autoAssignedProviderId = null;
                 for (const closestProvider of providersWithDistance) {
                     if (closestProvider.distance <= dispatchRadius) {
+                        // Check if provider is on leave on scheduledDate
+                        const leaveSnapshot = await adminDb.collection('leaves')
+                            .where('providerId', '==', closestProvider.id)
+                            .where('startDate', '<=', booking.scheduledDate)
+                            .get();
+
+                        const isOnLeave = leaveSnapshot.docs.some(doc => {
+                            const data = doc.data();
+                            return data.endDate >= booking.scheduledDate;
+                        });
+                        if (isOnLeave) {
+                            continue; // Skip provider on leave
+                        }
+
                         // Check Overlaps
                         const overlapSnapshot = await adminDb.collection('bookings')
                             .where('providerId', '==', closestProvider.id)
