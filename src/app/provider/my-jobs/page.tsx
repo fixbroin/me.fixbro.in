@@ -125,6 +125,24 @@ export default function ProviderMyJobsPage() {
       if (!result.success) {
         throw new Error(result.message);
       }
+
+      // Optimistically update local bookings state immediately (0 seconds lag)
+      setBookings(prev => prev.map(b => {
+        if (b.id !== bookingId) return b;
+        const updated: FirestoreBooking = {
+          ...b,
+          status: newStatus,
+          updatedAt: Timestamp.now()
+        };
+        if (additionalCharges && additionalCharges.length > 0) {
+          updated.additionalCharges = additionalCharges;
+          updated.totalAmount = (b.totalAmount || 0) + additionalCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+        }
+        if (finalizedPaymentMethod) {
+          updated.paymentMethod = finalizedPaymentMethod;
+        }
+        return updated;
+      }));
       
       // TRIGGER POST-PROCESS
       fetch('/api/bookings/post-process', {

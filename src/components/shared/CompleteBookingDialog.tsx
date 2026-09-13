@@ -272,8 +272,17 @@ export default function CompleteBookingDialog({
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose} disabled={isProcessing} className="rounded-xl">Cancel</Button>
           <Button onClick={handleConfirm} disabled={isProcessing} className="bg-green-600 hover:bg-green-700 rounded-xl flex-1 h-11 font-bold">
-            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-            Confirm Completion
+            {isProcessing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Completing Job...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Confirm Completion
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

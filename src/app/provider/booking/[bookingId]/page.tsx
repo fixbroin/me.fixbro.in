@@ -53,6 +53,7 @@ export default function ProviderBookingDetailsPage() {
   const [isLoadingBooking, setIsLoadingBooking] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<BookingStatus | null>(null);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [providerWalletBalance, setProviderWalletBalance] = useState<number | null>(null);
   const [minBalanceForJobs, setMinBalanceForJobs] = useState<number | null>(null);
@@ -79,6 +80,7 @@ export default function ProviderBookingDetailsPage() {
   const updateBookingStatus = async (newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
     if (!booking?.id || !providerUser) return;
     setIsProcessingAction(true);
+    setProcessingStatus(newStatus);
     try {
       const result = await updateBookingStatusByProviderAction(
         booking.id,
@@ -91,6 +93,24 @@ export default function ProviderBookingDetailsPage() {
       if (!result.success) {
         throw new Error(result.message);
       }
+
+      // Optimistically update local booking state immediately (0 seconds lag)
+      setBooking(prev => {
+        if (!prev) return null;
+        const updated: FirestoreBooking = {
+          ...prev,
+          status: newStatus,
+          updatedAt: Timestamp.now(),
+        };
+        if (additionalCharges && additionalCharges.length > 0) {
+          updated.additionalCharges = additionalCharges;
+          updated.totalAmount = (prev.totalAmount || 0) + additionalCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+        }
+        if (finalizedPaymentMethod) {
+          updated.paymentMethod = finalizedPaymentMethod;
+        }
+        return updated;
+      });
 
       // Log provider activity
       if (providerUser) {
@@ -133,6 +153,7 @@ export default function ProviderBookingDetailsPage() {
       toast({ title: "Error", description: "Could not update job status.", variant: "destructive" });
     } finally {
       setIsProcessingAction(false);
+      setProcessingStatus(null);
     }
   };
 
@@ -480,8 +501,17 @@ export default function ProviderBookingDetailsPage() {
                         disabled={isProcessingAction || isLowBalance}
                         className="w-full sm:w-auto"
                     >
-                        {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
-                        Reject Booking
+                        {isProcessingAction && processingStatus === 'ProviderRejected' ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Rejecting...
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="mr-2 h-4 w-4" />
+                            Reject Booking
+                          </>
+                        )}
                     </Button>
                     {isLowBalance ? (
                       <Button className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold" asChild>
@@ -496,8 +526,17 @@ export default function ProviderBookingDetailsPage() {
                           disabled={isProcessingAction}
                           className="w-full sm:w-auto"
                       >
-                          {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                          Accept Booking
+                          {isProcessingAction && processingStatus === 'ProviderAccepted' ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Accepting...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Accept Booking
+                            </>
+                          )}
                       </Button>
                     )}
                 </>
@@ -509,8 +548,17 @@ export default function ProviderBookingDetailsPage() {
                     disabled={isProcessingAction}
                     className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
                 >
-                    {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
-                    Start Work
+                    {isProcessingAction && processingStatus === 'InProgressByProvider' ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Starting Work...
+                      </>
+                    ) : (
+                      <>
+                        <PlayCircle className="mr-2 h-4 w-4" />
+                        Start Work
+                      </>
+                    )}
                 </Button>
             )}
 
@@ -520,8 +568,17 @@ export default function ProviderBookingDetailsPage() {
                     disabled={isProcessingAction}
                     className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
                 >
-                    {isProcessingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                    Mark as Complete
+                    {isProcessingAction && processingStatus === 'Completed' ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Completing...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Mark as Complete
+                      </>
+                    )}
                 </Button>
             )}
         </CardFooter>

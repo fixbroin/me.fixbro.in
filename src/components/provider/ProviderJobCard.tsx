@@ -285,8 +285,22 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
             </Button>
             {type === 'new' && onAccept && onReject && (
               <>
-                <Button size="sm" onClick={() => onReject(job.id!)} variant="destructive" disabled={isProcessingAction} className="w-full sm:w-auto text-xs">
-                  {isProcessingAction && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin"/>} <XCircle className="mr-1 h-3.5 w-3.5"/> Reject
+                <Button 
+                  size="sm" 
+                  onClick={() => onReject(job.id!)} 
+                  variant="destructive" 
+                  disabled={isProcessingAction} 
+                  className="w-full sm:w-auto text-xs"
+                >
+                  {isProcessingAction ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/> Rejecting...
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="mr-1.5 h-3.5 w-3.5"/> Reject
+                    </>
+                  )}
                 </Button>
                 <Button 
                   size="sm" 
@@ -294,20 +308,54 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
                   disabled={isProcessingAction} 
                   className="w-full sm:w-auto text-xs"
                 >
-                  {isProcessingAction && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin"/>} <CheckCircle className="mr-1 h-3.5 w-3.5"/> Accept
+                  {isProcessingAction ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/> Accepting...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="mr-1.5 h-3.5 w-3.5"/> Accept
+                    </>
+                  )}
                 </Button>
               </>
             )}
           </>
         )}
         {type === 'ongoing' && job.status === 'ProviderAccepted' && onStartWork && (
-          <Button size="sm" onClick={() => onStartWork(job.id!)} disabled={isProcessingAction} className="w-full text-xs">
-            {isProcessingAction && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin"/>} <PlayCircle className="mr-1 h-3.5 w-3.5"/> Start Work
+          <Button 
+            size="sm" 
+            onClick={() => onStartWork(job.id!)} 
+            disabled={isProcessingAction} 
+            className="w-full text-xs"
+          >
+            {isProcessingAction ? (
+              <>
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/> Starting Work...
+              </>
+            ) : (
+              <>
+                <PlayCircle className="mr-1.5 h-3.5 w-3.5"/> Start Work
+              </>
+            )}
           </Button>
         )}
         {type === 'ongoing' && job.status === 'InProgressByProvider' && onCompleteWork && (
-          <Button size="sm" onClick={() => onCompleteWork(job.id!)} disabled={isProcessingAction} className="w-full text-xs bg-green-600 hover:bg-green-700">
-            {isProcessingAction && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin"/>} <CheckCircle className="mr-1 h-3.5 w-3.5"/> Mark Complete
+          <Button 
+            size="sm" 
+            onClick={() => onCompleteWork(job.id!)} 
+            disabled={isProcessingAction} 
+            className="w-full text-xs bg-green-600 hover:bg-green-700"
+          >
+            {isProcessingAction ? (
+              <>
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/> Completing...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="mr-1.5 h-3.5 w-3.5"/> Mark Complete
+              </>
+            )}
           </Button>
         )}
       </CardFooter>
