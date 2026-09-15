@@ -1,7 +1,31 @@
 import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 import { NextRequest } from 'next/server';
+import crypto from 'crypto';
 
-const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET || "wecanfix_internal_secret_j7K9R2pX_2026";
+// In-memory process-lifetime fallback token if process.env.INTERNAL_API_SECRET is not configured.
+// This ensures that unconfigured servers NEVER fall back to a known hardcoded public string.
+declare global {
+  // eslint-disable-next-line no-var
+  var __WECANFIX_RUNTIME_INTERNAL_SECRET: string | undefined;
+}
+
+const KNOWN_INSECURE_SECRETS = new Set([
+  'wecanfix_internal_secret_j7K9R2pX_2026',
+  'fixbro_internal_secret_j7K9R2pX_2026',
+  'default_secret',
+  'change_in_production'
+]);
+
+export function getInternalApiSecret(): string {
+  const envSecret = process.env.INTERNAL_API_SECRET;
+  if (envSecret && envSecret.trim() && !KNOWN_INSECURE_SECRETS.has(envSecret.trim())) {
+    return envSecret.trim();
+  }
+  if (!globalThis.__WECANFIX_RUNTIME_INTERNAL_SECRET) {
+    globalThis.__WECANFIX_RUNTIME_INTERNAL_SECRET = crypto.randomBytes(32).toString('hex');
+  }
+  return globalThis.__WECANFIX_RUNTIME_INTERNAL_SECRET;
+}
 
 export interface RequestUser {
   uid: string;
@@ -16,7 +40,8 @@ export interface RequestUser {
 export async function verifyRequest(req: NextRequest): Promise<RequestUser> {
   // 1. Check internal bypass header (for server-side routes / Next.js server actions)
   const internalToken = req.headers.get('x-internal-token');
-  if (internalToken === INTERNAL_SECRET) {
+  const validSecret = getInternalApiSecret();
+  if (internalToken && internalToken === validSecret) {
     return { uid: 'server', role: 'super_admin', isInternal: true };
   }
 
@@ -79,6 +104,281 @@ export function isUserAdmin(user: RequestUser): boolean {
 }
 
 /**
+ * List of sensitive configuration keys that must never be exposed to non-administrators.
+ */
+export const SENSITIVE_CONFIG_KEYS = new Set([
+  'stripesecretkey',
+  'stripewebhooksecret',
+  'razorpaykeysecret',
+  'razorpaywebhooksecret',
+  'smtppass',
+  'smtppassword',
+  'smtpuser',
+  'smtphost',
+  'whatsapptoken',
+  'whatsappaccesstoken',
+  'whatsappappsecret',
+  'whatsappverifytoken',
+  'firebaseprivatekey',
+  'fcmserverkey',
+  'cronsecret',
+  'internalapisecret',
+  'adminemailpassword'
+]);
+
+/**
+ * Strips sensitive credentials and private data before returning to non-administrators.
+ */
+export function sanitizeDocumentData(table: string, data: any, user: RequestUser): any {
+  if (!data || typeof data !== 'object') return data;
+  if (isUserAdmin(user)) return data;
+
+  // 1. Settings & Config: Strip sensitive payment, email, webhook, and API credentials
+  if (table === 'webSettings' || table === 'appConfiguration' || table === 'marketingConfiguration') {
+    const sanitized = { ...data };
+    for (const key of Object.keys(sanitized)) {
+      const lower = key.toLowerCase();
+      if (
+        SENSITIVE_CONFIG_KEYS.has(lower) ||
+        lower.endsWith('secret') ||
+        lower.endsWith('secretkey') ||
+        lower.endsWith('password') ||
+        lower.endsWith('pass')
+      ) {
+        delete sanitized[key];
+      }
+    }
+    return sanitized;
+  }
+
+  // 2. Provider Applications: Strip sensitive KYC documents and bank details for other users
+  if (table === 'providerApplications' && data.uid !== user.uid) {
+    const {
+      bankAccount,
+      bankDetails,
+      kycDocuments,
+      aadhaarNumber,
+      panNumber,
+      adminReviewNotes,
+      signatureUrl,
+      ...safeData
+    } = data;
+    return safeData;
+  }
+
+  // 3. User documents: Prevent leaking private authentication or internal notes
+  if (table === 'users' && data.uid !== user.uid) {
+    const {
+      fcmTokens,
+      internalNotes,
+      adminNotes,
+      ...safeUserData
+    } = data;
+    return safeUserData;
+  }
+
+  return data;
+}
+
+/**
+ * Fields on user profile documents that regular users are NOT allowed to modify.
+ */
+export const PROTECTED_USER_FIELDS = [
+  'role',
+  'adminPermissions',
+  'isBlocked',
+  'providerWalletBalance',
+  'walletBalance',
+  'balance',
+  'commission',
+  'commissionRate',
+  'rating',
+  'reviewCount',
+  'totalEarnings',
+  'isVerified',
+  'status',
+  'isSuperAdmin',
+  'isActive',
+  'marketingStatus'
+];
+
+/**
+ * Sanitizes incoming user mutation payloads to prevent privilege escalation.
+ */
+export function sanitizeUserMutationPayload(data: any): any {
+  if (!data || typeof data !== 'object') return data;
+  const sanitized = { ...data };
+  for (const field of PROTECTED_USER_FIELDS) {
+    delete sanitized[field];
+  }
+  return sanitized;
+}
+
+/**
+ * Validates mutation requests (addDoc, setDoc, updateDoc, deleteDoc) at the field and table level.
+ */
+export function validateMutationAccess(
+  user: RequestUser,
+  action: string,
+  path: string,
+  targetId?: string,
+  payload?: any
+): { allowed: boolean; reason?: string; sanitizedData?: any } {
+  // Admins & internal server actions have full mutation access
+  if (isUserAdmin(user)) {
+    return { allowed: true, sanitizedData: payload };
+  }
+
+  const parts = path.split('/').filter(Boolean);
+  const table = parts[0];
+  const docId = targetId || parts[1];
+
+  // 1. Guest users can ONLY submit public forms/analytics
+  const PUBLIC_WRITE_TABLES = [
+    'contactUsSubmissions',
+    'popupSubmissions',
+    'userActivities',
+    'outOfZoneRequests',
+    'visitorInfoLogs',
+    'searchAnalytics'
+  ];
+
+  if (user.uid === 'guest') {
+    if (PUBLIC_WRITE_TABLES.includes(table) && action === 'addDoc') {
+      return { allowed: true, sanitizedData: payload };
+    }
+    return { allowed: false, reason: 'Authentication required for this operation.' };
+  }
+
+  // 2. Users Collection (Profile updates): Owner only, with privilege escalation stripping
+  if (table === 'users') {
+    if (action === 'deleteDoc') {
+      return { allowed: false, reason: 'Only administrators can delete user accounts.' };
+    }
+    if (docId !== user.uid) {
+      return { allowed: false, reason: 'You can only update your own user profile.' };
+    }
+    const sanitized = sanitizeUserMutationPayload(payload);
+    return { allowed: true, sanitizedData: sanitized };
+  }
+
+  // 3. Admins Collection: Non-admins cannot modify admin records
+  if (table === 'admins') {
+    return { allowed: false, reason: 'Unauthorized access to administrator records.' };
+  }
+
+  // 4. Provider Applications: Owner can modify own application, but cannot approve it
+  if (table === 'providerApplications') {
+    if (action === 'deleteDoc') {
+      return { allowed: false, reason: 'Only administrators can delete provider applications.' };
+    }
+    if (docId !== user.uid) {
+      return { allowed: false, reason: 'You can only manage your own provider application.' };
+    }
+    const sanitized = { ...payload };
+    delete sanitized.status; // Only admins can approve or reject applications
+    delete sanitized.adminReviewNotes;
+    return { allowed: true, sanitizedData: sanitized };
+  }
+
+  // 5. Carts: Owner only
+  if (table === 'userCarts') {
+    if (docId && docId !== user.uid) {
+      return { allowed: false, reason: 'You can only modify your own cart.' };
+    }
+    return { allowed: true, sanitizedData: payload };
+  }
+
+  // 6. Bookings:
+  // - Non-admins CANNOT delete bookings
+  // - Non-admins CANNOT modify pricing, discounts, or directly flip paymentStatus to Paid
+  if (table === 'bookings') {
+    if (action === 'deleteDoc') {
+      return { allowed: false, reason: 'Only administrators can delete bookings.' };
+    }
+    if (action === 'updateDoc' || action === 'setDoc') {
+      const sanitized = { ...payload };
+      // Prevent client-side price tampering or unauthorized status override
+      delete sanitized.totalAmount;
+      delete sanitized.subTotal;
+      delete sanitized.discountAmount;
+      delete sanitized.visitingCharge;
+      delete sanitized.platformFeeTotal;
+      if (sanitized.paymentStatus === 'Paid') {
+        delete sanitized.paymentStatus;
+      }
+      return { allowed: true, sanitizedData: sanitized };
+    }
+    return { allowed: true, sanitizedData: payload };
+  }
+
+  // 7. Withdrawals:
+  // - Non-admins can only submit a pending request for themselves
+  // - Non-admins CANNOT approve, modify status, or delete withdrawal requests
+  if (table === 'withdrawalRequests') {
+    if (action === 'deleteDoc') {
+      return { allowed: false, reason: 'Only administrators can delete withdrawal requests.' };
+    }
+    if (action === 'addDoc') {
+      const sanitized = { ...payload };
+      sanitized.providerId = user.uid;
+      sanitized.status = 'pending';
+      return { allowed: true, sanitizedData: sanitized };
+    }
+    return { allowed: false, reason: 'Only administrators can update withdrawal requests.' };
+  }
+
+  // 8. Provider Wallet Transactions: ONLY admins or internal server can record transactions
+  if (table === 'providerWalletTransactions') {
+    return { allowed: false, reason: 'Wallet transactions can only be created by system processes.' };
+  }
+
+  // 9. Quotations & Invoices:
+  if (table === 'quotations' || table === 'invoices') {
+    if (action === 'deleteDoc') {
+      return { allowed: false, reason: 'Only administrators can delete invoices or quotations.' };
+    }
+    return { allowed: true, sanitizedData: payload };
+  }
+
+  // 10. Provider Leaves:
+  if (table === 'leaves') {
+    if (payload && payload.providerId && payload.providerId !== user.uid) {
+      return { allowed: false, reason: 'You can only manage your own leaves.' };
+    }
+    return { allowed: true, sanitizedData: payload };
+  }
+
+  // 11. User Notifications
+  if (table === 'userNotifications') {
+    return { allowed: true, sanitizedData: payload };
+  }
+
+  // 12. Chats
+  if (table === 'chats' || table === 'chats_messages') {
+    return { allowed: true, sanitizedData: payload };
+  }
+
+  // 13. Customer Reviews: Authenticated users can write reviews
+  if (table === 'adminReviews') {
+    if (action === 'deleteDoc') {
+      return { allowed: false, reason: 'Only administrators can delete reviews.' };
+    }
+    return { allowed: true, sanitizedData: payload };
+  }
+
+  // 14. Public submission tables
+  if (PUBLIC_WRITE_TABLES.includes(table)) {
+    if (action === 'addDoc') {
+      return { allowed: true, sanitizedData: payload };
+    }
+    return { allowed: false, reason: 'Only adding entries is permitted for this table.' };
+  }
+
+  return { allowed: false, reason: `Forbidden: No write access to "${path}".` };
+}
+
+/**
  * Firestore-style database security rules.
  */
 export function validateAccess(user: RequestUser, path: string, action: 'read' | 'write'): boolean {
@@ -135,7 +435,7 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
 
   // 4. Admins table (Users can read/check their own admin doc; admin writes)
   if (table === 'admins') {
-    return isOwner;
+    return action === 'read' && isOwner;
   }
 
   // 5. Provider Applications (Owner can write/read own; Public read allowed for approved providers for serviceable zone mapping & checkout availability)
@@ -163,24 +463,24 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
 
   // 7. Chats & Chat Messages (Only participants can access)
   if (table === 'chats' || table === 'chats_messages') {
-    // We allow access; sub-level messages check is checked in query filters
     return true;
   }
 
-  // 8. Bookings (Filtered by customerId/providerId query constraints, write allowed to create booking)
+  // 8. Bookings
   if (table === 'bookings') {
-    if (action === 'write') return true; // Can create or update booking details (e.g. pay cancel fee)
-    return true; // Read is allowed; returned data is filtered at database query level
+    if (action === 'write') return user.uid !== 'guest';
+    return true;
   }
 
   // 9. User Notifications
   if (table === 'userNotifications') {
-    return true; // Owner checking is handled via query parameters
+    return true;
   }
 
   // 10. Withdrawals & Quotations & Invoices & Referrals & Custom Requests
   if (['withdrawalRequests', 'quotations', 'invoices', 'referrals', 'leaves', 'customServiceRequests', 'providerWalletTransactions', 'providerComplaints'].includes(table)) {
-    return true; // Handled dynamically in components/actions by filtering for providerId/userId
+    if (action === 'read') return user.uid !== 'guest';
+    return user.uid !== 'guest';
   }
 
   // 11. Customer Reviews (Public read, authenticated write)

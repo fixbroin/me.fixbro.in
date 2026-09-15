@@ -2,9 +2,10 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 import * as admin from 'firebase-admin';
-
 import { getPushTemplate } from '@/app/actions/pushSettingsActions';
 import { replacePlaceholders } from '@/lib/seoUtils';
+import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
+import { RateLimiter, getClientIp } from '@/lib/rateLimit';
 
 // Initialize messaging only once
 let messaging: admin.messaging.Messaging;
@@ -47,12 +48,68 @@ function determinePushType(title: string): string {
   return 'other';
 }
 
+const pushLimiter = new RateLimiter(60, 60 * 1000);
+const guestPushLimiter = new RateLimiter(5, 5 * 60 * 1000);
+
+async function isTargetAdmin(targetUid: string): Promise<boolean> {
+  if (!targetUid) return false;
+  try {
+    const adminDoc = await adminDb.collection('admins').doc(targetUid).get();
+    if (adminDoc.exists) return true;
+    const userDoc = await adminDb.collection('users').doc(targetUid).get();
+    if (userDoc.exists) {
+      const role = userDoc.data()?.role;
+      if (role === 'admin' || role === 'super_admin' || role === 'finance_admin') return true;
+    }
+  } catch (e) {
+    console.error("Error checking target admin status:", e);
+  }
+  return false;
+}
+
 export async function POST(request: Request) {
   try {
+    const clientIp = getClientIp(request);
+    const generalCheck = pushLimiter.check(clientIp);
+    if (!generalCheck.allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
+
     const { userId, title, body, href, icon, sound, type: customType, variables } = await request.json();
 
     if (!userId || !title || !body) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const user = await verifyRequest(request as any);
+
+    // Cryptographic & role-based verification of caller
+    if (!user.isInternal && !isUserAdmin(user)) {
+      if (user.uid === 'guest') {
+        const guestCheck = guestPushLimiter.check(clientIp);
+        if (!guestCheck.allowed) {
+          return NextResponse.json({ error: 'Rate limit exceeded for guest notifications' }, { status: 429 });
+        }
+
+        const targetAdmin = await isTargetAdmin(userId);
+        if (!targetAdmin) {
+          return NextResponse.json({ error: 'Unauthorized: Guests may only send notifications to administrators.' }, { status: 403 });
+        }
+      } else {
+        if (user.uid !== userId) {
+          const targetAdmin = await isTargetAdmin(userId);
+          if (!targetAdmin) {
+            const bookingCheck = await adminDb.collection('bookings')
+              .where('userId', '==', user.uid)
+              .where('providerId', '==', userId)
+              .limit(1)
+              .get();
+            if (bookingCheck.empty) {
+              return NextResponse.json({ error: 'Forbidden: You cannot send notifications to this recipient.' }, { status: 403 });
+            }
+          }
+        }
+      }
     }
 
     let finalTitle = title;

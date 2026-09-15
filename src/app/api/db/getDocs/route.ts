@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPool, getDocsInternal } from '@/lib/mysql';
-import { verifyRequest, validateAccess, isUserAdmin } from '@/lib/dbSecurity';
+import { verifyRequest, validateAccess, isUserAdmin, sanitizeDocumentData } from '@/lib/dbSecurity';
 
 const queryCache = new Map<string, { data: any; expiresAt: number }>();
 const CACHE_TTL_MS = 3000;
@@ -91,7 +91,8 @@ export async function POST(request: NextRequest) {
     }
 
     const isCacheable = (path === 'adminCategories' || path === 'adminSubCategories' || path === 'adminServices' || path === 'adminSlideshows' || path === 'webSettings' || path === 'adminReviews' || path === 'blogPosts') && constraints.length === 0;
-    const cacheKey = `${path}:${JSON.stringify(constraints)}`;
+    const roleKey = isUserAdmin(user) ? 'admin' : 'public';
+    const cacheKey = `${path}:${roleKey}:${JSON.stringify(constraints)}`;
 
     if (isCacheable) {
       const cached = queryCache.get(cacheKey);
@@ -103,25 +104,12 @@ export async function POST(request: NextRequest) {
     const pool = await getPool();
     const result = await getDocsInternal(pool, path, constraints);
 
-    // Sanitize sensitive provider details for non-admin queries (e.g. checkout zone queries)
-    if (path === 'providerApplications' && !isUserAdmin(user) && Array.isArray(result?.docs)) {
-      result.docs = result.docs.map((d: any) => {
-        if (!d?.data) return d;
-        const {
-          bankAccount,
-          bankDetails,
-          kycDocuments,
-          aadhaarNumber,
-          panNumber,
-          adminReviewNotes,
-          signatureUrl,
-          ...safeData
-        } = d.data;
-        return {
-          ...d,
-          data: safeData
-        };
-      });
+    // Sanitize sensitive credentials and private data for non-admins
+    if (Array.isArray(result?.docs)) {
+      result.docs = result.docs.map((d: any) => ({
+        ...d,
+        data: sanitizeDocumentData(path, d.data, user)
+      }));
     }
 
     if (isCacheable) {

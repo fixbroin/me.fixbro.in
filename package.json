@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "db:init": "node scripts/db-init.js",
+    "db:setup": "node scripts/db-init.js",
     "dev": "node scripts/db-init.js && npx next dev --webpack --port 3006 --hostname 0.0.0.0",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",

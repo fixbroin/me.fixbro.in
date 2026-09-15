@@ -24,6 +24,45 @@ export async function GET(req: NextRequest) {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 
     if (session.payment_status === 'paid') {
+      const metadata = session.metadata || {};
+      const { type, bookingId } = metadata;
+
+      if (type === 'booking' && bookingId) {
+        try {
+          const bookingRef = adminDb.collection('bookings').doc(bookingId);
+          const bookingSnap = await bookingRef.get();
+          if (bookingSnap.exists) {
+            const bData = bookingSnap.data() as any;
+            if (bData?.status === 'Pending Payment') {
+              const { assignNewBookingNumber } = await import('@/lib/webServerUtils');
+              const { Timestamp } = await import('@/lib/mysqlDbAdmin');
+              let finalBookingNum = bData.bookingNumber;
+              if (!finalBookingNum || finalBookingNum === 0) {
+                finalBookingNum = await assignNewBookingNumber();
+              }
+              await bookingRef.update({
+                status: 'Confirmed',
+                paymentStatus: 'Paid',
+                bookingNumber: finalBookingNum,
+                stripeSessionId: session.id,
+                stripePaymentIntent: typeof session.payment_intent === 'string' ? session.payment_intent : null,
+                paymentMethod: 'Online',
+                updatedAt: Timestamp.now(),
+              });
+
+              const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3006';
+              fetch(`${appUrl}/api/bookings/post-process`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bookingDocId: bookingId, triggerSource: 'stripe_server_verify' })
+              }).catch(err => console.error("Error triggering post-process from verify-session:", err));
+            }
+          }
+        } catch (dbErr) {
+          console.error("Error updating booking in verify-session:", dbErr);
+        }
+      }
+
       return NextResponse.json({ 
         success: true, 
         payment_intent: session.payment_intent, 

@@ -2,7 +2,7 @@
 "use client";
 
 import { getMessaging, getToken, onMessage, isSupported } from "firebase/messaging";
-import { app, db } from "./firebase"; // Ensure your firebase.ts exports 'app'
+import { app, db, auth } from "./firebase"; // Ensure your firebase.ts exports 'app'
 import { doc, setDoc, Timestamp, getDoc } from '@/lib/mysqlDb';
 import type { MarketingSettings } from "@/types/firestore";
 import { isWebView, sendPushNotificationData } from './webview-bridge'; // Import WebView bridge functions
@@ -141,9 +141,16 @@ export const triggerPushNotification = async (params: {
   variables?: Record<string, string | number | undefined>;
 }) => {
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (typeof window !== 'undefined' && auth?.currentUser) {
+      try {
+        const token = await auth.currentUser.getIdToken();
+        headers['Authorization'] = `Bearer ${token}`;
+      } catch (e) {}
+    }
     const response = await fetch('/api/send-push', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(params),
     });
     return await response.json();

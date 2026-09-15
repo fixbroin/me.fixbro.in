@@ -599,9 +599,13 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
           const marketingConfig = marketingConfigDoc.data() as MarketingAutomationSettings;
           if (marketingConfig?.isWhatsAppEnabled && marketingConfig.whatsAppOnSignup?.enabled && marketingConfig.whatsAppOnSignup.templateName && (user.phoneNumber || details.mobileNumber)) {
               try {
+                  const token = await user.getIdToken();
                   await fetch('/api/whatsapp/send', {
                       method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
+                      headers: { 
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${token}`
+                      },
                       body: JSON.stringify({
                           to: user.phoneNumber || details.mobileNumber,
                           templateName: marketingConfig.whatsAppOnSignup.templateName,

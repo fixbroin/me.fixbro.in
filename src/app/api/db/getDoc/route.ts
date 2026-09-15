@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPool, getDocInternal } from '@/lib/mysql';
-import { verifyRequest, validateAccess, isUserAdmin } from '@/lib/dbSecurity';
+import { verifyRequest, validateAccess, isUserAdmin, sanitizeDocumentData } from '@/lib/dbSecurity';
 
 const docCache = new Map<string, { data: any; expiresAt: number }>();
 const CACHE_TTL_MS = 5000;
@@ -22,9 +22,11 @@ export async function POST(request: NextRequest) {
     }
     
     const isCacheable = fullPath.startsWith('webSettings') || fullPath.startsWith('seoSettings') || fullPath.startsWith('appConfiguration');
+    const roleKey = isUserAdmin(user) ? 'admin' : 'public';
+    const cacheKey = `${fullPath}:${roleKey}`;
     
     if (isCacheable) {
-      const cached = docCache.get(fullPath);
+      const cached = docCache.get(cacheKey);
       if (cached && Date.now() < cached.expiresAt) {
         return NextResponse.json(cached.data);
       }
@@ -33,23 +35,13 @@ export async function POST(request: NextRequest) {
     const pool = await getPool();
     const result = await getDocInternal(pool, path, docId);
 
-    // Sanitize sensitive provider data if non-admin is fetching someone else's provider application
-    if (path === 'providerApplications' && !isUserAdmin(user) && docId !== user.uid && result?.data) {
-      const {
-        bankAccount,
-        bankDetails,
-        kycDocuments,
-        aadhaarNumber,
-        panNumber,
-        adminReviewNotes,
-        signatureUrl,
-        ...safeData
-      } = result.data;
-      result.data = safeData;
+    // Sanitize sensitive credentials and private data for non-admins
+    if (result?.data) {
+      result.data = sanitizeDocumentData(path, result.data, user);
     }
 
     if (isCacheable) {
-      docCache.set(fullPath, { data: result, expiresAt: Date.now() + CACHE_TTL_MS });
+      docCache.set(cacheKey, { data: result, expiresAt: Date.now() + CACHE_TTL_MS });
     }
 
     return NextResponse.json(result);

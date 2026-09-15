@@ -5,6 +5,7 @@ import { triggerRefresh } from '@/lib/revalidateUtils';
 import * as admin from 'firebase-admin';
 import { getBaseUrl } from '@/lib/config';
 import { replacePlaceholders } from '@/lib/seoUtils';
+import { getInternalApiSecret } from '@/lib/dbSecurity';
 
 export interface PushTemplate {
   id: string;
@@ -468,6 +469,7 @@ export async function sendTestPushAction(id: string, adminUid: string): Promise<
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-internal-token': getInternalApiSecret(),
       },
       body: JSON.stringify({
         userId: adminUid,

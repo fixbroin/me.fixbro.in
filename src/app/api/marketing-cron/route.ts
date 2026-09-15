@@ -7,6 +7,7 @@ import type { MarketingAutomationSettings, AppSettings, GlobalWebSettings, Fires
 import { getBaseUrl } from '@/lib/config';
 import { getMarketingAutomationSettings, getGlobalAppSettings, getGlobalWebSettings } from '@/lib/webServerUtils';
 import { formatDateInTimezone } from '@/lib/utils';
+import { getInternalApiSecret } from '@/lib/dbSecurity';
 
 /**
  * Server-side helper to safely get milliseconds from various timestamp formats.
@@ -80,9 +81,20 @@ const replaceMergeTags = (
 };
 
 export async function GET(req: NextRequest) {
-    const secret = new URL(req.url).searchParams.get('secret');
-    if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const searchSecret = new URL(req.url).searchParams.get('secret');
+    const authHeader = req.headers.get('authorization');
+    const bearerSecret = authHeader?.startsWith('Bearer ') ? authHeader.substring(7).trim() : null;
+    const internalHeader = req.headers.get('x-internal-token')?.trim();
+
+    const expectedCronSecret = process.env.CRON_SECRET?.trim();
+    const internalSecret = getInternalApiSecret();
+
+    const isAuthorized = 
+        (expectedCronSecret && (searchSecret === expectedCronSecret || bearerSecret === expectedCronSecret)) ||
+        (internalSecret && (internalHeader === internalSecret || bearerSecret === internalSecret || searchSecret === internalSecret));
+
+    if (!isAuthorized) {
+        return NextResponse.json({ error: 'Unauthorized: Valid CRON_SECRET or internal authorization required.' }, { status: 401 });
     }
 
     try {

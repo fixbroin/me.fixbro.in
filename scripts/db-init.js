@@ -2,13 +2,36 @@ const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
 const path = require('path');
 
+dotenv.config({ path: path.join(__dirname, '../.env.local') });
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-const host = process.env.MYSQL_HOST || 'localhost';
-const user = process.env.MYSQL_USER || 'root';
-const password = process.env.MYSQL_PASSWORD || '';
-const databaseName = process.env.MYSQL_DATABASE || 'wecanfix_db';
-const port = parseInt(process.env.MYSQL_PORT || '3306', 10);
+function getDbConnectionConfig() {
+  const connUrl = process.env.MYSQL_URL || process.env.DATABASE_URL;
+  if (connUrl && !process.env.MYSQL_HOST) {
+    try {
+      const parsed = new URL(connUrl);
+      return {
+        host: parsed.hostname || 'localhost',
+        user: decodeURIComponent(parsed.username || 'root'),
+        password: decodeURIComponent(parsed.password || ''),
+        databaseName: (parsed.pathname || '/wecanfix_db').replace(/^\//, '') || 'wecanfix_db',
+        port: parseInt(parsed.port || '3306', 10)
+      };
+    } catch (e) {
+      console.warn("Failed to parse DATABASE_URL / MYSQL_URL, falling back to individual variables:", e);
+    }
+  }
+
+  return {
+    host: process.env.MYSQL_HOST || 'localhost',
+    user: process.env.MYSQL_USER || 'root',
+    password: process.env.MYSQL_PASSWORD || '',
+    databaseName: process.env.MYSQL_DATABASE || 'wecanfix_db',
+    port: parseInt(process.env.MYSQL_PORT || '3306', 10)
+  };
+}
+
+const { host, user, password, databaseName, port } = getDbConnectionConfig();
 
 const TABLES = [
   'adminCategories',
@@ -71,7 +94,7 @@ async function main() {
     await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${databaseName}\``);
     console.log(`[DB-Init] Database "${databaseName}" checked/created successfully.`);
   } catch (err) {
-    console.error('[DB-Init] Error creating database:', err.message);
+    console.error('[DB-Init] Error creating database:', err.message || err.code || err);
     process.exit(1);
   } finally {
     if (rootConn) await rootConn.end();

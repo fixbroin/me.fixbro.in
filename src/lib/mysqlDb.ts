@@ -17,8 +17,14 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   };
 
   if (typeof window === 'undefined') {
-    const secret = process.env.INTERNAL_API_SECRET || "wecanfix_internal_secret_j7K9R2pX_2026";
-    headers['x-internal-token'] = secret;
+    const envSecret = process.env.INTERNAL_API_SECRET;
+    const isKnownInsecure = !envSecret || envSecret === 'wecanfix_internal_secret_j7K9R2pX_2026' || envSecret === 'fixbro_internal_secret_j7K9R2pX_2026';
+    const secret = (!isKnownInsecure && envSecret)
+      ? envSecret
+      : ((globalThis as any).__WECANFIX_RUNTIME_INTERNAL_SECRET || '');
+    if (secret) {
+      headers['x-internal-token'] = secret;
+    }
   } else {
     try {
       if (auth.currentUser) {
