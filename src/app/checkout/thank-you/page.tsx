@@ -140,7 +140,7 @@ export default function ThankYouPage() {
   const [cancelledBookingId, setCancelledBookingId] = useState<string | null>(null); 
   const [cancellationFeePaidAmount, setCancellationFeePaidAmount] = useState<number>(0);
   const { toast } = useToast();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isInitialAuthCheckComplete } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { hideLoading } = useLoading();
@@ -167,7 +167,7 @@ export default function ThankYouPage() {
   }, []);
 
   useEffect(() => {
-    if (!isMounted || isLoadingAppSettings) return;
+    if (!isMounted || isLoadingAppSettings || !isInitialAuthCheckComplete) return;
 
     const processPage = async () => {
       if (processingRef.current) return;
@@ -535,10 +535,22 @@ export default function ThankYouPage() {
           if (addressDataString) { const addressData = JSON.parse(addressDataString); customerName = addressData.fullName || customerName; customerPhone = addressData.phone || customerPhone; customerEmail = addressData.email || customerEmail; addressLine1 = addressData.addressLine1 || addressLine1; addressLine2 = addressData.addressLine2 || undefined; city = addressData.city || city; state = addressData.state || state; pincode = addressData.pincode || pincode; latitude = addressData.latitude === null ? undefined : addressData.latitude; longitude = addressData.longitude === null ? undefined : addressData.longitude; }
         }
 
+        const effectiveUserId = currentUser?.uid || (auth.currentUser ? auth.currentUser.uid : null) || (typeof window !== 'undefined' ? localStorage.getItem('wecanfix_user_uid') : null) || undefined;
+
+        const createHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        try {
+          if (auth.currentUser) {
+            const token = await auth.currentUser.getIdToken();
+            createHeaders['Authorization'] = `Bearer ${token}`;
+          }
+        } catch (tokenErr) {
+          console.warn("Could not attach idToken to create-cash:", tokenErr);
+        }
+
         // Authoritative server-side booking creation and price calculation
         const createCashRes = await fetch('/api/bookings/create-cash', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: createHeaders,
           body: JSON.stringify({
             cartEntries: cartEntriesFromStorage,
             customerInfo: {
@@ -562,7 +574,7 @@ export default function ThankYouPage() {
             },
             workCategoryId: currentCategoryId,
             promoCode: bookingDiscountCode,
-            userId: currentUser?.uid,
+            userId: effectiveUserId,
           }),
         });
 
@@ -631,7 +643,7 @@ export default function ThankYouPage() {
     };
 
     processPage();
-  }, [isMounted, isLoadingAppSettings, appConfig, toast, router, currentUser, hideLoading]);
+  }, [isMounted, isLoadingAppSettings, isInitialAuthCheckComplete, appConfig, toast, router, currentUser, hideLoading]);
 
   if (isLoadingPage || !isMounted || isLoadingAppSettings || (!bookingDetailsForDisplay && !isCancellationConfirmation)) {
     return (

@@ -1449,6 +1449,7 @@ export interface ProviderApplication {
     longitude: number;
   };
   workAreaRadiusKm?: number;
+  workAreaAddress?: string;
   bankDetails?: BankDetails;
   termsConfirmedAt?: Timestamp;
   signatureUrl?: string;

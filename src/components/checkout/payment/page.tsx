@@ -542,10 +542,12 @@ export default function PaymentPage() {
       };
     }).filter(Boolean);
 
+    const effectiveUserId = currentUser?.uid || auth.currentUser?.uid || (typeof window !== 'undefined' ? localStorage.getItem('wecanfix_user_uid') : null);
+
     const newBookingData = {
       bookingId: newBookingId,
       bookingNumber: 0,
-      ...(currentUser?.uid && { userId: currentUser.uid }),
+      ...(effectiveUserId && { userId: effectiveUserId }),
       customerName, customerEmail, customerPhone, addressLine1, ...(addressLine2 && { addressLine2 }), city, state, pincode,
       ...(latitude !== undefined && { latitude }), ...(longitude !== undefined && { longitude }),
       scheduledDate: localStorage.getItem('wecanfixScheduledDate') || "",

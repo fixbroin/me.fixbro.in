@@ -1,10 +1,11 @@
-// src/app/api/bookings/create-cash/route.ts
 import { type NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { calculateServerBookingTotal } from '@/lib/bookingPricingServer';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
 import { generateBookingId } from '@/lib/bookingUtils';
 import { Timestamp } from '@/lib/mysqlDbAdmin';
+import { verifyRequest } from '@/lib/dbSecurity';
+import { getPool, getDocsInternal } from '@/lib/mysql';
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,6 +26,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Robust User Resolution:
+    let resolvedUserId: string | undefined = typeof userId === 'string' && userId.trim() ? userId.trim() : undefined;
+
+    // 1. Check request Authorization token if userId not yet resolved
+    if (!resolvedUserId) {
+      try {
+        const caller = await verifyRequest(req);
+        if (caller && caller.uid && caller.uid !== 'guest' && caller.uid !== 'server') {
+          resolvedUserId = caller.uid;
+        }
+      } catch (authErr) {
+        console.warn("Could not verify caller token in create-cash:", authErr);
+      }
+    }
+
+    // 2. If still unresolved, look up registered user by email
+    const emailToMatch = (customerInfo.email || '').toLowerCase().trim();
+    if (!resolvedUserId && emailToMatch) {
+      try {
+        const pool = await getPool();
+        const matchingUsers = await getDocsInternal(pool, 'users', [
+          { type: 'where', field: 'email', op: '==', value: emailToMatch },
+          { type: 'limit', value: 1 }
+        ]);
+        if (matchingUsers && matchingUsers.length > 0) {
+          resolvedUserId = matchingUsers[0].id;
+        }
+      } catch (dbErr) {
+        console.warn("Could not look up user by email in create-cash:", dbErr);
+      }
+    }
+
     // 1. Authoritative Server-side Price Calculation
     const pricing = await calculateServerBookingTotal({
       cartEntries,
@@ -40,7 +73,7 @@ export async function POST(req: NextRequest) {
     const newBookingData = {
       bookingId: newBookingId,
       bookingNumber: nextBookingNumber,
-      ...(userId && { userId }),
+      ...(resolvedUserId && { userId: resolvedUserId }),
       customerName: customerInfo.fullName || customerInfo.name || 'Guest User',
       customerEmail: customerInfo.email || '',
       customerPhone: customerInfo.phone || 'N/A',
