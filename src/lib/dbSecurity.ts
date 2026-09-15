@@ -233,18 +233,52 @@ export function validateMutationAccess(
   const table = parts[0];
   const docId = targetId || parts[1];
 
-  // 1. Guest users can ONLY submit public forms/analytics
+  // 1. Tables where public/guest submission is allowed via addDoc
   const PUBLIC_WRITE_TABLES = [
     'contactUsSubmissions',
     'popupSubmissions',
     'userActivities',
     'outOfZoneRequests',
     'visitorInfoLogs',
-    'searchAnalytics'
+    'searchAnalytics',
+    'customServiceRequests',
+    'adminReviews',
+    'userNotifications',
+    'chats',
+    'chats_messages'
   ];
 
   if (user.uid === 'guest') {
-    if (PUBLIC_WRITE_TABLES.includes(table) && action === 'addDoc') {
+    if (PUBLIC_WRITE_TABLES.includes(table) && (action === 'addDoc' || action === 'setDoc')) {
+      return { allowed: true, sanitizedData: payload };
+    }
+    if (table === 'providerApplications' && (action === 'addDoc' || action === 'setDoc')) {
+      const sanitized = { ...payload };
+      if (sanitized.status && sanitized.status !== 'pending_review' && sanitized.status !== 'draft') {
+        delete sanitized.status;
+      }
+      delete sanitized.adminReviewNotes;
+      return { allowed: true, sanitizedData: sanitized };
+    }
+    if (table === 'bookings' && action === 'addDoc') {
+      const sanitized = { ...payload };
+      sanitized.paymentStatus = 'Pending';
+      return { allowed: true, sanitizedData: sanitized };
+    }
+    if (table === 'bookings' && action === 'updateDoc') {
+      // Allow guests to update their booking during payment or review (e.g. isReviewedByCustomer)
+      const sanitized = { ...payload };
+      delete sanitized.totalAmount;
+      delete sanitized.subTotal;
+      delete sanitized.discountAmount;
+      delete sanitized.visitingCharge;
+      delete sanitized.platformFeeTotal;
+      if (sanitized.paymentStatus === 'Paid') {
+        delete sanitized.paymentStatus;
+      }
+      return { allowed: true, sanitizedData: sanitized };
+    }
+    if (table === 'chats' || table === 'chats_messages') {
       return { allowed: true, sanitizedData: payload };
     }
     return { allowed: false, reason: 'Authentication required for this operation.' };
@@ -267,16 +301,19 @@ export function validateMutationAccess(
     return { allowed: false, reason: 'Unauthorized access to administrator records.' };
   }
 
-  // 4. Provider Applications: Owner can modify own application, but cannot approve it
+  // 4. Provider Applications: Owner can modify own application, applicant can submit
   if (table === 'providerApplications') {
     if (action === 'deleteDoc') {
       return { allowed: false, reason: 'Only administrators can delete provider applications.' };
     }
-    if (docId !== user.uid) {
+    if (docId && docId !== user.uid) {
       return { allowed: false, reason: 'You can only manage your own provider application.' };
     }
     const sanitized = { ...payload };
-    delete sanitized.status; // Only admins can approve or reject applications
+    // Non-admins can only submit as pending_review or draft
+    if (sanitized.status && sanitized.status !== 'pending_review' && sanitized.status !== 'draft') {
+      delete sanitized.status;
+    }
     delete sanitized.adminReviewNotes;
     return { allowed: true, sanitizedData: sanitized };
   }
@@ -295,6 +332,11 @@ export function validateMutationAccess(
   if (table === 'bookings') {
     if (action === 'deleteDoc') {
       return { allowed: false, reason: 'Only administrators can delete bookings.' };
+    }
+    if (action === 'addDoc') {
+      const sanitized = { ...payload };
+      sanitized.paymentStatus = 'Pending';
+      return { allowed: true, sanitizedData: sanitized };
     }
     if (action === 'updateDoc' || action === 'setDoc') {
       const sanitized = { ...payload };
@@ -359,17 +401,31 @@ export function validateMutationAccess(
     return { allowed: true, sanitizedData: payload };
   }
 
-  // 13. Customer Reviews: Authenticated users can write reviews
+  // 13. Customer Reviews: Authenticated users & guests can submit reviews
   if (table === 'adminReviews') {
     if (action === 'deleteDoc') {
       return { allowed: false, reason: 'Only administrators can delete reviews.' };
     }
-    return { allowed: true, sanitizedData: payload };
+    if (action === 'addDoc' || action === 'setDoc') {
+      return { allowed: true, sanitizedData: payload };
+    }
+    return { allowed: false, reason: 'Only administrators can modify existing reviews.' };
   }
 
-  // 14. Public submission tables
+  // 14. Custom Service Requests
+  if (table === 'customServiceRequests') {
+    if (action === 'deleteDoc') {
+      return { allowed: false, reason: 'Only administrators can delete custom service requests.' };
+    }
+    if (action === 'addDoc' || action === 'setDoc') {
+      return { allowed: true, sanitizedData: payload };
+    }
+    return { allowed: false, reason: 'Only administrators can modify custom service requests.' };
+  }
+
+  // 15. Public submission tables
   if (PUBLIC_WRITE_TABLES.includes(table)) {
-    if (action === 'addDoc') {
+    if (action === 'addDoc' || action === 'setDoc') {
       return { allowed: true, sanitizedData: payload };
     }
     return { allowed: false, reason: 'Only adding entries is permitted for this table.' };
@@ -438,10 +494,10 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     return action === 'read' && isOwner;
   }
 
-  // 5. Provider Applications (Owner can write/read own; Public read allowed for approved providers for serviceable zone mapping & checkout availability)
+  // 5. Provider Applications (Public read for active/zone mapping, write allowed for applications)
   if (table === 'providerApplications') {
     if (action === 'read') return true;
-    return isOwner;
+    return true;
   }
 
   // 5. Carts (Owner only)
@@ -449,26 +505,26 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     return isOwner;
   }
 
-  // 6. Contact & Popup Submissions & Logs (Write-only for guests/users, read-only for admin)
+  // 6. Contact, Popup, Custom Service & Analytics Logs (Write allowed for public/guests/users)
   if ([
     'contactUsSubmissions',
     'popupSubmissions',
     'userActivities',
     'outOfZoneRequests',
     'visitorInfoLogs',
-    'searchAnalytics'
+    'searchAnalytics',
+    'customServiceRequests'
   ].includes(table)) {
     return action === 'write';
   }
 
-  // 7. Chats & Chat Messages (Only participants can access)
+  // 7. Chats & Chat Messages (Allowed for user support)
   if (table === 'chats' || table === 'chats_messages') {
     return true;
   }
 
-  // 8. Bookings
+  // 8. Bookings (Public read for invoice/confirmation lookup; write permitted with mutation validation)
   if (table === 'bookings') {
-    if (action === 'write') return user.uid !== 'guest';
     return true;
   }
 
@@ -477,16 +533,16 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     return true;
   }
 
-  // 10. Withdrawals & Quotations & Invoices & Referrals & Custom Requests
-  if (['withdrawalRequests', 'quotations', 'invoices', 'referrals', 'leaves', 'customServiceRequests', 'providerWalletTransactions', 'providerComplaints'].includes(table)) {
+  // 10. Withdrawals & Quotations & Invoices & Referrals
+  if (['withdrawalRequests', 'quotations', 'invoices', 'referrals', 'leaves', 'providerWalletTransactions', 'providerComplaints'].includes(table)) {
     if (action === 'read') return user.uid !== 'guest';
     return user.uid !== 'guest';
   }
 
-  // 11. Customer Reviews (Public read, authenticated write)
+  // 11. Customer Reviews (Public read, write allowed for customers)
   if (table === 'adminReviews') {
     if (action === 'read') return true;
-    return action === 'write' && user.uid !== 'guest';
+    return action === 'write';
   }
 
   // Block everything else by default

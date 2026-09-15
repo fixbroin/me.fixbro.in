@@ -324,16 +324,9 @@ export default function ThankYouPage() {
         return;
       }
       
-      const cartEntriesFromStorage = getActiveCheckoutEntries();
-      if (cartEntriesFromStorage.length === 0) {
-        toast({ title: "Booking Processed", description: "Redirecting to My Bookings.", variant: "default" });
-        router.push('/my-bookings');
-        setIsLoadingPage(false);
-        return;
-      }
-
       // --- 2. Handle Regular Booking Confirmation ---
-      const stripeBookingId = searchParams.get('bookingId');
+      const urlBookingId = searchParams.get('bookingId') || (typeof window !== 'undefined' ? localStorage.getItem('wecanfixLastBookingId') : null);
+      const stripeBookingId = searchParams.get('bookingId') || urlBookingId;
       const isStripeBooking = stripePaymentMethod === 'stripe' && !isProcessingCancellationFee;
 
       if (isStripeBooking) {
@@ -442,7 +435,6 @@ export default function ThankYouPage() {
         return;
       }
 
-      const urlBookingId = searchParams.get('bookingId');
       const isRazorpayBooking = (searchParams.get('payment_method') === 'razorpay' || (isOnlinePayment && !!urlBookingId)) && !isProcessingCancellationFee;
 
       if (isRazorpayBooking && urlBookingId) {
@@ -594,6 +586,17 @@ export default function ThankYouPage() {
         }
       }
 
+      // Check remaining checkout entries from cart if no booking ID was found
+      const cartEntriesFromStorage = getActiveCheckoutEntries();
+      if (cartEntriesFromStorage.length === 0) {
+        if (currentUser) {
+          toast({ title: "Booking Processed", description: "Redirecting to My Bookings.", variant: "default" });
+          router.push('/my-bookings');
+        }
+        setIsLoadingPage(false);
+        return;
+      }
+
       // Fallback: create booking securely via server-side API if no bookingId in URL
       try {
         let customerAddressData: any = {};
@@ -672,7 +675,7 @@ export default function ThankYouPage() {
     processPage();
   }, [isMounted, isLoadingAppSettings, appConfig, toast, router, currentUser, hideLoading]);
 
-  if (isLoadingPage || !isMounted || isLoadingAppSettings || (!bookingDetailsForDisplay && !isCancellationConfirmation)) {
+  if (isLoadingPage || !isMounted || isLoadingAppSettings) {
     return (
       <div className="max-w-2xl mx-auto px-2 sm:px-0">
         <CheckoutStepper currentStepId="confirmation" />
@@ -749,11 +752,19 @@ export default function ThankYouPage() {
                     <Home className="mr-2 h-4 w-4" /> Go to Home
                   </Button>
                 </Link>
-                <Link href="/my-bookings" passHref className="w-full sm:w-auto">
-                  <Button size="lg" className="w-full sm:w-auto h-12 font-bold rounded-xl shadow-lg shadow-primary/20">
-                    <ListOrdered className="mr-2 h-4 w-4" /> View My Bookings
-                  </Button>
-                </Link>
+                {currentUser ? (
+                  <Link href="/my-bookings" passHref className="w-full sm:w-auto">
+                    <Button size="lg" className="w-full sm:w-auto h-12 font-bold rounded-xl shadow-lg shadow-primary/20">
+                      <ListOrdered className="mr-2 h-4 w-4" /> View My Bookings
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link href="/contact-us" passHref className="w-full sm:w-auto">
+                    <Button size="lg" className="w-full sm:w-auto h-12 font-bold rounded-xl shadow-lg shadow-primary/20">
+                      <Mail className="mr-2 h-4 w-4" /> Need Help? Contact Us
+                    </Button>
+                  </Link>
+                )}
             </CardFooter>
         </Card>
       </div>

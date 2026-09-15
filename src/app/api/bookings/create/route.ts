@@ -1,4 +1,4 @@
-﻿import { type NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { Timestamp } from '@/lib/mysqlDbAdmin';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
@@ -70,9 +70,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Cart items are required.' }, { status: 400 });
     }
 
-    if (!customerAddress || (!customerAddress.fullName && !user.uid)) {
-      return NextResponse.json({ success: false, error: 'Customer address is required.' }, { status: 400 });
-    }
+    const effectiveAddress = customerAddress || {};
+    const customerFullName = effectiveAddress.fullName || (user.uid !== 'guest' ? (user as any).displayName || user.email : '') || 'Customer';
 
     // 1. Fetch server application configuration
     const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
@@ -214,9 +213,9 @@ export async function POST(req: NextRequest) {
       bookingNumber = await assignNewBookingNumber();
     }
 
-    const customerEmail = customerAddress?.email || (user.uid !== 'guest' ? user.email : '') || '';
-    const customerName = customerAddress?.fullName || 'Customer';
-    const customerPhone = customerAddress?.phone || '';
+    const customerEmail = effectiveAddress.email || (user.uid !== 'guest' ? user.email : '') || '';
+    const customerName = customerFullName;
+    const customerPhone = effectiveAddress.phone || '';
 
     const newBookingData = {
       bookingId,
@@ -225,13 +224,13 @@ export async function POST(req: NextRequest) {
       customerName,
       customerEmail,
       customerPhone,
-      addressLine1: customerAddress?.addressLine1 || '',
-      ...(customerAddress?.addressLine2 ? { addressLine2: customerAddress.addressLine2 } : {}),
-      city: customerAddress?.city || '',
-      state: customerAddress?.state || '',
-      pincode: customerAddress?.pincode || '',
-      ...(customerAddress?.latitude !== undefined && customerAddress.latitude !== null ? { latitude: customerAddress.latitude } : {}),
-      ...(customerAddress?.longitude !== undefined && customerAddress.longitude !== null ? { longitude: customerAddress.longitude } : {}),
+      addressLine1: effectiveAddress.addressLine1 || '',
+      ...(effectiveAddress.addressLine2 ? { addressLine2: effectiveAddress.addressLine2 } : {}),
+      city: effectiveAddress.city || '',
+      state: effectiveAddress.state || '',
+      pincode: effectiveAddress.pincode || '',
+      ...(effectiveAddress.latitude !== undefined && effectiveAddress.latitude !== null ? { latitude: effectiveAddress.latitude } : {}),
+      ...(effectiveAddress.longitude !== undefined && effectiveAddress.longitude !== null ? { longitude: effectiveAddress.longitude } : {}),
       scheduledDate: scheduledDate || new Date().toISOString().split('T')[0],
       scheduledTimeSlot: scheduledTimeSlot || '10:00 AM',
       estimatedEndTime: estimatedEndTime || null,
