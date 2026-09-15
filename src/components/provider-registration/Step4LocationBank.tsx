@@ -27,7 +27,7 @@ import { compressImage } from "@/lib/imageCompressor";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-const STORAGE_KEY = 'fixbro_reg_step4';
+const STORAGE_KEY = 'wecanfix_reg_step4';
 
 const ProviderMapZoneSelector = dynamic(() => import('@/components/provider-registration/ProviderMapZoneSelector'), {
   loading: () => <div className="flex items-center justify-center h-64 bg-muted rounded-md"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
