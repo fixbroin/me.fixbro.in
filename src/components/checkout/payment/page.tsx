@@ -521,43 +521,56 @@ export default function PaymentPage() {
       }
     }
 
-    const addressPayload = {
-      fullName: customerName,
-      email: customerEmail,
-      phone: customerPhone,
-      addressLine1,
-      addressLine2,
-      city,
-      state,
-      pincode,
-      latitude,
-      longitude
+    const bookingServices = cartEntries.map(entry => {
+      const detail = serviceDetailsMap[entry.serviceId];
+      if (!detail) return null;
+      const displayedPriceForQuantity = calculateIncrementalTotalPriceForItem(detail, entry.quantity);
+      const itemTaxRate = (detail.taxPercent || 0) > 0 ? (detail.taxPercent || 0) : 0;
+      const basePriceForQuantity = getBasePrice(displayedPriceForQuantity, detail.isTaxInclusive === true, itemTaxRate);
+      const taxAmountForItem = basePriceForQuantity * (itemTaxRate / 100);
+
+      return {
+        serviceId: entry.serviceId,
+        name: detail.name,
+        quantity: entry.quantity,
+        pricePerUnit: displayedPriceForQuantity / entry.quantity,
+        discountedPricePerUnit: detail.discountedPrice || null,
+        isTaxInclusive: detail.isTaxInclusive === true,
+        taxPercentApplied: itemTaxRate,
+        taxAmountForItem: taxAmountForItem,
+        imageUrl: detail.imageUrl || null
+      };
+    }).filter(Boolean);
+
+    const newBookingData = {
+      bookingId: newBookingId,
+      bookingNumber: 0,
+      ...(currentUser?.uid && { userId: currentUser.uid }),
+      customerName, customerEmail, customerPhone, addressLine1, ...(addressLine2 && { addressLine2 }), city, state, pincode,
+      ...(latitude !== undefined && { latitude }), ...(longitude !== undefined && { longitude }),
+      scheduledDate: localStorage.getItem('wecanfixScheduledDate') || "",
+      scheduledTimeSlot: localStorage.getItem('wecanfixScheduledTimeSlot') || "",
+      estimatedEndTime: localStorage.getItem('wecanfixEstimatedEndTime') || null,
+      interveningBreaks: storedInterveningBreaks,
+      dailyTimeline: storedDailyTimeline,
+      services: bookingServices,
+      subTotal: subTotal,
+      ...(visitingCharge > 0 && { visitingCharge: visitingCharge }),
+      taxAmount: taxAmount,
+      totalAmount: totalAmountDue,
+      platformFeeTotal: totalPlatformFeeBaseAmount + totalTaxOnPlatformFees,
+      ...(bookingDiscountCode !== undefined && { discountCode: bookingDiscountCode }),
+      ...(bookingDiscountAmount !== undefined && { discountAmount: bookingDiscountAmount }),
+      ...(calculatedPlatformFees.length > 0 && { appliedPlatformFees: calculatedPlatformFees }),
+      paymentMethod: 'Online',
+      status: 'Pending Payment',
+      createdAt: Timestamp.now(),
+      isReviewedByCustomer: false,
+      workCategoryId: currentCategoryId || undefined,
     };
 
-    const serverRes = await fetch('/api/bookings/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: cartEntries.map(e => ({ serviceId: e.serviceId, quantity: e.quantity })),
-        scheduledDate: localStorage.getItem('wecanfixScheduledDate') || "",
-        scheduledTimeSlot: localStorage.getItem('wecanfixScheduledTimeSlot') || "",
-        estimatedEndTime: localStorage.getItem('wecanfixEstimatedEndTime') || null,
-        interveningBreaks: storedInterveningBreaks,
-        dailyTimeline: storedDailyTimeline,
-        customerAddress: addressPayload,
-        paymentMethod: 'Online',
-        promoCode: appliedPromoCode?.code || undefined,
-        workCategoryId: currentCategoryId || undefined,
-      })
-    });
-
-    const serverData = await serverRes.json();
-    if (!serverRes.ok || !serverData.success) {
-      throw new Error(serverData.error || "Failed to create booking on server.");
-    }
-
-    const docRef = { id: serverData.bookingDocId };
-    return { docRef, newBookingId: serverData.bookingId, customerName, customerEmail, customerPhone };
+    const docRef = await addDoc(collection(db, "bookings"), newBookingData);
+    return { docRef, newBookingId, customerName, customerEmail, customerPhone };
   };
 
   const loadRazorpayScript = () => new Promise((resolve) => { if (window.Razorpay) { resolve(true); return; } const script = document.createElement('script'); script.src = 'https://checkout.razorpay.com/v1/checkout.js'; script.onload = () => resolve(true); script.onerror = () => resolve(false); document.body.appendChild(script); });
@@ -822,68 +835,21 @@ export default function PaymentPage() {
     setIsProcessingPayment(true); showLoading();
 
     if (paymentMethod === 'Pay After Service' && !isCancellationFeeMode) {
-      try {
-        let customerAddressData: any = {};
-        const addressDataString = localStorage.getItem('wecanfixCustomerAddress');
-        if (addressDataString) {
-          try { customerAddressData = JSON.parse(addressDataString); } catch (e) {}
-        }
-
-        const currentCategoryId = localStorage.getItem('wecanfixActiveCheckoutCategory');
-        const serverRes = await fetch('/api/bookings/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            items: cartEntries.map(e => ({ serviceId: e.serviceId, quantity: e.quantity })),
-            scheduledDate: localStorage.getItem('wecanfixScheduledDate') || "",
-            scheduledTimeSlot: localStorage.getItem('wecanfixScheduledTimeSlot') || "",
-            estimatedEndTime: localStorage.getItem('wecanfixEstimatedEndTime') || null,
-            interveningBreaks: (() => { try { return JSON.parse(localStorage.getItem('wecanfixInterveningBreaks') || '[]'); } catch (e) { return []; } })(),
-            dailyTimeline: (() => { try { return JSON.parse(localStorage.getItem('wecanfixDailyTimeline') || '[]'); } catch (e) { return []; } })(),
-            customerAddress: {
-              fullName: customerAddressData.fullName || currentUser?.displayName || 'Customer',
-              email: customerAddressData.email || currentUser?.email || '',
-              phone: customerAddressData.phone || (currentUser as any)?.phoneNumber || '',
-              addressLine1: customerAddressData.addressLine1 || '',
-              addressLine2: customerAddressData.addressLine2 || undefined,
-              city: customerAddressData.city || '',
-              state: customerAddressData.state || '',
-              pincode: customerAddressData.pincode || '',
-              latitude: customerAddressData.latitude || undefined,
-              longitude: customerAddressData.longitude || undefined,
-            },
-            paymentMethod: 'Pay After Service',
-            promoCode: appliedPromoCode?.code || undefined,
-            workCategoryId: currentCategoryId || undefined,
-          })
-        });
-
-        const serverData = await serverRes.json();
-        if (!serverRes.ok || !serverData.success) {
-          throw new Error(serverData.error || 'Failed to create booking on server.');
-        }
-
         localStorage.setItem('wecanfixPaymentMethod', 'Pay After Service');
-        localStorage.setItem('wecanfixFinalBookingTotal', serverData.totalAmount.toString());
+        localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
         if (appliedPromoCode) {
-          localStorage.setItem('wecanfixBookingDiscountCode', appliedPromoCode.code);
-          localStorage.setItem('wecanfixBookingDiscountAmount', appliedPromoCode.calculatedDiscount.toString());
-          localStorage.setItem('wecanfixAppliedPromoCodeId', appliedPromoCode.id);
+            localStorage.setItem('wecanfixBookingDiscountCode', appliedPromoCode.code);
+            localStorage.setItem('wecanfixBookingDiscountAmount', appliedPromoCode.calculatedDiscount.toString());
+            localStorage.setItem('wecanfixAppliedPromoCodeId', appliedPromoCode.id);
         } else {
-          localStorage.removeItem('wecanfixBookingDiscountCode');
-          localStorage.removeItem('wecanfixBookingDiscountAmount');
-          localStorage.removeItem('wecanfixAppliedPromoCodeId');
+            localStorage.removeItem('wecanfixBookingDiscountCode');
+            localStorage.removeItem('wecanfixBookingDiscountAmount');
+            localStorage.removeItem('wecanfixAppliedPromoCodeId');
         }
         if (calculatedPlatformFees.length > 0) localStorage.setItem('wecanfixAppliedPlatformFees', JSON.stringify(calculatedPlatformFees)); else localStorage.removeItem('wecanfixAppliedPlatformFees');
-
-        router.push(`/checkout/thank-you?payment_method=cod&bookingId=${serverData.bookingDocId}`);
-        return;
-      } catch (err: any) {
-        toast({ title: 'Booking Error', description: err.message || 'Failed to place booking.', variant: 'destructive' });
-        setIsProcessingPayment(false);
-        hideLoading();
-        return;
-      }
+        
+        router.push('/checkout/thank-you'); 
+        return; 
     }
 
     const razorpayEnabled = appConfig.enableRazorpay !== false && !!appConfig.razorpayKeyId;

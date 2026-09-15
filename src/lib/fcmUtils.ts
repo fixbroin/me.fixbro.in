@@ -142,11 +142,13 @@ export const triggerPushNotification = async (params: {
 }) => {
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (typeof window !== 'undefined' && auth?.currentUser) {
+    if (auth?.currentUser) {
       try {
         const token = await auth.currentUser.getIdToken();
         headers['Authorization'] = `Bearer ${token}`;
-      } catch (e) {}
+      } catch (e) {
+        // continue without token
+      }
     }
     const response = await fetch('/api/send-push', {
       method: 'POST',

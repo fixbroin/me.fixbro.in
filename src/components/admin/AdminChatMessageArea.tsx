@@ -40,43 +40,10 @@ interface AdminChatMessageAreaProps {
 
 const ADMIN_FALLBACK_AVATAR_INITIAL_CHAT_AREA = "S";
 
-const escapeHtml = (unsafe: string): string => {
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-};
+import { safeFormatChatMessage } from '@/lib/chatSanitizer';
 
-// Function to safely format chat messages with clean markdown links, bold text, and clickable URLs
-const formatChatMessage = (text: string) => {
-  if (!text) return '';
-  // 1. Strictly HTML-escape all user input so no HTML tags or scripts can be injected
-  const escaped = escapeHtml(text);
-
-  // 2. Convert Markdown links: [Title](url) -> <a href="url">Title</a> (HTTP/HTTPS only)
-  const mdLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
-  let formatted = escaped.replace(mdLinkRegex, (_, title, url) => {
-    const cleanUrl = url.replace(/"/g, '%22').replace(/'/g, '%27');
-    return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="font-semibold underline text-primary hover:text-primary/80 transition-colors">${title}</a>`;
-  });
-
-  // 3. Convert Bold: **text** -> <strong>text</strong>
-  formatted = formatted.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
-
-  // 4. Convert Strikethrough: ~~text~~ -> <del class="opacity-75">text</del>
-  formatted = formatted.replace(/~~([^~\n]+)~~/g, '<del class="opacity-75">$1</del>');
-
-  // 5. Auto-link remaining raw URLs that are not already inside href
-  const rawUrlRegex = /(?<!href="|href='|">)(\bhttps?:\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gi;
-  formatted = formatted.replace(rawUrlRegex, (url) => {
-    const cleanUrl = url.replace(/"/g, '%22').replace(/'/g, '%27');
-    return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="font-medium underline text-primary hover:text-primary/80 transition-colors">${cleanUrl}</a>`;
-  });
-
-  return formatted;
-};
+// Safe chat message formatter preventing stored/DOM-based XSS
+const formatChatMessage = safeFormatChatMessage;
 
 export default function AdminChatMessageArea({ selectedUser }: AdminChatMessageAreaProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);

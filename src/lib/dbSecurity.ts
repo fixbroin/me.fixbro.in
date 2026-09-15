@@ -1,51 +1,31 @@
 import { adminAuth, adminDb } from '@/lib/firebaseAdmin';
 import { NextRequest } from 'next/server';
-import crypto from 'crypto';
 
-// In-memory process-lifetime fallback token if process.env.INTERNAL_API_SECRET is not configured.
-// This ensures that unconfigured servers NEVER fall back to a known hardcoded public string.
-declare global {
-  // eslint-disable-next-line no-var
-  var __WECANFIX_RUNTIME_INTERNAL_SECRET: string | undefined;
-}
-
-const KNOWN_INSECURE_SECRETS = new Set([
-  'wecanfix_internal_secret_j7K9R2pX_2026',
-  'fixbro_internal_secret_j7K9R2pX_2026',
-  'default_secret',
-  'change_in_production'
-]);
-
-export function getInternalApiSecret(): string {
-  const envSecret = process.env.INTERNAL_API_SECRET;
-  if (envSecret && envSecret.trim() && !KNOWN_INSECURE_SECRETS.has(envSecret.trim())) {
-    return envSecret.trim();
-  }
-  if (!globalThis.__WECANFIX_RUNTIME_INTERNAL_SECRET) {
-    globalThis.__WECANFIX_RUNTIME_INTERNAL_SECRET = crypto.randomBytes(32).toString('hex');
-  }
-  return globalThis.__WECANFIX_RUNTIME_INTERNAL_SECRET;
-}
+// Strictly require configured internal secret with minimum 32 characters; NO fallback key
+const rawSecret = process.env.INTERNAL_API_SECRET;
+const INTERNAL_SECRET = (rawSecret && rawSecret.trim().length >= 32) ? rawSecret.trim() : null;
 
 export interface RequestUser {
   uid: string;
   email?: string;
   role?: string;
   isInternal: boolean;
+  isAdmin?: boolean;
+  userId?: string;
+  isInternalBypass?: boolean;
 }
 
 /**
  * Decodes Authorization header token or checks for x-internal-token.
  */
-export async function verifyRequest(req: NextRequest): Promise<RequestUser> {
-  // 1. Check internal bypass header (for server-side routes / Next.js server actions)
+export async function verifyRequest(req: NextRequest | Request): Promise<RequestUser> {
+  // 1. Check internal bypass header (for secure server-side routes with valid configured secret)
   const internalToken = req.headers.get('x-internal-token');
-  const validSecret = getInternalApiSecret();
-  if (internalToken && internalToken === validSecret) {
-    return { uid: 'server', role: 'super_admin', isInternal: true };
+  if (INTERNAL_SECRET && internalToken && internalToken === INTERNAL_SECRET) {
+    return { uid: 'server', role: 'super_admin', isInternal: true, isAdmin: true, userId: 'server', isInternalBypass: true };
   }
 
-  const guestUser: RequestUser = { uid: 'guest', role: 'guest', isInternal: false };
+  const guestUser: RequestUser = { uid: 'guest', role: 'guest', isInternal: false, isAdmin: false, isInternalBypass: false };
 
   // 2. Check Authorization Bearer header
   const authHeader = req.headers.get('authorization');
@@ -59,24 +39,31 @@ export async function verifyRequest(req: NextRequest): Promise<RequestUser> {
     const uid = decodedToken.uid;
     const email = decodedToken.email;
 
-    // Fetch user role from database (check both users and admins collection)
-    let role: string | undefined = undefined;
-    const userDoc = await adminDb.collection('users').doc(uid).get();
-    if (userDoc.exists) {
-      role = userDoc.data()?.role;
-    }
+    // Security Rule: Administrative roles MUST NEVER be read from the regular `users` collection!
+    // Admin privileges are strictly derived from the dedicated `admins` collection.
+    let role: string = 'customer';
 
-    if (!role || (role !== 'super_admin' && role !== 'finance_admin')) {
+    try {
       const adminDoc = await adminDb.collection('admins').doc(uid).get();
       if (adminDoc.exists) {
         const adminData = adminDoc.data();
-        if (adminData?.status === 'active' || adminData?.role) {
-          role = adminData.role || 'super_admin';
+        if (adminData?.status === 'active' && adminData?.role) {
+          role = adminData.role;
+        }
+      } else {
+        // Check if user has an approved provider application
+        const providerDoc = await adminDb.collection('providerApplications').doc(uid).get();
+        if (providerDoc.exists && providerDoc.data()?.status === 'approved') {
+          role = 'provider';
         }
       }
+    } catch (dbErr) {
+      console.error("Error reading role verification from adminDb:", dbErr);
     }
 
-    return { uid, email, role, isInternal: false };
+    const tempUser: RequestUser = { uid, email, role, isInternal: false };
+    const isAdmin = isUserAdmin(tempUser);
+    return { uid, email, role, isInternal: false, isAdmin, userId: uid, isInternalBypass: false };
   } catch (error) {
     console.error("verifyRequest authentication error:", error);
     return guestUser;
@@ -87,358 +74,97 @@ export async function verifyRequest(req: NextRequest): Promise<RequestUser> {
  * Determines if the authenticated user has administrator privileges.
  */
 export function isUserAdmin(user: RequestUser): boolean {
-  const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com";
-  const userEmail = (user.email || '').toLowerCase();
-  return (
-    user.isInternal ||
-    user.role === 'super_admin' ||
-    user.role === 'superadmin' ||
-    user.role === 'finance_admin' ||
-    user.role === 'admin' ||
-    user.role === 'staff' ||
-    userEmail === ADMIN_EMAIL.toLowerCase() ||
-    userEmail === 'wecanfix.in@gmail.com' ||
-    userEmail === 'Wecanfix.in@gmail.com' ||
-    false
-  );
+  if (user.isInternal) return true;
+  if (!user.uid || user.uid === 'guest') return false;
+
+  const ADMIN_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || '').toLowerCase().trim();
+  const userEmail = (user.email || '').toLowerCase().trim();
+
+  const adminRoles = ['super_admin', 'superadmin', 'finance_admin', 'admin', 'staff'];
+  const hasAdminRole = !!(user.role && adminRoles.includes(user.role));
+  const isEnvAdminEmail = !!(ADMIN_EMAIL && userEmail && userEmail === ADMIN_EMAIL);
+
+  return hasAdminRole || isEnvAdminEmail;
 }
 
 /**
- * List of sensitive configuration keys that must never be exposed to non-administrators.
+ * Sanitizes configuration and settings objects by stripping sensitive credentials
+ * such as payment gateway secret keys, webhooks secrets, SMTP passwords, and API tokens.
  */
-export const SENSITIVE_CONFIG_KEYS = new Set([
-  'stripesecretkey',
-  'stripewebhooksecret',
-  'razorpaykeysecret',
-  'razorpaywebhooksecret',
-  'smtppass',
-  'smtppassword',
-  'smtpuser',
-  'smtphost',
-  'whatsapptoken',
-  'whatsappaccesstoken',
-  'whatsappappsecret',
-  'whatsappverifytoken',
-  'firebaseprivatekey',
-  'fcmserverkey',
-  'cronsecret',
-  'internalapisecret',
-  'adminemailpassword'
-]);
-
-/**
- * Strips sensitive credentials and private data before returning to non-administrators.
- */
-export function sanitizeDocumentData(table: string, data: any, user: RequestUser): any {
+export function sanitizeSettingsData(data: any): any {
   if (!data || typeof data !== 'object') return data;
-  if (isUserAdmin(user)) return data;
 
-  // 1. Settings & Config: Strip sensitive payment, email, webhook, and API credentials
-  if (table === 'webSettings' || table === 'appConfiguration' || table === 'marketingConfiguration') {
-    const sanitized = { ...data };
-    for (const key of Object.keys(sanitized)) {
-      const lower = key.toLowerCase();
-      if (
-        SENSITIVE_CONFIG_KEYS.has(lower) ||
-        lower.endsWith('secret') ||
-        lower.endsWith('secretkey') ||
-        lower.endsWith('password') ||
-        lower.endsWith('pass')
-      ) {
-        delete sanitized[key];
-      }
+  // Sensitive keys that must NEVER be returned to non-admin callers
+  const SENSITIVE_KEYS = new Set([
+    'stripesecretkey',
+    'stripewebhooksecret',
+    'razorpaykeysecret',
+    'razorpaywebhooksecret',
+    'smtppass',
+    'smtppassword',
+    'smtpuser',
+    'smtphost',
+    'cronsecret',
+    'jwtsecret',
+    'internalapisecret',
+    'whatsappapitoken',
+    'whatsapptoken',
+    'whatsappappsecret',
+    'firebaseserviceaccount',
+    'firebaseadminsdk',
+    'adminsdkconfig',
+    'privatekey',
+    'private_key',
+    'secretkey',
+    'appsecret'
+  ]);
+
+  const sanitized: any = Array.isArray(data) ? [] : {};
+
+  for (const [key, val] of Object.entries(data)) {
+    const lowerKey = key.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (SENSITIVE_KEYS.has(lowerKey) || lowerKey.endsWith('secret') || lowerKey.endsWith('keysecret') || lowerKey.endsWith('pass') || lowerKey.endsWith('password')) {
+      // Omit sensitive field
+      continue;
     }
-    return sanitized;
+
+    if (val && typeof val === 'object' && !Array.isArray(val) && !(val instanceof Date)) {
+      sanitized[key] = sanitizeSettingsData(val);
+    } else {
+      sanitized[key] = val;
+    }
   }
 
-  // 2. Provider Applications: Strip sensitive KYC documents and bank details for other users
-  if (table === 'providerApplications' && data.uid !== user.uid) {
-    const {
-      bankAccount,
-      bankDetails,
-      kycDocuments,
-      aadhaarNumber,
-      panNumber,
-      adminReviewNotes,
-      signatureUrl,
-      ...safeData
-    } = data;
-    return safeData;
-  }
-
-  // 3. User documents: Prevent leaking private authentication or internal notes
-  if (table === 'users' && data.uid !== user.uid) {
-    const {
-      fcmTokens,
-      internalNotes,
-      adminNotes,
-      ...safeUserData
-    } = data;
-    return safeUserData;
-  }
-
-  return data;
-}
-
-/**
- * Fields on user profile documents that regular users are NOT allowed to modify.
- */
-export const PROTECTED_USER_FIELDS = [
-  'role',
-  'adminPermissions',
-  'isBlocked',
-  'providerWalletBalance',
-  'walletBalance',
-  'balance',
-  'commission',
-  'commissionRate',
-  'rating',
-  'reviewCount',
-  'totalEarnings',
-  'isVerified',
-  'status',
-  'isSuperAdmin',
-  'isActive',
-  'marketingStatus'
-];
-
-/**
- * Sanitizes incoming user mutation payloads to prevent privilege escalation.
- */
-export function sanitizeUserMutationPayload(data: any): any {
-  if (!data || typeof data !== 'object') return data;
-  const sanitized = { ...data };
-  for (const field of PROTECTED_USER_FIELDS) {
-    delete sanitized[field];
-  }
   return sanitized;
 }
 
 /**
- * Validates mutation requests (addDoc, setDoc, updateDoc, deleteDoc) at the field and table level.
+ * Validates whether a given field can be mutated by a non-administrative user.
+ * Prevents privilege escalation and tampering with account status or wallet balances.
  */
-export function validateMutationAccess(
-  user: RequestUser,
-  action: string,
-  path: string,
-  targetId?: string,
-  payload?: any
-): { allowed: boolean; reason?: string; sanitizedData?: any } {
-  // Admins & internal server actions have full mutation access
-  if (isUserAdmin(user)) {
-    return { allowed: true, sanitizedData: payload };
-  }
-
-  const parts = path.split('/').filter(Boolean);
-  const table = parts[0];
-  const docId = targetId || parts[1];
-
-  // 1. Tables where public/guest submission is allowed via addDoc
-  const PUBLIC_WRITE_TABLES = [
-    'contactUsSubmissions',
-    'popupSubmissions',
-    'userActivities',
-    'outOfZoneRequests',
-    'visitorInfoLogs',
-    'searchAnalytics',
-    'customServiceRequests',
-    'adminReviews',
-    'userNotifications',
-    'chats',
-    'chats_messages'
-  ];
-
-  if (user.uid === 'guest') {
-    if (PUBLIC_WRITE_TABLES.includes(table) && (action === 'addDoc' || action === 'setDoc')) {
-      return { allowed: true, sanitizedData: payload };
-    }
-    if (table === 'providerApplications' && (action === 'addDoc' || action === 'setDoc')) {
-      const sanitized = { ...payload };
-      if (sanitized.status && sanitized.status !== 'pending_review' && sanitized.status !== 'draft') {
-        delete sanitized.status;
-      }
-      delete sanitized.adminReviewNotes;
-      return { allowed: true, sanitizedData: sanitized };
-    }
-    if (table === 'bookings' && action === 'addDoc') {
-      const sanitized = { ...payload };
-      sanitized.paymentStatus = 'Pending';
-      return { allowed: true, sanitizedData: sanitized };
-    }
-    if (table === 'bookings' && action === 'updateDoc') {
-      // Allow guests to update their booking during payment or review (e.g. isReviewedByCustomer)
-      const sanitized = { ...payload };
-      delete sanitized.totalAmount;
-      delete sanitized.subTotal;
-      delete sanitized.discountAmount;
-      delete sanitized.visitingCharge;
-      delete sanitized.platformFeeTotal;
-      if (sanitized.paymentStatus === 'Paid') {
-        delete sanitized.paymentStatus;
-      }
-      return { allowed: true, sanitizedData: sanitized };
-    }
-    if (table === 'chats' || table === 'chats_messages') {
-      return { allowed: true, sanitizedData: payload };
-    }
-    return { allowed: false, reason: 'Authentication required for this operation.' };
-  }
-
-  // 2. Users Collection (Profile updates): Owner only, with privilege escalation stripping
-  if (table === 'users') {
-    if (action === 'deleteDoc') {
-      return { allowed: false, reason: 'Only administrators can delete user accounts.' };
-    }
-    if (docId !== user.uid) {
-      return { allowed: false, reason: 'You can only update your own user profile.' };
-    }
-    const sanitized = sanitizeUserMutationPayload(payload);
-    return { allowed: true, sanitizedData: sanitized };
-  }
-
-  // 3. Admins Collection: Non-admins cannot modify admin records
-  if (table === 'admins') {
-    return { allowed: false, reason: 'Unauthorized access to administrator records.' };
-  }
-
-  // 4. Provider Applications: Owner can modify own application, applicant can submit
-  if (table === 'providerApplications') {
-    if (action === 'deleteDoc') {
-      return { allowed: false, reason: 'Only administrators can delete provider applications.' };
-    }
-    if (docId && docId !== user.uid) {
-      return { allowed: false, reason: 'You can only manage your own provider application.' };
-    }
-    const sanitized = { ...payload };
-    // Non-admins can only submit as pending_review or draft
-    if (sanitized.status && sanitized.status !== 'pending_review' && sanitized.status !== 'draft') {
-      delete sanitized.status;
-    }
-    delete sanitized.adminReviewNotes;
-    return { allowed: true, sanitizedData: sanitized };
-  }
-
-  // 5. Carts: Owner only
-  if (table === 'userCarts') {
-    if (docId && docId !== user.uid) {
-      return { allowed: false, reason: 'You can only modify your own cart.' };
-    }
-    return { allowed: true, sanitizedData: payload };
-  }
-
-  // 6. Bookings:
-  // - Non-admins CANNOT delete bookings
-  // - Non-admins CANNOT modify pricing, discounts, or directly flip paymentStatus to Paid
-  if (table === 'bookings') {
-    if (action === 'deleteDoc') {
-      return { allowed: false, reason: 'Only administrators can delete bookings.' };
-    }
-    if (action === 'addDoc') {
-      const sanitized = { ...payload };
-      sanitized.paymentStatus = 'Pending';
-      return { allowed: true, sanitizedData: sanitized };
-    }
-    if (action === 'updateDoc' || action === 'setDoc') {
-      const sanitized = { ...payload };
-      // Prevent client-side price tampering or unauthorized status override
-      delete sanitized.totalAmount;
-      delete sanitized.subTotal;
-      delete sanitized.discountAmount;
-      delete sanitized.visitingCharge;
-      delete sanitized.platformFeeTotal;
-      if (sanitized.paymentStatus === 'Paid') {
-        delete sanitized.paymentStatus;
-      }
-      return { allowed: true, sanitizedData: sanitized };
-    }
-    return { allowed: true, sanitizedData: payload };
-  }
-
-  // 7. Withdrawals:
-  // - Non-admins can only submit a pending request for themselves
-  // - Non-admins CANNOT approve, modify status, or delete withdrawal requests
-  if (table === 'withdrawalRequests') {
-    if (action === 'deleteDoc') {
-      return { allowed: false, reason: 'Only administrators can delete withdrawal requests.' };
-    }
-    if (action === 'addDoc') {
-      const sanitized = { ...payload };
-      sanitized.providerId = user.uid;
-      sanitized.status = 'pending';
-      return { allowed: true, sanitizedData: sanitized };
-    }
-    return { allowed: false, reason: 'Only administrators can update withdrawal requests.' };
-  }
-
-  // 8. Provider Wallet Transactions: ONLY admins or internal server can record transactions
-  if (table === 'providerWalletTransactions') {
-    return { allowed: false, reason: 'Wallet transactions can only be created by system processes.' };
-  }
-
-  // 9. Quotations & Invoices:
-  if (table === 'quotations' || table === 'invoices') {
-    if (action === 'deleteDoc') {
-      return { allowed: false, reason: 'Only administrators can delete invoices or quotations.' };
-    }
-    return { allowed: true, sanitizedData: payload };
-  }
-
-  // 10. Provider Leaves:
-  if (table === 'leaves') {
-    if (payload && payload.providerId && payload.providerId !== user.uid) {
-      return { allowed: false, reason: 'You can only manage your own leaves.' };
-    }
-    return { allowed: true, sanitizedData: payload };
-  }
-
-  // 11. User Notifications
-  if (table === 'userNotifications') {
-    return { allowed: true, sanitizedData: payload };
-  }
-
-  // 12. Chats
-  if (table === 'chats' || table === 'chats_messages') {
-    return { allowed: true, sanitizedData: payload };
-  }
-
-  // 13. Customer Reviews: Authenticated users & guests can submit reviews
-  if (table === 'adminReviews') {
-    if (action === 'deleteDoc') {
-      return { allowed: false, reason: 'Only administrators can delete reviews.' };
-    }
-    if (action === 'addDoc' || action === 'setDoc') {
-      return { allowed: true, sanitizedData: payload };
-    }
-    return { allowed: false, reason: 'Only administrators can modify existing reviews.' };
-  }
-
-  // 14. Custom Service Requests
-  if (table === 'customServiceRequests') {
-    if (action === 'deleteDoc') {
-      return { allowed: false, reason: 'Only administrators can delete custom service requests.' };
-    }
-    if (action === 'addDoc' || action === 'setDoc') {
-      return { allowed: true, sanitizedData: payload };
-    }
-    return { allowed: false, reason: 'Only administrators can modify custom service requests.' };
-  }
-
-  // 15. Public submission tables
-  if (PUBLIC_WRITE_TABLES.includes(table)) {
-    if (action === 'addDoc' || action === 'setDoc') {
-      return { allowed: true, sanitizedData: payload };
-    }
-    return { allowed: false, reason: 'Only adding entries is permitted for this table.' };
-  }
-
-  return { allowed: false, reason: `Forbidden: No write access to "${path}".` };
+export function isFieldProtectedFromCustomerMutation(field: string): boolean {
+  const PROTECTED_USER_FIELDS = new Set([
+    'role',
+    'isadmin',
+    'isstaff',
+    'issuperadmin',
+    'status',
+    'walletbalance',
+    'commissionrate',
+    'permissions',
+    'referralcode',
+    'totalearnings',
+    'rating',
+    'reviewcount'
+  ]);
+  return PROTECTED_USER_FIELDS.has(field.toLowerCase().replace(/[^a-z0-9]/g, ''));
 }
 
 /**
- * Firestore-style database security rules.
+ * Database security rules for reading and writing data.
  */
 export function validateAccess(user: RequestUser, path: string, action: 'read' | 'write'): boolean {
-  // 1. Admins have absolute read & write access to everything
+  // 1. Admins and verified internal server requests have full access
   if (isUserAdmin(user)) {
     return true;
   }
@@ -447,22 +173,25 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
   const table = parts[0];
   const docId = parts[1];
 
-  // Helper: check if doc ID matches user's UID
-  const isOwner = docId === user.uid;
+  const isAuthenticated: boolean = Boolean(user.uid && user.uid !== 'guest');
+  const isOwner: boolean = Boolean(isAuthenticated && docId === user.uid);
 
-  // 2. Public Static Content (Readable by all, writable only by Admin)
-  const PUBLIC_READ_TABLES = [
+  // 2. Financial & System-Critical Tables (NEVER directly writable by client mutations)
+  // These tables can ONLY be written by authenticated server routes / admin tasks:
+  const SERVER_ONLY_WRITE_TABLES = [
+    'providerWalletTransactions',
+    'invoices',
+    'admins',
+    'webSettings',
+    'appConfiguration',
     'adminCategories',
     'adminSubCategories',
     'adminServices',
     'adminSlideshows',
-    'webSettings',
-    'appConfiguration',
     'contentPages',
     'adminFAQs',
     'taxes',
     'adminPopups',
-    'blogPosts',
     'cities',
     'areas',
     'pinCodeAreaMappings',
@@ -479,25 +208,22 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     'adminTaxes'
   ];
 
-  if (PUBLIC_READ_TABLES.includes(table)) {
-    return action === 'read';
-  }
-
-  // 3. User Accounts (Owner only, or query-level filtered getDocs, or allowed if authenticated to view provider/public user info)
-  if (table === 'users') {
-    if (action === 'read') return user.uid !== 'guest';
-    return isOwner;
-  }
-
-  // 4. Admins table (Users can read/check their own admin doc; admin writes)
-  if (table === 'admins') {
-    return action === 'read' && isOwner;
-  }
-
-  // 5. Provider Applications (Public read for active/zone mapping, write allowed for applications)
-  if (table === 'providerApplications') {
-    if (action === 'read') return true;
+  if (SERVER_ONLY_WRITE_TABLES.includes(table)) {
+    if (action === 'write') return false; // Strictly blocked for non-admins
+    // For read access: public static content is readable (sanitized at endpoint level)
     return true;
+  }
+
+  // 3. User Accounts (Owner can read/write their own; non-owner read requires authentication)
+  if (table === 'users') {
+    if (action === 'read') return isAuthenticated;
+    return isOwner; // Fields sanitized in mutate endpoint
+  }
+
+  // 4. Provider Applications (Public read for directory/assignment; authenticated applicants can create/update their own)
+  if (table === 'providerApplications') {
+    if (action === 'read') return true; // Sanitized at endpoint level for non-admins
+    return Boolean(isOwner || isAuthenticated);
   }
 
   // 5. Carts (Owner only)
@@ -505,11 +231,10 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     return isOwner;
   }
 
-  // 6. Contact, Popup, Custom Service & Analytics Logs (Write allowed for public/guests/users)
+  // 6. Public Inquiries & Form Submissions (Write-allowed for visitors, read-only for admin)
   if ([
     'contactUsSubmissions',
     'popupSubmissions',
-    'userActivities',
     'outOfZoneRequests',
     'visitorInfoLogs',
     'searchAnalytics',
@@ -518,28 +243,35 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
     return action === 'write';
   }
 
-  // 7. Chats & Chat Messages (Allowed for user support)
+  // 7. Chats & Chat Messages (Only authenticated users)
   if (table === 'chats' || table === 'chats_messages') {
-    return true;
+    return isAuthenticated;
   }
 
-  // 8. Bookings (Public read for invoice/confirmation lookup; write permitted with mutation validation)
+  // 8. Bookings (Readable for tracking; writable for initial creation; status escalation guarded in mutate route)
   if (table === 'bookings') {
-    return true;
+    if (action === 'read') return true;
+    // Clients can create initial bookings with 'Pending Payment'; escalation to Confirmed/Completed is strictly blocked in /api/db/mutate
+    return action === 'write';
   }
 
   // 9. User Notifications
   if (table === 'userNotifications') {
-    return true;
+    return isAuthenticated;
   }
 
-  // 10. Withdrawals & Quotations & Invoices & Referrals
-  if (['withdrawalRequests', 'quotations', 'invoices', 'referrals', 'leaves', 'providerWalletTransactions', 'providerComplaints'].includes(table)) {
-    if (action === 'read') return user.uid !== 'guest';
-    return user.uid !== 'guest';
+  // 10. Withdrawals, Quotations, Referrals, Leaves, Provider Complaints
+  if ([
+    'withdrawalRequests',
+    'quotations',
+    'referrals',
+    'leaves',
+    'providerComplaints'
+  ].includes(table)) {
+    return isAuthenticated;
   }
 
-  // 11. Customer Reviews (Public read, write allowed for customers)
+  // 11. Customer Reviews (Public read, public write submission)
   if (table === 'adminReviews') {
     if (action === 'read') return true;
     return action === 'write';

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPool, setDocInternal, updateDocInternal, deleteDocInternal } from '@/lib/mysql';
-import { verifyRequest, validateAccess, validateMutationAccess } from '@/lib/dbSecurity';
+import { verifyRequest, validateAccess } from '@/lib/dbSecurity';
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,24 +11,13 @@ export async function POST(request: NextRequest) {
 
     const { operations = [] } = await request.json();
 
-    // Verify access and sanitize all operations in the batch
-    const sanitizedOps: any[] = [];
+    // Verify access for all operations in the batch first
     for (const op of operations) {
       const pathToCheck = op.collection ? `${op.collection}/${op.id || ''}` : op.id || '';
       const isAllowed = validateAccess(user, pathToCheck, 'write');
       if (!isAllowed) {
         return NextResponse.json({ success: false, error: `Forbidden: No write access to "${pathToCheck}".` }, { status: 403 });
       }
-
-      const mutationCheck = validateMutationAccess(user, op.action, op.collection, op.id, op.data);
-      if (!mutationCheck.allowed) {
-        return NextResponse.json({ success: false, error: mutationCheck.reason || `Forbidden: Mutation not allowed on "${pathToCheck}".` }, { status: 403 });
-      }
-
-      sanitizedOps.push({
-        ...op,
-        data: mutationCheck.sanitizedData !== undefined ? mutationCheck.sanitizedData : op.data
-      });
     }
 
     const pool = await getPool();
@@ -37,7 +26,7 @@ export async function POST(request: NextRequest) {
     try {
       await conn.beginTransaction();
 
-      for (const op of sanitizedOps) {
+      for (const op of operations) {
         if (op.action === 'setDoc') {
           await setDocInternal(conn, op.collection, op.id, op.data, op.options);
         } else if (op.action === 'updateDoc') {

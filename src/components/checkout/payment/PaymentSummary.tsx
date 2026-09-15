@@ -367,57 +367,6 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
     }
 
     try {
-      let customerName = "Guest", customerEmail = "guest@example.com", customerContact = undefined;
-      let customerAddressData: any = {};
-      const customerAddressDataString = localStorage.getItem('wecanfixCustomerAddress');
-      if (customerAddressDataString) {
-        try {
-          customerAddressData = JSON.parse(customerAddressDataString);
-          customerName = customerAddressData.fullName || customerName;
-          customerEmail = customerAddressData.email || customerEmail;
-          customerContact = customerAddressData.phone || undefined;
-        } catch (e) {}
-      }
-
-      const activeCategoryId = localStorage.getItem('wecanfixActiveCheckoutCategory');
-
-      // Create pending booking on server first
-      const serverRes = await fetch('/api/bookings/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: cartEntries.map(e => ({ serviceId: e.serviceId, quantity: e.quantity })),
-          scheduledDate: localStorage.getItem('wecanfixScheduledDate') || "",
-          scheduledTimeSlot: localStorage.getItem('wecanfixScheduledTimeSlot') || "",
-          estimatedEndTime: localStorage.getItem('wecanfixEstimatedEndTime') || null,
-          interveningBreaks: (() => { try { return JSON.parse(localStorage.getItem('wecanfixInterveningBreaks') || '[]'); } catch (e) { return []; } })(),
-          dailyTimeline: (() => { try { return JSON.parse(localStorage.getItem('wecanfixDailyTimeline') || '[]'); } catch (e) { return []; } })(),
-          customerAddress: {
-            fullName: customerName,
-            email: customerEmail,
-            phone: customerContact || '',
-            addressLine1: customerAddressData.addressLine1 || '',
-            addressLine2: customerAddressData.addressLine2 || undefined,
-            city: customerAddressData.city || '',
-            state: customerAddressData.state || '',
-            pincode: customerAddressData.pincode || '',
-            latitude: customerAddressData.latitude || undefined,
-            longitude: customerAddressData.longitude || undefined,
-          },
-          paymentMethod: 'Online',
-          promoCode: appliedPromo?.code || undefined,
-          workCategoryId: activeCategoryId || undefined,
-        })
-      });
-
-      const serverData = await serverRes.json();
-      if (!serverRes.ok || !serverData.success) {
-        throw new Error(serverData.error || 'Failed to prepare booking on server.');
-      }
-
-      const pendingBookingDocId = serverData.bookingDocId;
-      localStorage.setItem('wecanfixLastBookingId', pendingBookingDocId);
-
       const getCurrencySubunitDecimals = (currencyCode: string): number => {
         const c = currencyCode.toUpperCase();
         if (['JPY', 'KRW', 'CLP', 'VND', 'UGX'].includes(c)) return 0;
@@ -430,11 +379,22 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-              amount: Math.round(serverData.totalAmount * Math.pow(10, currencyDecimals)),
+              amount: Math.round(totalAmountDue * Math.pow(10, currencyDecimals)),
               currency: code
           }),
       });
       const orderDetails = await res.json();
+
+      let customerName = "Guest", customerEmail = "guest@example.com", customerContact = undefined;
+      const customerAddressDataString = localStorage.getItem('wecanfixCustomerAddress');
+      if (customerAddressDataString) {
+        try {
+          const addr = JSON.parse(customerAddressDataString);
+          customerName = addr.fullName || customerName;
+          customerEmail = addr.email || customerEmail;
+          customerContact = addr.phone || undefined;
+        } catch (e) {}
+      }
 
       const options = {
         key: appConfig.razorpayKeyId,
@@ -448,15 +408,14 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
           localStorage.setItem('razorpayOrderId', response.razorpay_order_id);
           localStorage.setItem('razorpaySignature', response.razorpay_signature);
           localStorage.setItem('wecanfixPaymentMethod', 'Online');
-          localStorage.setItem('wecanfixLastBookingId', pendingBookingDocId);
-          localStorage.setItem('wecanfixFinalBookingTotal', serverData.totalAmount.toString());
+          localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
           if (appliedPromo) {
             localStorage.setItem('wecanfixBookingDiscountCode', appliedPromo.code);
             localStorage.setItem('wecanfixBookingDiscountAmount', appliedPromo.calculatedDiscount.toString());
             localStorage.setItem('wecanfixAppliedPromoCodeId', appliedPromo.id);
           }
           if (calculatedPlatformFees.length > 0) localStorage.setItem('wecanfixAppliedPlatformFees', JSON.stringify(calculatedPlatformFees));
-          router.push(`/checkout/thank-you?payment_method=razorpay&bookingId=${pendingBookingDocId}`);
+          router.push('/checkout/thank-you');
         },
         prefill: {
           name: customerName,
@@ -468,8 +427,8 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       };
       const rzp = new window.Razorpay(options);
       rzp.open();
-    } catch (e: any) {
-      toast({ title: "Payment Error", description: e.message || "Failed to initialize payment.", variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Payment Error", variant: "destructive" });
       setIsProcessingPayment(false);
       hideLoading();
     }
@@ -585,7 +544,6 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
       const data = await res.json();
 
       localStorage.setItem('wecanfixPaymentMethod', 'Online');
-      localStorage.setItem('wecanfixLastBookingId', docRef.id);
       localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
       if (appliedPromo) {
         localStorage.setItem('wecanfixBookingDiscountCode', appliedPromo.code);
@@ -613,65 +571,16 @@ export default function PaymentSummary({ paymentMethod, canBook, appliedPromo, o
     const storageMethod = paymentMethod === 'Pay After Service' ? 'Pay After Service' : 'Online';
 
     if (paymentMethod === 'Pay After Service') {
-      try {
-        let customerAddressData: any = {};
-        const addressDataString = localStorage.getItem('wecanfixCustomerAddress');
-        if (addressDataString) {
-          try { customerAddressData = JSON.parse(addressDataString); } catch (e) {}
-        }
-        const activeCategoryId = localStorage.getItem('wecanfixActiveCheckoutCategory');
-
-        const serverRes = await fetch('/api/bookings/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            items: cartEntries.map(e => ({ serviceId: e.serviceId, quantity: e.quantity })),
-            scheduledDate: localStorage.getItem('wecanfixScheduledDate') || "",
-            scheduledTimeSlot: localStorage.getItem('wecanfixScheduledTimeSlot') || "",
-            estimatedEndTime: localStorage.getItem('wecanfixEstimatedEndTime') || null,
-            interveningBreaks: (() => { try { return JSON.parse(localStorage.getItem('wecanfixInterveningBreaks') || '[]'); } catch (e) { return []; } })(),
-            dailyTimeline: (() => { try { return JSON.parse(localStorage.getItem('wecanfixDailyTimeline') || '[]'); } catch (e) { return []; } })(),
-            customerAddress: {
-              fullName: customerAddressData.fullName || auth.currentUser?.displayName || 'Customer',
-              email: customerAddressData.email || auth.currentUser?.email || '',
-              phone: customerAddressData.phone || (auth.currentUser as any)?.phoneNumber || '',
-              addressLine1: customerAddressData.addressLine1 || '',
-              addressLine2: customerAddressData.addressLine2 || undefined,
-              city: customerAddressData.city || '',
-              state: customerAddressData.state || '',
-              pincode: customerAddressData.pincode || '',
-              latitude: customerAddressData.latitude || undefined,
-              longitude: customerAddressData.longitude || undefined,
-            },
-            paymentMethod: 'Pay After Service',
-            promoCode: appliedPromo?.code || undefined,
-            workCategoryId: activeCategoryId || undefined,
-          })
-        });
-
-        const serverData = await serverRes.json();
-        if (!serverRes.ok || !serverData.success) {
-          throw new Error(serverData.error || 'Failed to create booking on server.');
-        }
-
         localStorage.setItem('wecanfixPaymentMethod', storageMethod);
-        localStorage.setItem('wecanfixLastBookingId', serverData.bookingDocId);
-        localStorage.setItem('wecanfixFinalBookingTotal', serverData.totalAmount.toString());
+        localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
         if (appliedPromo) {
-          localStorage.setItem('wecanfixBookingDiscountCode', appliedPromo.code);
-          localStorage.setItem('wecanfixBookingDiscountAmount', appliedPromo.calculatedDiscount.toString());
-          localStorage.setItem('wecanfixAppliedPromoCodeId', appliedPromo.id);
+            localStorage.setItem('wecanfixBookingDiscountCode', appliedPromo.code);
+            localStorage.setItem('wecanfixBookingDiscountAmount', appliedPromo.calculatedDiscount.toString());
+            localStorage.setItem('wecanfixAppliedPromoCodeId', appliedPromo.id);
         }
         if (calculatedPlatformFees.length > 0) localStorage.setItem('wecanfixAppliedPlatformFees', JSON.stringify(calculatedPlatformFees));
-
-        router.push(`/checkout/thank-you?payment_method=cod&bookingId=${serverData.bookingDocId}`); 
-        return;
-      } catch (err: any) {
-        toast({ title: 'Booking Error', description: err.message || 'Failed to place booking.', variant: 'destructive' });
-        setIsProcessingPayment(false);
-        hideLoading();
-        return;
-      }
+        router.push('/checkout/thank-you'); 
+        return; 
     }
 
     if (paymentMethod === 'online') {

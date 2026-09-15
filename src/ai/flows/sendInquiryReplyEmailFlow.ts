@@ -27,7 +27,7 @@ const InquiryReplyEmailInputSchema = z.object({
   smtpPort: z.string().optional().describe("SMTP port (e.g., '587', '465')."),
   smtpUser: z.string().optional().describe("SMTP username."),
   smtpPass: z.string().optional().describe("SMTP password."),
-  senderEmail: z.string().optional().describe("The email address to send from (e.g., support@yourdomain.com)."),
+  senderEmail: z.string().optional().describe("The email address to send from (e.g., support@wecanfix.in)."),
   siteName: z.string().optional(),
   logoUrl: z.string().optional(),
 });

@@ -1,26 +1,22 @@
-
 import { type NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { adminDb } from '@/lib/firebaseAdmin';
-import { getInternalApiSecret } from '@/lib/dbSecurity';
+import { db } from '@/lib/firebase';
+import { doc, getDoc } from '@/lib/mysqlDb';
+import type { MarketingSettings } from '@/types/firestore';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
-const getWhatsAppConfig = async (): Promise<{ verifyToken?: string; appSecret?: string }> => {
+const getMarketingSettings = async (): Promise<MarketingSettings | null> => {
   try {
-    const docSnap = await adminDb.collection('webSettings').doc('marketingConfiguration').get();
-    if (docSnap.exists) {
-      const data = docSnap.data() as any;
-      return {
-        verifyToken: data?.whatsAppVerifyToken || process.env.WHATSAPP_VERIFY_TOKEN,
-        appSecret: data?.whatsAppAppSecret || process.env.WHATSAPP_APP_SECRET
-      };
+    const settingsDocRef = doc(db, "webSettings", "marketingConfiguration");
+    const docSnap = await getDoc(settingsDocRef);
+    if (docSnap.exists()) {
+      return docSnap.data() as MarketingSettings;
     }
+    return null;
   } catch (error) {
-    console.error("Error fetching WhatsApp settings from database:", error);
+    console.error("Error fetching Marketing Settings from database:", error);
+    return null;
   }
-  return {
-    verifyToken: process.env.WHATSAPP_VERIFY_TOKEN,
-    appSecret: process.env.WHATSAPP_APP_SECRET
-  };
 };
 
 /**
@@ -28,76 +24,86 @@ const getWhatsAppConfig = async (): Promise<{ verifyToken?: string; appSecret?: 
  * See: https://developers.facebook.com/docs/graph-api/webhooks/getting-started#verification-requests
  */
 export async function GET(req: NextRequest) {
+  const rl = checkRateLimit(req, { max: 30, windowMs: 60 * 1000, keyPrefix: 'whatsapp-webhook-get' });
+  if (!rl.allowed) {
+    return rateLimitResponse(rl.resetTime);
+  }
+
   const { searchParams } = new URL(req.url);
   const mode = searchParams.get('hub.mode');
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  const { verifyToken } = await getWhatsAppConfig();
+  const settings = await getMarketingSettings();
+  const VERIFY_TOKEN = settings?.whatsAppVerifyToken || process.env.WHATSAPP_VERIFY_TOKEN;
 
-  if (!verifyToken) {
-    console.error("WHATSAPP_VERIFY_TOKEN is not set in database or environment variables.");
+  if (!VERIFY_TOKEN) {
+    console.error("WHATSAPP_VERIFY_TOKEN is not set in Firestore or environment variables.");
     return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
   }
 
-  // Check if a token and mode is in the query string of the request
-  if (mode === 'subscribe' && token === verifyToken) {
-    // Responds with the challenge token from the request
-    console.log('WhatsApp Webhook Verified!');
+  // Check if token and mode match
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    console.log('WhatsApp Webhook Verified successfully!');
     return new NextResponse(challenge, { status: 200 });
   } else {
-    // Responds with '403 Forbidden' if verify tokens do not match
     console.warn('WhatsApp Webhook verification failed. Tokens do not match.');
     return new NextResponse('Forbidden', { status: 403 });
   }
 }
 
 /**
- * Handles incoming WhatsApp message notifications via POST request.
- * Cryptographically verifies Meta's x-hub-signature-256 HMAC-SHA256 header.
+ * Handles incoming WhatsApp message notifications via POST request with cryptographic signature validation.
  * See: https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/components
  */
 export async function POST(req: NextRequest) {
+  // 1. Rate Limiting
+  const rl = checkRateLimit(req, { max: 120, windowMs: 60 * 1000, keyPrefix: 'whatsapp-webhook-post' });
+  if (!rl.allowed) {
+    return rateLimitResponse(rl.resetTime);
+  }
+
   try {
     const rawBody = await req.text();
-    const signatureHeader = req.headers.get('x-hub-signature-256');
-    const { appSecret } = await getWhatsAppConfig();
+    const signature = req.headers.get('x-hub-signature-256');
 
+    const settings = await getMarketingSettings();
+    const appSecret = settings?.whatsAppAppSecret || process.env.WHATSAPP_APP_SECRET;
+
+    // 2. Cryptographic Signature Verification
     if (appSecret) {
-      if (!signatureHeader) {
-        console.warn('WhatsApp webhook rejected: Missing x-hub-signature-256 header.');
-        return NextResponse.json({ error: 'Missing signature header' }, { status: 401 });
+      if (!signature) {
+        console.warn('WhatsApp Webhook rejected: Missing x-hub-signature-256 header.');
+        return NextResponse.json({ error: 'Missing webhook signature.' }, { status: 401 });
       }
 
-      const [prefix, signature] = signatureHeader.split('=');
-      if (prefix !== 'sha256' || !signature) {
-        console.warn('WhatsApp webhook rejected: Invalid signature format.');
-        return NextResponse.json({ error: 'Invalid signature format' }, { status: 400 });
-      }
+      const expectedSignature = 'sha256=' + crypto
+        .createHmac('sha256', appSecret)
+        .update(rawBody)
+        .digest('hex');
 
-      const expectedSignature = crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
-      const signatureBuf = Buffer.from(signature, 'hex');
-      const expectedBuf = Buffer.from(expectedSignature, 'hex');
+      const sigBuffer = Buffer.from(signature);
+      const expectedBuffer = Buffer.from(expectedSignature);
 
-      if (signatureBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(signatureBuf, expectedBuf)) {
-        console.warn('WhatsApp webhook rejected: Signature mismatch.');
-        return NextResponse.json({ error: 'Signature verification failed' }, { status: 403 });
-      }
-    } else {
-      const internalHeader = req.headers.get('x-internal-token');
-      const validSecret = getInternalApiSecret();
-      if (!internalHeader || internalHeader !== validSecret) {
-        console.warn('WhatsApp webhook rejected: WHATSAPP_APP_SECRET is not configured on server.');
-        return NextResponse.json({ error: 'Webhook signature verification required but secret not configured.' }, { status: 401 });
+      if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+        console.warn('WhatsApp Webhook rejected: Signature verification failed.');
+        return NextResponse.json({ error: 'Invalid webhook signature.' }, { status: 403 });
       }
     }
 
-    const body = rawBody ? JSON.parse(rawBody) : {};
+    // 3. Process Webhook Payload
+    let body = {};
+    if (rawBody) {
+      try {
+        body = JSON.parse(rawBody);
+      } catch (parseErr) {
+        console.error('Invalid JSON payload in WhatsApp webhook:', parseErr);
+        return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+      }
+    }
 
-    // Log the verified payload
-    console.log('Verified WhatsApp Webhook Payload:', JSON.stringify(body, null, 2));
+    console.log('Received authenticated WhatsApp Webhook Payload:', JSON.stringify(body, null, 2));
 
-    // WhatsApp requires a quick 200 OK response to acknowledge receipt of the webhook.
     return NextResponse.json({ status: 'success' }, { status: 200 });
 
   } catch (error) {

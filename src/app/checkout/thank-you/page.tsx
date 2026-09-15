@@ -324,9 +324,16 @@ export default function ThankYouPage() {
         return;
       }
       
+      const cartEntriesFromStorage = getActiveCheckoutEntries();
+      if (cartEntriesFromStorage.length === 0) {
+        toast({ title: "Booking Processed", description: "Redirecting to My Bookings.", variant: "default" });
+        router.push('/my-bookings');
+        setIsLoadingPage(false);
+        return;
+      }
+
       // --- 2. Handle Regular Booking Confirmation ---
-      const urlBookingId = searchParams.get('bookingId') || (typeof window !== 'undefined' ? localStorage.getItem('wecanfixLastBookingId') : null);
-      const stripeBookingId = searchParams.get('bookingId') || urlBookingId;
+      const stripeBookingId = searchParams.get('bookingId');
       const isStripeBooking = stripePaymentMethod === 'stripe' && !isProcessingCancellationFee;
 
       if (isStripeBooking) {
@@ -335,7 +342,7 @@ export default function ThankYouPage() {
             router.push('/cart'); setIsLoadingPage(false); return;
         }
         try {
-            const verifyRes = await fetch(`/api/stripe/verify-session?session_id=${stripeSessionId}`);
+            const verifyRes = await fetch(`/api/stripe/verify-session?session_id=${stripeSessionId}&bookingId=${stripeBookingId}`);
             const verifyData = await verifyRes.json();
             if (!verifyData.success) {
                 throw new Error(verifyData.error || "Stripe payment verification failed.");
@@ -345,61 +352,26 @@ export default function ThankYouPage() {
             const bookingRef = doc(db, 'bookings', stripeBookingId);
             const bookingSnap = await getDoc(bookingRef);
 
-            if (bookingSnap.exists()) {
-                const bookingData = bookingSnap.data() as FirestoreBooking;
-                let finalBookingNum = bookingData.bookingNumber;
-
-                if (bookingData.status === 'Pending Payment') {
-                    const nextBookingNumber = await assignNewBookingNumber();
-                    finalBookingNum = nextBookingNumber;
-
-                    await updateDoc(bookingRef, {
-                        status: 'Confirmed',
-                        bookingNumber: nextBookingNumber,
-                        stripeSessionId: stripeSessionId,
-                        stripePaymentIntent: verifyData.payment_intent || null,
-                        updatedAt: Timestamp.now(),
-                    });
-
-                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-                    fetch(`${appUrl}/api/bookings/post-process`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ bookingDocId: stripeBookingId, triggerSource: 'stripe_checkout_thankyou' })
-                    }).catch(err => console.error("Error triggering post-process from thank-you:", err));
-
-                    const servicesSummary = (bookingData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
-                    logUserActivity(
-                      'newBooking',
-                      {
-                        bookingId: bookingData.bookingId,
-                        bookingDocId: stripeBookingId,
-                        totalAmount: bookingData.totalAmount,
-                        paymentMethod: 'Online',
-                        customerName: bookingData.customerName,
-                        customerPhone: bookingData.customerPhone,
-                        servicesSummary
-                      },
-                      currentUser?.uid,
-                      !currentUser ? getGuestId() : null,
-                      bookingData.customerName
-                    );
-
-                    if (currentUser?.uid) {
-                        const userNotification: Omit<FirestoreNotification, 'id'> = {
-                          userId: currentUser.uid,
-                          title: "Booking Confirmed!",
-                          message: `Your booking ${bookingData.bookingId} has been successfully placed. We'll assign a provider shortly.`,
-                          type: 'success',
-                          href: '/my-bookings',
-                          read: false,
-                          createdAt: Timestamp.now(),
-                        };
-                        await addDoc(collection(db, "userNotifications"), userNotification);
-                    }
-                }
-
+            if (bookingSnap.exists() || verifyData.booking) {
+                const bookingData = (verifyData.booking || (bookingSnap.exists() ? bookingSnap.data() : {})) as FirestoreBooking;
+                const finalBookingNum = bookingData.bookingNumber;
                 const servicesSummary = (bookingData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
+
+                logUserActivity(
+                  'newBooking',
+                  {
+                    bookingId: bookingData.bookingId,
+                    bookingDocId: stripeBookingId,
+                    totalAmount: bookingData.totalAmount,
+                    paymentMethod: 'Online',
+                    customerName: bookingData.customerName,
+                    customerPhone: bookingData.customerPhone,
+                    servicesSummary
+                  },
+                  currentUser?.uid,
+                  !currentUser ? getGuestId() : null,
+                  bookingData.customerName
+                );
                 setBookingDetailsForDisplay({ 
                     ...bookingData, 
                     id: stripeBookingId, 
@@ -435,6 +407,7 @@ export default function ThankYouPage() {
         return;
       }
 
+      const urlBookingId = searchParams.get('bookingId');
       const isRazorpayBooking = (searchParams.get('payment_method') === 'razorpay' || (isOnlinePayment && !!urlBookingId)) && !isProcessingCancellationFee;
 
       if (isRazorpayBooking && urlBookingId) {
@@ -457,63 +430,26 @@ export default function ThankYouPage() {
             const bookingRef = doc(db, 'bookings', urlBookingId);
             const bookingSnap = await getDoc(bookingRef);
 
-            if (bookingSnap.exists()) {
-                const bookingData = bookingSnap.data() as FirestoreBooking;
-                let finalBookingNum = bookingData.bookingNumber;
-
-                if (bookingData.status === 'Pending Payment') {
-                    const nextBookingNumber = await assignNewBookingNumber();
-                    finalBookingNum = nextBookingNumber;
-
-                    await updateDoc(bookingRef, {
-                        status: 'Confirmed',
-                        bookingNumber: nextBookingNumber,
-                        paymentMethod: 'Online',
-                        razorpayPaymentId: razorpayPaymentId,
-                        razorpayOrderId: razorpayOrderId,
-                        razorpaySignature: razorpaySignature,
-                        updatedAt: Timestamp.now(),
-                    });
-
-                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-                    fetch(`${appUrl}/api/bookings/post-process`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ bookingDocId: urlBookingId, triggerSource: 'razorpay_checkout_thankyou' })
-                    }).catch(err => console.error("Error triggering post-process from thank-you:", err));
-
-                    const servicesSummary = (bookingData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
-                    logUserActivity(
-                      'newBooking',
-                      {
-                        bookingId: bookingData.bookingId,
-                        bookingDocId: urlBookingId,
-                        totalAmount: bookingData.totalAmount,
-                        paymentMethod: 'Online',
-                        customerName: bookingData.customerName,
-                        customerPhone: bookingData.customerPhone,
-                        servicesSummary
-                      },
-                      currentUser?.uid,
-                      !currentUser ? getGuestId() : null,
-                      bookingData.customerName
-                    );
-
-                    if (currentUser?.uid) {
-                        const userNotification: Omit<FirestoreNotification, 'id'> = {
-                          userId: currentUser.uid,
-                          title: "Booking Confirmed!",
-                          message: `Your booking ${bookingData.bookingId} has been successfully placed. We'll assign a provider shortly.`,
-                          type: 'success',
-                          href: '/my-bookings',
-                          read: false,
-                          createdAt: Timestamp.now(),
-                        };
-                        await addDoc(collection(db, "userNotifications"), userNotification);
-                    }
-                }
-
+            if (bookingSnap.exists() || verificationResult.booking) {
+                const bookingData = (verificationResult.booking || (bookingSnap.exists() ? bookingSnap.data() : {})) as FirestoreBooking;
+                const finalBookingNum = bookingData.bookingNumber;
                 const servicesSummary = (bookingData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
+
+                logUserActivity(
+                  'newBooking',
+                  {
+                    bookingId: bookingData.bookingId,
+                    bookingDocId: urlBookingId,
+                    totalAmount: bookingData.totalAmount,
+                    paymentMethod: 'Online',
+                    customerName: bookingData.customerName,
+                    customerPhone: bookingData.customerPhone,
+                    servicesSummary
+                  },
+                  currentUser?.uid,
+                  !currentUser ? getGuestId() : null,
+                  bookingData.customerName
+                );
                 setBookingDetailsForDisplay({ 
                     ...bookingData, 
                     id: urlBookingId, 
@@ -549,120 +485,142 @@ export default function ThankYouPage() {
         return;
       }
 
-      // Handle Pay After Service (COD) or pre-created bookings
-      if (urlBookingId) {
+      if (isOnlinePayment) {
+        if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
+            toast({ title: "Verification Failed", description: "Payment details are missing. Please contact support if you were charged.", variant: "destructive" });
+            router.push('/cart'); setIsLoadingPage(false); return;
+        }
         try {
-          const bookingRef = doc(db, 'bookings', urlBookingId);
-          const bookingSnap = await getDoc(bookingRef);
-
-          if (bookingSnap.exists()) {
-            const bookingData = bookingSnap.data() as FirestoreBooking;
-            const servicesSummary = (bookingData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
-            setBookingDetailsForDisplay({
-              ...bookingData,
-              id: urlBookingId,
-              servicesSummary,
-              createdAt: (() => {
-                const millis = getTimestampMillis(bookingData.createdAt);
-                if (!millis) return 'N/A';
-                const d = new Date(millis);
-                return `${formatDateInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')} ${formatTimeInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')}`;
-              })(),
-              scheduledDateDisplay: formatDateForDisplay(bookingData.scheduledDate, appConfig),
-              latitude: bookingData.latitude === undefined ? null : bookingData.latitude,
-              longitude: bookingData.longitude === undefined ? null : bookingData.longitude,
-              visitingChargeDisplayed: bookingData.visitingCharge || 0,
-              discountCode: bookingData.discountCode || null,
-              discountAmount: bookingData.discountAmount || 0,
+            const verificationResponse = await fetch('/api/razorpay/verify-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ razorpay_payment_id: razorpayPaymentId, razorpay_order_id: razorpayOrderId, razorpay_signature: razorpaySignature }),
             });
-
-            toast({ title: "Booking Confirmed!", description: `Your booking ID is ${bookingData.bookingId}.` });
-            await clearLocalStorageItems(currentUser?.uid);
-            setIsLoadingPage(false);
-            return;
-          }
-        } catch (fetchErr) {
-          console.error("Error loading booking details:", fetchErr);
+            const verificationResult = await verificationResponse.json();
+            if (!verificationResult.success || verificationResult.status !== 'captured') {
+                throw new Error(verificationResult.error || "Payment verification failed. Please contact support.");
+            }
+            toast({ title: "Payment Verified", description: "Your payment has been successfully verified." });
+            // Payment verified, we continue to create the booking
+        } catch (error) {
+            console.error("Error during regular payment verification:", error);
+            toast({ title: "Payment Error", description: (error as Error).message, variant: "destructive", duration: 7000 });
+            router.push('/checkout/payment'); setIsLoadingPage(false); return;
         }
       }
 
-      // Check remaining checkout entries from cart if no booking ID was found
-      const cartEntriesFromStorage = getActiveCheckoutEntries();
-      if (cartEntriesFromStorage.length === 0) {
-        if (currentUser) {
-          toast({ title: "Booking Processed", description: "Redirecting to My Bookings.", variant: "default" });
-          router.push('/my-bookings');
-        }
-        setIsLoadingPage(false);
-        return;
-      }
-
-      // Fallback: create booking securely via server-side API if no bookingId in URL
       try {
-        let customerAddressData: any = {};
-        const addressDataString = localStorage.getItem('wecanfixCustomerAddress');
-        if (addressDataString) {
-          try { customerAddressData = JSON.parse(addressDataString); } catch (e) {}
+        let customerEmail = "", scheduledDateStored = new Date().toLocaleDateString('en-CA'), scheduledTimeSlot = "10:00 AM";
+        let customerName = "Guest User", customerPhone = "N/A", addressLine1 = "N/A", addressLine2: string | undefined, city = "N/A", state = "N/A", pincode = "N/A";
+        let latitude: number | undefined, longitude: number | undefined;
+        let bookingDiscountCode: string | undefined;
+        let estimatedEndTime: string | undefined;
+        let currentCategoryId: string | null = null;
+        let storedInterveningBreaks: any[] = [];
+        let storedDailyTimeline: any[] = [];
+
+        if (typeof window !== 'undefined') {
+          const storedEmail = localStorage.getItem('wecanfixCustomerEmail');
+          customerEmail = (storedEmail && storedEmail.trim()) ? storedEmail : (currentUser?.email || "");
+          currentCategoryId = localStorage.getItem('wecanfixActiveCheckoutCategory');
+          scheduledDateStored = localStorage.getItem('wecanfixScheduledDate') || scheduledDateStored; 
+          scheduledTimeSlot = localStorage.getItem('wecanfixScheduledTimeSlot') || scheduledTimeSlot;
+          estimatedEndTime = localStorage.getItem('wecanfixEstimatedEndTime') || undefined;
+          const breaksStr = localStorage.getItem('wecanfixInterveningBreaks');
+          if (breaksStr) { try { storedInterveningBreaks = JSON.parse(breaksStr); } catch (e) {} }
+          const dailyTimelineStr = localStorage.getItem('wecanfixDailyTimeline');
+          if (dailyTimelineStr) { try { storedDailyTimeline = JSON.parse(dailyTimelineStr); } catch (e) {} }
+          bookingDiscountCode = localStorage.getItem('wecanfixBookingDiscountCode') || undefined;
+          const addressDataString = localStorage.getItem('wecanfixCustomerAddress');
+          if (addressDataString) { const addressData = JSON.parse(addressDataString); customerName = addressData.fullName || customerName; customerPhone = addressData.phone || customerPhone; customerEmail = addressData.email || customerEmail; addressLine1 = addressData.addressLine1 || addressLine1; addressLine2 = addressData.addressLine2 || undefined; city = addressData.city || city; state = addressData.state || state; pincode = addressData.pincode || pincode; latitude = addressData.latitude === null ? undefined : addressData.latitude; longitude = addressData.longitude === null ? undefined : addressData.longitude; }
         }
 
-        const serverRes = await fetch('/api/bookings/create', {
+        // Authoritative server-side booking creation and price calculation
+        const createCashRes = await fetch('/api/bookings/create-cash', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            items: cartEntriesFromStorage.map(e => ({ serviceId: e.serviceId, quantity: e.quantity })),
-            scheduledDate: localStorage.getItem('wecanfixScheduledDate') || "",
-            scheduledTimeSlot: localStorage.getItem('wecanfixScheduledTimeSlot') || "",
-            estimatedEndTime: localStorage.getItem('wecanfixEstimatedEndTime') || null,
-            interveningBreaks: (() => { try { return JSON.parse(localStorage.getItem('wecanfixInterveningBreaks') || '[]'); } catch (e) { return []; } })(),
-            dailyTimeline: (() => { try { return JSON.parse(localStorage.getItem('wecanfixDailyTimeline') || '[]'); } catch (e) { return []; } })(),
-            customerAddress: {
-              fullName: customerAddressData.fullName || currentUser?.displayName || 'Customer',
-              email: customerAddressData.email || currentUser?.email || '',
-              phone: customerAddressData.phone || (currentUser as any)?.phoneNumber || '',
-              addressLine1: customerAddressData.addressLine1 || '',
-              addressLine2: customerAddressData.addressLine2 || undefined,
-              city: customerAddressData.city || '',
-              state: customerAddressData.state || '',
-              pincode: customerAddressData.pincode || '',
-              latitude: customerAddressData.latitude || undefined,
-              longitude: customerAddressData.longitude || undefined,
+            cartEntries: cartEntriesFromStorage,
+            customerInfo: {
+              fullName: customerName,
+              email: customerEmail,
+              phone: customerPhone,
+              addressLine1,
+              addressLine2,
+              city,
+              state,
+              pincode,
+              latitude,
+              longitude,
             },
-            paymentMethod: isOnlinePayment ? 'Online' : 'Pay After Service',
-            promoCode: localStorage.getItem('wecanfixBookingDiscountCode') || undefined,
-            workCategoryId: localStorage.getItem('wecanfixActiveCheckoutCategory') || undefined,
-          })
+            schedule: {
+              scheduledDate: scheduledDateStored,
+              scheduledTimeSlot,
+              estimatedEndTime,
+              interveningBreaks: storedInterveningBreaks,
+              dailyTimeline: storedDailyTimeline,
+            },
+            workCategoryId: currentCategoryId,
+            promoCode: bookingDiscountCode,
+            userId: currentUser?.uid,
+          }),
         });
 
-        const serverData = await serverRes.json();
-        if (!serverRes.ok || !serverData.success) {
-          throw new Error(serverData.error || 'Failed to create booking on server.');
+        const createResult = await createCashRes.json();
+        if (!createResult.success) {
+          throw new Error(createResult.error || 'Failed to place booking.');
         }
 
-        const bookingRef = doc(db, 'bookings', serverData.bookingDocId);
-        const bookingSnap = await getDoc(bookingRef);
-        if (bookingSnap.exists()) {
-          const bookingData = bookingSnap.data() as FirestoreBooking;
-          const servicesSummary = (bookingData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
-          setBookingDetailsForDisplay({
-            ...bookingData,
-            id: serverData.bookingDocId,
-            servicesSummary,
+        const newBookingData = createResult.booking;
+        const newBookingId = createResult.bookingId;
+        const bookingDocId = createResult.bookingDocId;
+
+        const servicesSummary = (newBookingData.services || []).map((s: any) => `${s.name} (x${s.quantity})`).join(', ');
+
+        logUserActivity(
+          'newBooking',
+          {
+            bookingId: newBookingId,
+            bookingDocId: bookingDocId,
+            totalAmount: newBookingData.totalAmount,
+            paymentMethod: 'Pay After Service',
+            customerName,
+            customerPhone,
+            servicesSummary
+          },
+          currentUser?.uid,
+          !currentUser ? getGuestId() : null,
+          customerName
+        );
+
+        setBookingDetailsForDisplay({ 
+            ...newBookingData, 
+            id: bookingDocId, 
+            servicesSummary, 
             createdAt: (() => {
-              const millis = getTimestampMillis(bookingData.createdAt);
-              if (!millis) return 'N/A';
-              const d = new Date(millis);
-              return `${formatDateInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')} ${formatTimeInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')}`;
+                const millis = getTimestampMillis(newBookingData.createdAt);
+                if (!millis) return 'N/A';
+                const d = new Date(millis);
+                return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
             })(),
-            scheduledDateDisplay: formatDateForDisplay(bookingData.scheduledDate, appConfig),
-            latitude: bookingData.latitude === undefined ? null : bookingData.latitude,
-            longitude: bookingData.longitude === undefined ? null : bookingData.longitude,
-            visitingChargeDisplayed: bookingData.visitingCharge || 0,
-            discountCode: bookingData.discountCode || null,
-            discountAmount: bookingData.discountAmount || 0,
-          });
-        }
+            scheduledDateDisplay: formatDateForDisplay(newBookingData.scheduledDate, appConfig),
+            latitude: newBookingData.latitude === undefined ? null : newBookingData.latitude, 
+            longitude: newBookingData.longitude === undefined ? null : newBookingData.longitude, 
+            visitingChargeDisplayed: newBookingData.visitingCharge || 0, 
+            discountCode: newBookingData.discountCode, 
+            discountAmount: newBookingData.discountAmount, 
+            appliedPlatformFees: newBookingData.appliedPlatformFees 
+        } as any);
+        setIsLoadingPage(false);
+        toast({ title: "Booking Placed!", description: `Your booking ID is ${newBookingId}.`});
 
-        toast({ title: "Booking Confirmed!", description: `Your booking ID is ${serverData.bookingId}.` });
+        // --- FIRE AND FORGET: Server handles everything else safely ---
+        fetch('/api/bookings/post-process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingDocId: bookingDocId }),
+        }).catch(err => console.error("Error triggering server post-process:", err));
+
         await clearLocalStorageItems(currentUser?.uid);
 
       } catch (error) {
@@ -675,7 +633,7 @@ export default function ThankYouPage() {
     processPage();
   }, [isMounted, isLoadingAppSettings, appConfig, toast, router, currentUser, hideLoading]);
 
-  if (isLoadingPage || !isMounted || isLoadingAppSettings) {
+  if (isLoadingPage || !isMounted || isLoadingAppSettings || (!bookingDetailsForDisplay && !isCancellationConfirmation)) {
     return (
       <div className="max-w-2xl mx-auto px-2 sm:px-0">
         <CheckoutStepper currentStepId="confirmation" />
@@ -752,19 +710,11 @@ export default function ThankYouPage() {
                     <Home className="mr-2 h-4 w-4" /> Go to Home
                   </Button>
                 </Link>
-                {currentUser ? (
-                  <Link href="/my-bookings" passHref className="w-full sm:w-auto">
-                    <Button size="lg" className="w-full sm:w-auto h-12 font-bold rounded-xl shadow-lg shadow-primary/20">
-                      <ListOrdered className="mr-2 h-4 w-4" /> View My Bookings
-                    </Button>
-                  </Link>
-                ) : (
-                  <Link href="/contact-us" passHref className="w-full sm:w-auto">
-                    <Button size="lg" className="w-full sm:w-auto h-12 font-bold rounded-xl shadow-lg shadow-primary/20">
-                      <Mail className="mr-2 h-4 w-4" /> Need Help? Contact Us
-                    </Button>
-                  </Link>
-                )}
+                <Link href="/my-bookings" passHref className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto h-12 font-bold rounded-xl shadow-lg shadow-primary/20">
+                    <ListOrdered className="mr-2 h-4 w-4" /> View My Bookings
+                  </Button>
+                </Link>
             </CardFooter>
         </Card>
       </div>

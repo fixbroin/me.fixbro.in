@@ -10,7 +10,6 @@ import { generateInvoicePdf } from '@/lib/invoiceGenerator';
 import { triggerRefresh } from '@/lib/revalidateUtils';
 import { getZonedDate, formatScheduledDate, isCashPayment } from '@/lib/utils';
 import { getHaversineDistance } from '@/lib/locationUtils';
-import { getInternalApiSecret } from '@/lib/dbSecurity';
 
 // Define ADMIN_EMAIL - should match your AuthContext
 const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.com"; 
@@ -277,10 +276,7 @@ export async function POST(request: Request) {
                 try {
                     await fetch(`${getBaseUrl()}/api/send-push`, {
                         method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'x-internal-token': getInternalApiSecret()
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
                             userId: booking.providerId, 
                             title: "New Job Assigned!", 
@@ -459,10 +455,7 @@ export async function POST(request: Request) {
         try {
             await fetch(`${getBaseUrl()}/api/send-push`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'x-internal-token': getInternalApiSecret()
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     userId: pUserId, 
                     title: pTitle, 
@@ -663,10 +656,7 @@ export async function POST(request: Request) {
         if (isCompleted && marketingConfig.whatsAppOnBookingCompleted?.enabled) {
             tasks.push(fetch(`${getBaseUrl()}/api/whatsapp/send`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'x-internal-token': getInternalApiSecret()
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     to: booking.customerPhone,
                     templateName: marketingConfig.whatsAppOnBookingCompleted.templateName,
@@ -676,10 +666,7 @@ export async function POST(request: Request) {
         } else if (!isCompleted && marketingConfig.whatsAppOnBookingConfirmed?.enabled) {
             tasks.push(fetch(`${getBaseUrl()}/api/whatsapp/send`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'x-internal-token': getInternalApiSecret()
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     to: booking.customerPhone,
                     templateName: marketingConfig.whatsAppOnBookingConfirmed.templateName,
@@ -689,10 +676,7 @@ export async function POST(request: Request) {
         } else if (isCancelled && marketingConfig.whatsAppOnBookingCancelled?.enabled) {
             tasks.push(fetch(`${getBaseUrl()}/api/whatsapp/send`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'x-internal-token': getInternalApiSecret()
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     to: booking.customerPhone,
                     templateName: marketingConfig.whatsAppOnBookingCancelled.templateName,
@@ -795,10 +779,7 @@ export async function POST(request: Request) {
                 const baseUrl = getBaseUrl();
                 fetch(`${baseUrl}/api/send-push`, {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'x-internal-token': getInternalApiSecret()
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(pushParams)
                 }).catch(e => console.error("Error triggering referral completed push:", e));
             }

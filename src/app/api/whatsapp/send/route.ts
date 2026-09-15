@@ -3,10 +3,8 @@ import { type NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { getBaseUrl } from '@/lib/config';
 import { adminDb } from '@/lib/firebaseAdmin';
-import { verifyRequest, isUserAdmin } from '@/lib/dbSecurity';
-import { RateLimiter, getClientIp } from '@/lib/rateLimit';
-
-const waLimiter = new RateLimiter(20, 60 * 1000);
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { verifyRequest } from '@/lib/dbSecurity';
 
 // Handler for the POST method
 export async function POST(req: NextRequest) {
@@ -15,19 +13,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Method Not Allowed' }, { status: 405 });
   }
 
-  const clientIp = getClientIp(req);
-  const rateCheck = waLimiter.check(clientIp);
-  if (!rateCheck.allowed) {
-    return NextResponse.json({ success: false, error: 'Too many requests. Please try again later.' }, { status: 429 });
+  // 1. Rate Limiting
+  const rl = checkRateLimit(req, { max: 20, windowMs: 60 * 1000, keyPrefix: 'whatsapp-send' });
+  if (!rl.allowed) {
+    return rateLimitResponse(rl.resetTime);
+  }
+
+  // 2. Privilege Verification (Admins or Internal system tasks only)
+  const verification = await verifyRequest(req);
+  if (!verification.isInternalBypass && !verification.isAdmin) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized: WhatsApp dispatch requires administrative authorization.' },
+      { status: 401 }
+    );
   }
 
   try {
-    // Verify caller authentication
-    const user = await verifyRequest(req);
-    if (user.uid === 'guest') {
-      return NextResponse.json({ success: false, error: 'Authentication required to send WhatsApp notifications.' }, { status: 401 });
-    }
-
     // 1. Fetch Global Master Toggle & Credentials from Firestore
     const [marketingConfigDoc, marketingAutomationDoc] = await Promise.all([
       adminDb.collection('webSettings').doc('marketingConfiguration').get(),
@@ -61,23 +62,6 @@ export async function POST(req: NextRequest) {
     // Validate essential parameters
     if (!to || !templateName) {
       return NextResponse.json({ success: false, error: 'Missing `to` or `templateName` in request body.' }, { status: 400 });
-    }
-
-    // Verify non-admin permissions: only allow sending welcome template to own phone number
-    if (!user.isInternal && !isUserAdmin(user)) {
-      const allowedSignupTemplate = marketingAutomation?.whatsAppOnSignup?.templateName;
-      if (!allowedSignupTemplate || templateName !== allowedSignupTemplate) {
-        return NextResponse.json({ success: false, error: 'Forbidden: Insufficient permissions to dispatch arbitrary WhatsApp templates.' }, { status: 403 });
-      }
-
-      const userDoc = await adminDb.collection('users').doc(user.uid).get();
-      const userPhone = userDoc.data()?.mobileNumber || userDoc.data()?.phoneNumber || '';
-      const cleanTo = String(to).replace(/\D/g, '');
-      const cleanUserPhone = String(userPhone).replace(/\D/g, '');
-
-      if (!cleanUserPhone || !cleanTo.endsWith(cleanUserPhone.slice(-10))) {
-        return NextResponse.json({ success: false, error: 'Forbidden: You may only send notifications to your own verified phone number.' }, { status: 403 });
-      }
     }
 
     // Construct the components array

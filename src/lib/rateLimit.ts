@@ -1,84 +1,81 @@
-﻿interface RateLimitRecord {
+// src/lib/rateLimit.ts
+import { type NextRequest, NextResponse } from 'next/server';
+
+interface RateLimitEntry {
   count: number;
   resetTime: number;
 }
 
-/**
- * In-memory sliding window rate limiter.
- * Protects privileged and sensitive endpoints from brute force and enumeration attacks.
- */
-export class RateLimiter {
-  private store = new Map<string, RateLimitRecord>();
-  private maxRequests: number;
-  private windowMs: number;
+const rateLimitStore = new Map<string, RateLimitEntry>();
 
-  constructor(maxRequests: number, windowMs: number) {
-    this.maxRequests = maxRequests;
-    this.windowMs = windowMs;
-
-    // Periodically clean up expired records
-    if (typeof setInterval !== 'undefined') {
-      const timer = setInterval(() => {
-        const now = Date.now();
-        for (const [key, val] of this.store.entries()) {
-          if (now > val.resetTime) {
-            this.store.delete(key);
-          }
-        }
-      }, 5 * 60 * 1000);
-      if (timer && typeof timer === 'object' && 'unref' in timer) {
-        (timer as any).unref();
+// Clean up stale entries every 5 minutes to prevent memory leak
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of rateLimitStore.entries()) {
+      if (entry.resetTime < now) {
+        rateLimitStore.delete(key);
       }
     }
-  }
-
-  public check(identifier: string): { allowed: boolean; remaining: number; retryAfterSeconds: number } {
-    const now = Date.now();
-    const record = this.store.get(identifier);
-
-    if (!record || now > record.resetTime) {
-      this.store.set(identifier, { count: 1, resetTime: now + this.windowMs });
-      return { allowed: true, remaining: this.maxRequests - 1, retryAfterSeconds: 0 };
-    }
-
-    if (record.count >= this.maxRequests) {
-      const retryAfterSeconds = Math.max(1, Math.ceil((record.resetTime - now) / 1000));
-      return { allowed: false, remaining: 0, retryAfterSeconds };
-    }
-
-    record.count += 1;
-    return {
-      allowed: true,
-      remaining: this.maxRequests - record.count,
-      retryAfterSeconds: 0,
-    };
-  }
+  }, 5 * 60 * 1000);
 }
 
-/**
- * Extracts client IP safely from common proxy headers.
- */
-export function getClientIp(req: Request | any): string {
-  try {
-    const headers = req.headers;
-    const forwarded = typeof headers?.get === 'function' 
-      ? headers.get('x-forwarded-for') 
-      : headers?.['x-forwarded-for'];
-      
-    if (forwarded && typeof forwarded === 'string') {
-      return forwarded.split(',')[0].trim();
-    }
+export function getClientIp(req: NextRequest | Request): string {
+  const forwarded = req.headers.get('x-forwarded-for');
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp) {
+    return realIp.trim();
+  }
+  return '127.0.0.1';
+}
 
-    const realIp = typeof headers?.get === 'function' 
-      ? headers.get('x-real-ip') 
-      : headers?.['x-real-ip'];
-      
-    if (realIp && typeof realIp === 'string') {
-      return realIp.trim();
-    }
-  } catch (e) {
-    // Fallback if headers object is unavailable
+export interface RateLimitOptions {
+  windowMs?: number; // Time window in milliseconds (default: 60,000 = 1 min)
+  max?: number;      // Max allowed requests in the window (default: 60)
+  keyPrefix?: string;
+}
+
+export function checkRateLimit(
+  req: NextRequest | Request,
+  options: RateLimitOptions = {}
+): { allowed: boolean; remaining: number; resetTime: number } {
+  const windowMs = options.windowMs || 60 * 1000;
+  const max = options.max || 60;
+  const prefix = options.keyPrefix || 'global';
+  const ip = getClientIp(req);
+  const key = `${prefix}:${ip}`;
+
+  const now = Date.now();
+  const entry = rateLimitStore.get(key);
+
+  if (!entry || entry.resetTime < now) {
+    rateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
+    return { allowed: true, remaining: max - 1, resetTime: now + windowMs };
   }
 
-  return '127.0.0.1';
+  entry.count += 1;
+  if (entry.count > max) {
+    return { allowed: false, remaining: 0, resetTime: entry.resetTime };
+  }
+
+  return { allowed: true, remaining: max - entry.count, resetTime: entry.resetTime };
+}
+
+export function rateLimitResponse(resetTime: number) {
+  const retryAfterSec = Math.max(1, Math.ceil((resetTime - Date.now()) / 1000));
+  return NextResponse.json(
+    {
+      success: false,
+      error: 'Too many requests. Please slow down and try again later.',
+    },
+    {
+      status: 429,
+      headers: {
+        'Retry-After': retryAfterSec.toString(),
+      },
+    }
+  );
 }

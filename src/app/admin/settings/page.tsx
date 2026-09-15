@@ -1487,7 +1487,7 @@ export default function AdminSettingsPage() {
                   </div>
                   <div className="space-y-2">
                       <Label htmlFor="senderEmail">Sender Email Address</Label>
-                      <Input id="senderEmail" name="senderEmail" type="email" value={settings.senderEmail} onChange={handleInputChange} placeholder="e.g., no-reply@yourdomain.com" disabled={isSaving}/>
+                      <Input id="senderEmail" name="senderEmail" type="email" value={settings.senderEmail} onChange={handleInputChange} placeholder="e.g., no-reply@wecanfix.in" disabled={isSaving}/>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">

@@ -2,33 +2,32 @@ import mysql from 'mysql2/promise';
 import { Timestamp, isTimestamp } from './timestamp';
 export { Timestamp };
 
-function getDbConnectionConfig() {
-  const connUrl = process.env.MYSQL_URL || process.env.DATABASE_URL;
-  if (connUrl && !process.env.MYSQL_HOST) {
+function getMySqlConfig() {
+  const dbUrl = process.env.DATABASE_URL;
+  if (dbUrl && (dbUrl.startsWith('mysql://') || dbUrl.startsWith('mysql2://'))) {
     try {
-      const parsed = new URL(connUrl);
+      const parsed = new URL(dbUrl);
       return {
         host: parsed.hostname || 'localhost',
         user: decodeURIComponent(parsed.username || 'root'),
         password: decodeURIComponent(parsed.password || ''),
-        database: (parsed.pathname || '/wecanfix_db').replace(/^\//, '') || 'wecanfix_db',
-        port: parseInt(parsed.port || '3306', 10)
+        databaseName: (parsed.pathname || '').replace(/^\//, '') || 'wecanfix_db',
+        port: parseInt(parsed.port || '3306', 10),
       };
     } catch (e) {
-      console.warn("Failed to parse DATABASE_URL / MYSQL_URL, falling back to individual variables:", e);
+      console.warn("Failed to parse DATABASE_URL, falling back to MYSQL_* variables:", e);
     }
   }
-
   return {
     host: process.env.MYSQL_HOST || 'localhost',
     user: process.env.MYSQL_USER || 'root',
     password: process.env.MYSQL_PASSWORD || '',
-    database: process.env.MYSQL_DATABASE || 'wecanfix_db',
-    port: parseInt(process.env.MYSQL_PORT || '3306', 10)
+    databaseName: process.env.MYSQL_DATABASE || 'wecanfix_db',
+    port: parseInt(process.env.MYSQL_PORT || '3306', 10),
   };
 }
 
-const { host, user, password, database: databaseName, port } = getDbConnectionConfig();
+const { host, user, password, databaseName, port } = getMySqlConfig();
 
 let poolPromise: Promise<mysql.Pool> | null = null;
 let isInitialized = false;

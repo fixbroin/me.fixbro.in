@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils";
 import { Loader2, SendHorizonal, Trash2, PlusCircle, AlertTriangle, Check, ChevronsUpDown, Search } from "lucide-react"; 
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { auth } from '@/lib/firebase';
 
 const testSenderFormSchema = z.object({
   templateName: z.string({ required_error: "Please select a template."}),
@@ -90,17 +89,9 @@ export default function WhatsAppTestSenderForm() {
     toast({ title: "Sending Test Message..." });
     
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (auth?.currentUser) {
-        try {
-          const token = await auth.currentUser.getIdToken();
-          headers['Authorization'] = `Bearer ${token}`;
-        } catch (e) {}
-      }
-
       const response = await fetch('/api/whatsapp/send', {
         method: 'POST',
-        headers,
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: data.phoneNumber,
           templateName: data.templateName,
