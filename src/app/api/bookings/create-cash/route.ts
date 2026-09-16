@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { calculateServerBookingTotal } from '@/lib/bookingPricingServer';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
@@ -17,6 +18,8 @@ export async function POST(req: NextRequest) {
       workCategoryId,
       promoCode,
       userId,
+      paymentMethod,
+      paymentDetails,
     } = body;
 
     if (!Array.isArray(cartEntries) || cartEntries.length === 0) {
@@ -65,11 +68,61 @@ export async function POST(req: NextRequest) {
       categoryId: workCategoryId,
     });
 
-    // 2. Sequential Booking Number and ID Generation
+    // 2. Authoritative Online Payment Verification (if requested)
+    let finalPaymentMethod = 'Pay After Service';
+    let finalStatus = 'Pending Payment';
+    let onlinePaymentFields: Record<string, any> = {};
+
+    if (paymentMethod === 'Online') {
+      const razorpayPaymentId = paymentDetails?.razorpayPaymentId || paymentDetails?.razorpay_payment_id;
+      const razorpayOrderId = paymentDetails?.razorpayOrderId || paymentDetails?.razorpay_order_id;
+      const razorpaySignature = paymentDetails?.razorpaySignature || paymentDetails?.razorpay_signature;
+
+      if (!razorpayPaymentId || !razorpayOrderId || !razorpaySignature) {
+        return NextResponse.json(
+          { success: false, error: 'Payment details are required for online booking.' },
+          { status: 400 }
+        );
+      }
+
+      const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
+      const appConfig = appConfigSnap.exists ? (appConfigSnap.data() as any) : null;
+      const razorpayKeySecret = appConfig?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
+
+      if (!razorpayKeySecret) {
+        return NextResponse.json(
+          { success: false, error: 'Payment gateway secret not configured on server.' },
+          { status: 500 }
+        );
+      }
+
+      const verificationPayload = `${razorpayOrderId}|${razorpayPaymentId}`;
+      const expectedSignature = crypto
+        .createHmac('sha256', razorpayKeySecret)
+        .update(verificationPayload.toString())
+        .digest('hex');
+
+      if (expectedSignature !== razorpaySignature) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid online payment signature.' },
+          { status: 400 }
+        );
+      }
+
+      finalPaymentMethod = 'Online';
+      finalStatus = 'Confirmed';
+      onlinePaymentFields = {
+        razorpayPaymentId,
+        razorpayOrderId,
+        razorpaySignature,
+      };
+    }
+
+    // 3. Sequential Booking Number and ID Generation
     const nextBookingNumber = await assignNewBookingNumber();
     const newBookingId = generateBookingId();
 
-    // 3. Construct Authoritative Booking Record
+    // 4. Construct Authoritative Booking Record
     const newBookingData = {
       bookingId: newBookingId,
       bookingNumber: nextBookingNumber,
@@ -98,8 +151,9 @@ export async function POST(req: NextRequest) {
       ...(pricing.appliedPlatformFees.length > 0 && { appliedPlatformFees: pricing.appliedPlatformFees }),
       ...(pricing.discountCode && { discountCode: pricing.discountCode }),
       ...(pricing.discountAmount > 0 && { discountAmount: pricing.discountAmount }),
-      paymentMethod: 'Pay After Service',
-      status: 'Pending Payment',
+      paymentMethod: finalPaymentMethod,
+      status: finalStatus,
+      ...onlinePaymentFields,
       createdAt: Timestamp.now(),
       isReviewedByCustomer: false,
       ...(workCategoryId && { workCategoryId }),
@@ -107,13 +161,33 @@ export async function POST(req: NextRequest) {
 
     const docRef = await adminDb.collection('bookings').add(newBookingData);
 
-    // 4. Trigger Server-Side Post Processing (Notifications, Dispatch, WhatsApp)
+    // 5. Trigger Server-Side Post Processing (Notifications, Dispatch, WhatsApp)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3006';
     fetch(`${appUrl}/api/bookings/post-process`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookingDocId: docRef.id, triggerSource: 'cash_checkout' }),
-    }).catch((err) => console.error('Error triggering post-process for cash booking:', err));
+      body: JSON.stringify({ 
+        bookingDocId: docRef.id, 
+        triggerSource: finalPaymentMethod === 'Online' ? 'online_checkout' : 'cash_checkout' 
+      }),
+    }).catch((err) => console.error('Error triggering post-process for booking:', err));
+
+    // Send in-app notification if online booking placed by logged in user
+    if (finalPaymentMethod === 'Online' && resolvedUserId) {
+      try {
+        await adminDb.collection('userNotifications').add({
+          userId: resolvedUserId,
+          title: 'Booking Confirmed!',
+          message: `Your booking ${newBookingId} has been successfully placed. We'll assign a provider shortly.`,
+          type: 'success',
+          href: '/my-bookings',
+          read: false,
+          createdAt: Timestamp.now(),
+        });
+      } catch (notifyErr) {
+        console.error('Error sending in-app notification for online booking:', notifyErr);
+      }
+    }
 
     return NextResponse.json({
       success: true,

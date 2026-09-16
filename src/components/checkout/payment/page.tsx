@@ -681,6 +681,9 @@ export default function PaymentPage() {
           localStorage.setItem('razorpaySignature', response.razorpay_signature);
           localStorage.setItem('wecanfixPaymentMethod', 'Online');
           localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
+          if (pendingBookingDocId) {
+            localStorage.setItem('pendingBookingDocId', pendingBookingDocId);
+          }
 
           if (isCancellationFeeMode && cancellationFeeDetails) {
             localStorage.setItem('isProcessingCancellationFee', 'true');
@@ -814,6 +817,7 @@ export default function PaymentPage() {
 
       localStorage.setItem('wecanfixPaymentMethod', 'Online');
       localStorage.setItem('wecanfixFinalBookingTotal', totalAmountDue.toString());
+      localStorage.setItem('pendingBookingDocId', docRef.id);
       if (appliedPromoCode) {
         localStorage.setItem('wecanfixBookingDiscountCode', appliedPromoCode.code);
         localStorage.setItem('wecanfixBookingDiscountAmount', appliedPromoCode.calculatedDiscount.toString());

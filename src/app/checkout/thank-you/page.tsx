@@ -87,6 +87,7 @@ const clearLocalStorageItems = async (uid?: string) => {
         localStorage.removeItem('cancellationFeeAmount');
         localStorage.removeItem('wecanfixPaymentMethod');
         localStorage.removeItem('wecanfixFinalBookingTotal');
+        localStorage.removeItem('pendingBookingDocId');
     }
 };
 
@@ -333,7 +334,7 @@ export default function ThankYouPage() {
       }
 
       // --- 2. Handle Regular Booking Confirmation ---
-      const stripeBookingId = searchParams.get('bookingId');
+      const stripeBookingId = searchParams.get('bookingId') || (typeof window !== 'undefined' ? localStorage.getItem('pendingBookingDocId') : null);
       const isStripeBooking = stripePaymentMethod === 'stripe' && !isProcessingCancellationFee;
 
       if (isStripeBooking) {
@@ -381,7 +382,7 @@ export default function ThankYouPage() {
                         const millis = getTimestampMillis(bookingData.createdAt);
                         if (!millis) return 'N/A';
                         const d = new Date(millis);
-                        return `${formatDateInTimezone(d, 'Asia/Kolkata')} ${formatTimeInTimezone(d, 'Asia/Kolkata')}`;
+                        return `${formatDateInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')} ${formatTimeInTimezone(d, appConfig?.timezone || 'Asia/Kolkata')}`;
                     })(),
                     scheduledDateDisplay: formatDateForDisplay(bookingData.scheduledDate, appConfig),
                     latitude: bookingData.latitude === undefined ? null : bookingData.latitude, 
@@ -389,6 +390,8 @@ export default function ThankYouPage() {
                     visitingChargeDisplayed: bookingData.visitingCharge || 0, 
                     discountCode: bookingData.discountCode || null, 
                     discountAmount: bookingData.discountAmount || 0, 
+                    paymentMethod: 'Online',
+                    status: 'Confirmed',
                 });
             } else {
                 throw new Error("Booking record not found.");
@@ -407,7 +410,7 @@ export default function ThankYouPage() {
         return;
       }
 
-      const urlBookingId = searchParams.get('bookingId');
+      const urlBookingId = searchParams.get('bookingId') || (typeof window !== 'undefined' ? localStorage.getItem('pendingBookingDocId') : null);
       const isRazorpayBooking = (searchParams.get('payment_method') === 'razorpay' || (isOnlinePayment && !!urlBookingId)) && !isProcessingCancellationFee;
 
       if (isRazorpayBooking && urlBookingId) {
@@ -419,7 +422,12 @@ export default function ThankYouPage() {
             const verificationResponse = await fetch('/api/razorpay/verify-payment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ razorpay_payment_id: razorpayPaymentId, razorpay_order_id: razorpayOrderId, razorpay_signature: razorpaySignature }),
+                body: JSON.stringify({ 
+                    razorpay_payment_id: razorpayPaymentId, 
+                    razorpay_order_id: razorpayOrderId, 
+                    razorpay_signature: razorpaySignature,
+                    bookingId: urlBookingId
+                }),
             });
             const verificationResult = await verificationResponse.json();
             if (!verificationResult.success || verificationResult.status !== 'captured') {
@@ -467,6 +475,8 @@ export default function ThankYouPage() {
                     visitingChargeDisplayed: bookingData.visitingCharge || 0, 
                     discountCode: bookingData.discountCode || null, 
                     discountAmount: bookingData.discountAmount || 0, 
+                    paymentMethod: 'Online',
+                    status: 'Confirmed',
                 });
             } else {
                 throw new Error("Booking record not found.");
@@ -575,6 +585,12 @@ export default function ThankYouPage() {
             workCategoryId: currentCategoryId,
             promoCode: bookingDiscountCode,
             userId: effectiveUserId,
+            paymentMethod: isOnlinePayment ? 'Online' : 'Pay After Service',
+            paymentDetails: isOnlinePayment ? {
+              razorpayPaymentId,
+              razorpayOrderId,
+              razorpaySignature
+            } : undefined,
           }),
         });
 
@@ -589,13 +605,16 @@ export default function ThankYouPage() {
 
         const servicesSummary = (newBookingData.services || []).map((s: any) => `${s.name} (x${s.quantity})`).join(', ');
 
+        const finalMethod = newBookingData.paymentMethod || (isOnlinePayment ? 'Online' : 'Pay After Service');
+        const finalStatus = newBookingData.status || (isOnlinePayment ? 'Confirmed' : 'Pending Payment');
+
         logUserActivity(
           'newBooking',
           {
             bookingId: newBookingId,
             bookingDocId: bookingDocId,
             totalAmount: newBookingData.totalAmount,
-            paymentMethod: 'Pay After Service',
+            paymentMethod: finalMethod,
             customerName,
             customerPhone,
             servicesSummary
@@ -621,19 +640,24 @@ export default function ThankYouPage() {
             visitingChargeDisplayed: newBookingData.visitingCharge || 0, 
             discountCode: newBookingData.discountCode, 
             discountAmount: newBookingData.discountAmount, 
-            appliedPlatformFees: newBookingData.appliedPlatformFees 
+            appliedPlatformFees: newBookingData.appliedPlatformFees,
+            paymentMethod: finalMethod,
+            status: finalStatus,
         } as any);
         setIsLoadingPage(false);
         toast({ title: "Booking Placed!", description: `Your booking ID is ${newBookingId}.`});
 
         // --- FIRE AND FORGET: Server handles everything else safely ---
-        fetch('/api/bookings/post-process', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bookingDocId: bookingDocId }),
-        }).catch(err => console.error("Error triggering server post-process:", err));
+        if (!isOnlinePayment) {
+          fetch('/api/bookings/post-process', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ bookingDocId: bookingDocId }),
+          }).catch(err => console.error("Error triggering server post-process:", err));
+        }
 
         await clearLocalStorageItems(currentUser?.uid);
+        return;
 
       } catch (error) {
         console.error("Error creating booking:", error);

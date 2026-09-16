@@ -717,6 +717,12 @@ export default function MyBookingsPage() {
                     <p className="text-muted-foreground">Total Amount</p>
                     <p className="font-medium">{formatCurrency(booking.totalAmount, symbol, decimals, code)}</p>
                   </div>
+                  <div>
+                    <p className="text-muted-foreground">Payment Method</p>
+                    <p className="font-medium">
+                      {(booking.paymentMethod === 'Online' || !!booking.razorpayPaymentId || !!booking.stripePaymentIntent || !!booking.stripeSessionId) ? 'Online' : 'Pay After Service'}
+                    </p>
+                  </div>
                   <div className="sm:col-span-2 md:col-span-3">
                     <p className="text-muted-foreground">Booked On</p>
                     <p className="font-medium">{formatBookingTimestamp(booking.createdAt)}</p>
