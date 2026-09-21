@@ -157,14 +157,14 @@ export async function POST(request: Request) {
     };
 
     // 3. Send to all registered tokens for this user
+    const deadTokens: string[] = [];
+
     const sendPromises = tokens.map(token => 
       messaging.send({
         ...messagePayload,
         token,
       }).catch(async (err: any) => {
-        console.error(`Failed to send push to token ${token}:`, err);
-        
-        // Handle dead or invalid tokens
+        // Check if token has become dead or invalid
         const isDeadToken = 
             err.code === 'messaging/registration-token-not-registered' || 
             err.code === 'messaging/invalid-argument' ||
@@ -174,21 +174,42 @@ export async function POST(request: Request) {
             err.errorInfo?.code === 'messaging/registration-token-not-registered';
 
         if (isDeadToken) {
-            console.log(`Token ${token} is no longer valid. Deleting from Firestore for user ${userId}...`);
-            try {
-                await adminDb.collection('users').doc(userId).update({
-                    [`fcmTokens.${token}`]: admin.firestore.FieldValue.delete()
-                });
-                console.log(`Successfully removed dead token ${token} for user ${userId}`);
-            } catch (deleteErr) {
-                console.error(`Failed to delete dead token ${token} from Firestore:`, deleteErr);
-            }
+            console.warn(`[send-push] FCM token unregistered/expired for user ${userId} (${token.slice(0, 20)}...). Queued for removal.`);
+            deadTokens.push(token);
+        } else {
+            console.error(`Failed to send push to token ${token}:`, err);
         }
         return null;
       })
     );
 
     await Promise.all(sendPromises);
+
+    // Prune dead tokens directly from MySQL user document
+    if (deadTokens.length > 0) {
+      try {
+        const freshUserDoc = await adminDb.collection('users').doc(userId).get();
+        if (freshUserDoc.exists) {
+          const freshData = freshUserDoc.data() || {};
+          const currentTokens = { ...(freshData.fcmTokens || {}) };
+          let changed = false;
+          for (const dToken of deadTokens) {
+            if (dToken in currentTokens) {
+              delete currentTokens[dToken];
+              changed = true;
+            }
+          }
+          if (changed) {
+            await adminDb.collection('users').doc(userId).update({
+              fcmTokens: currentTokens
+            });
+            console.log(`[send-push] Successfully pruned ${deadTokens.length} dead FCM token(s) for user ${userId}`);
+          }
+        }
+      } catch (pruneErr) {
+        console.error(`[send-push] Failed to prune dead tokens for user ${userId}:`, pruneErr);
+      }
+    }
 
     return NextResponse.json({ success: true, message: `Push sent to ${tokens.length} devices.` });
 
