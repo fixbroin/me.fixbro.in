@@ -235,6 +235,7 @@ export function validateAccess(user: RequestUser, path: string, action: 'read' |
   if ([
     'contactUsSubmissions',
     'popupSubmissions',
+    'userActivities',
     'outOfZoneRequests',
     'visitorInfoLogs',
     'searchAnalytics',

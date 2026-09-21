@@ -224,16 +224,16 @@ export default function AdminActivityFeedPage() {
       
       const isGroupableType = enhancedActivity.eventType === 'addToCart' || enhancedActivity.eventType === 'removeFromCart';
       
-      if (isSameUser && prev.eventType === enhancedActivity.eventType && isGroupableType && prev.eventData.serviceId === enhancedActivity.eventData.serviceId) {
+      if (isSameUser && prev.eventType === enhancedActivity.eventType && isGroupableType && prev.eventData?.serviceId === enhancedActivity.eventData?.serviceId) {
         prev._isGrouped = true;
         prev._groupCount = (prev._groupCount || 1) + 1;
-        if (enhancedActivity.eventData.quantity) {
-          prev._totalQuantity = (prev._totalQuantity || prev.eventData.quantity || 0) + enhancedActivity.eventData.quantity;
+        if (enhancedActivity.eventData?.quantity) {
+          prev._totalQuantity = (prev._totalQuantity || prev.eventData?.quantity || 0) + enhancedActivity.eventData.quantity;
         }
       } else {
         const newActivity = { ...enhancedActivity } as GroupedUserActivity;
         if (isGroupableType) {
-          newActivity._totalQuantity = enhancedActivity.eventData.quantity;
+          newActivity._totalQuantity = enhancedActivity.eventData?.quantity;
           newActivity._groupCount = 1;
         }
         result.push(newActivity);
@@ -245,7 +245,7 @@ export default function AdminActivityFeedPage() {
   // Separate activities into Customer and Provider activities
   const customerActivities = useMemo(() => {
     return displayActivities.filter(a => {
-      const isProvider = a.eventType.startsWith('provider') || 
+      const isProvider = a.eventType?.startsWith('provider') || 
                          a.eventData?.pageUrl?.startsWith('/provider') || 
                          a.eventData?.pageUrl?.includes('/provider');
       return !isProvider;
@@ -254,7 +254,7 @@ export default function AdminActivityFeedPage() {
 
   const providerActivities = useMemo(() => {
     return displayActivities.filter(a => {
-      const isProvider = a.eventType.startsWith('provider') || 
+      const isProvider = a.eventType?.startsWith('provider') || 
                          a.eventData?.pageUrl?.startsWith('/provider') || 
                          a.eventData?.pageUrl?.includes('/provider');
       return isProvider;

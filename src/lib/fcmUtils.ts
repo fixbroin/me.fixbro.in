@@ -34,6 +34,25 @@ export const initializeFCM = async (userId?: string | null): Promise<string | nu
     return null;
   }
 
+  // If in Flutter WebView, sync native FCM token provided by Flutter App
+  if (isWebView()) {
+    const nativeToken = (window as any).fcmDeviceToken;
+    if (nativeToken && typeof nativeToken === 'string' && nativeToken.length > 0) {
+      console.log("FCM Utils: Syncing native Flutter FCM token to Firestore for user:", userId);
+      try {
+        const userDocRef = doc(db, "users", userId);
+        await setDoc(userDocRef, {
+          fcmTokens: {
+            [nativeToken]: Timestamp.now()
+          }
+        }, { merge: true });
+        return nativeToken;
+      } catch (e) {
+        console.error("FCM Utils: Failed to sync native FCM token:", e);
+      }
+    }
+  }
+
   const supported = await isSupported();
   if (!supported) {
     console.log("FCM Utils: Firebase Messaging is not supported in this browser.");
