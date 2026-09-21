@@ -135,11 +135,11 @@ export async function POST(request: Request) {
     const isAdminNotification = ['admin_provider_deposit_alert', 'admin_wallet_complaint_alert', 'new_review', 'new_inquiry', 'custom_request'].includes(pushType);
     const isProviderNotification = ['provider_assigned', 'withdrawal_status', 'provider_wallet_deposit', 'provider_wallet_refund'].includes(pushType);
     
-    let targetChannelId = 'wecanfix_orders_channel';
+    let targetChannelId = 'wecanfix_orders_channel_v2';
     if (isAdminNotification) {
-      targetChannelId = 'wecanfix_admin_channel';
+      targetChannelId = 'wecanfix_admin_channel_v2';
     } else if (isProviderNotification) {
-      targetChannelId = 'wecanfix_provider_channel';
+      targetChannelId = 'wecanfix_provider_channel_v2';
     }
 
     const isOrderSound = sound === 'order' || ['booking_created', 'booking_completed', 'provider_assigned', 'admin_wallet_complaint_alert'].includes(pushType);
@@ -170,10 +170,13 @@ export async function POST(request: Request) {
           title: finalTitle,
           body: finalBody,
           channelId: targetChannelId,
-          sound: targetSoundName,
+          sound: isOrderSound ? 'order_sound' : 'default',
           priority: 'max' as const,
           defaultVibrateTimings: true,
-          defaultSound: false,
+          defaultSound: !isOrderSound,
+          visibility: 'public' as const,
+          clickAction: href || '/',
+          ticker: finalTitle,
         },
         data: {
           title: finalTitle,

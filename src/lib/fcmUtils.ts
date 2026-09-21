@@ -5,7 +5,7 @@ import { getMessaging, getToken, onMessage, isSupported } from "firebase/messagi
 import { app, db, auth } from "./firebase"; // Ensure your firebase.ts exports 'app'
 import { doc, setDoc, Timestamp, getDoc } from '@/lib/mysqlDb';
 import type { MarketingSettings } from "@/types/firestore";
-import { isWebView, sendPushNotificationData } from './webview-bridge'; // Import WebView bridge functions
+import { isWebView, sendPushNotificationData, postToFlutter } from './webview-bridge'; // Import WebView bridge functions
 
 let marketingSettingsCache: MarketingSettings | null = null;
 
@@ -27,6 +27,38 @@ const getMarketingSettings = async (): Promise<MarketingSettings | null> => {
   }
 };
 
+export const syncNativeFcmToken = async (token: string, explicitUserId?: string | null): Promise<boolean> => {
+  if (typeof window === 'undefined' || !token) return false;
+  const targetUid = explicitUserId || auth?.currentUser?.uid || localStorage.getItem('wecanfix_user_uid');
+  if (!targetUid) {
+    (window as any).fcmDeviceToken = token;
+    return false;
+  }
+  try {
+    const userDocRef = doc(db, "users", targetUid);
+    await setDoc(userDocRef, {
+      fcmTokens: {
+        [token]: Timestamp.now()
+      }
+    }, { merge: true });
+    console.log("FCM Utils: Successfully synced native FCM token for user:", targetUid);
+    return true;
+  } catch (e) {
+    console.error("FCM Utils: Error syncing native FCM token:", e);
+    return false;
+  }
+};
+
+if (typeof window !== 'undefined') {
+  (window as any).syncNativeFcmToken = syncNativeFcmToken;
+  window.addEventListener('flutterNativeReady', (e: any) => {
+    const token = e.detail?.deviceToken || (window as any).fcmDeviceToken;
+    if (token) {
+      syncNativeFcmToken(token);
+    }
+  });
+}
+
 // Function to initialize Firebase Cloud Messaging and request permission
 export const initializeFCM = async (userId?: string | null): Promise<string | null> => {
   if (typeof window === 'undefined' || !userId) {
@@ -38,19 +70,11 @@ export const initializeFCM = async (userId?: string | null): Promise<string | nu
   if (isWebView()) {
     const nativeToken = (window as any).fcmDeviceToken;
     if (nativeToken && typeof nativeToken === 'string' && nativeToken.length > 0) {
-      console.log("FCM Utils: Syncing native Flutter FCM token to Firestore for user:", userId);
-      try {
-        const userDocRef = doc(db, "users", userId);
-        await setDoc(userDocRef, {
-          fcmTokens: {
-            [nativeToken]: Timestamp.now()
-          }
-        }, { merge: true });
-        return nativeToken;
-      } catch (e) {
-        console.error("FCM Utils: Failed to sync native FCM token:", e);
-      }
+      await syncNativeFcmToken(nativeToken, userId);
+      return nativeToken;
     }
+    // Proactively request token from Flutter bridge if not yet set
+    postToFlutter({ action: 'syncFcmToken' });
   }
 
   const supported = await isSupported();
