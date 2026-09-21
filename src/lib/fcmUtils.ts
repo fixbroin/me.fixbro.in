@@ -147,7 +147,8 @@ export const onForegroundMessage = async () => {
         window.location.href = url;
         notification.close();
       };
-    });
+    }
+  });
   } catch (e) {
     console.warn("FCM Utils: Could not attach foreground message listener:", e);
   }

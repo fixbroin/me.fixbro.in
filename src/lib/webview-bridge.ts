@@ -181,3 +181,13 @@ export const requestFileDownload = (url: string, fileName?: string) => {
     document.body.removeChild(link);
   }
 };
+
+/**
+ * Sends push notification data to the native Flutter app when received in WebView foreground.
+ */
+export const sendPushNotificationData = (payload: any) => {
+  if (isWebView()) {
+    postToFlutter({ action: 'pushNotificationData', payload });
+  }
+};
+

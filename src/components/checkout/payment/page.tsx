@@ -28,7 +28,7 @@ import { logUserActivity } from '@/lib/activityLogger';
 import { useAuth as useAuthHook } from '@/hooks/useAuth';
 import { getGuestId } from '@/lib/guestIdManager';
 import { useGlobalSettings } from '@/hooks/useGlobalSettings';
-import { isWebView, requestNativePayment } from '@/lib/webview-bridge';
+import { isWebView } from '@/lib/webview-bridge';
 import { getTimestampMillis } from '@/lib/utils';
 
 
@@ -580,18 +580,6 @@ export default function PaymentPage() {
   const handleRazorpayCheckout = async () => {
     setIsProcessingPayment(true);
     showLoading();
-
-    if (isWebView()) {
-        const paymentDetails = {
-            amount: Math.round(totalAmountDue * 100),
-            currency: appConfig?.currencyCode || 'INR',
-            description: isCancellationFeeMode && cancellationFeeDetails?.humanReadableBookingId ? `Cancellation Fee for Booking ${cancellationFeeDetails.humanReadableBookingId}` : "Service Booking Payment"
-        };
-        requestNativePayment(paymentDetails);
-        setIsProcessingPayment(false);
-        hideLoading();
-        return;
-    }
 
     const scriptLoaded = await loadRazorpayScript();
     if (!scriptLoaded) { 
