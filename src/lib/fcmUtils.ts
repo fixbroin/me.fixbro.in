@@ -105,12 +105,17 @@ export const initializeFCM = async (userId?: string | null): Promise<string | nu
 };
 
 // Listener for foreground messages (app is active tab)
-export const onForegroundMessage = () => {
-  if (typeof window === 'undefined' || !isSupported()) {
+export const onForegroundMessage = async () => {
+  if (typeof window === 'undefined' || isWebView()) {
     return;
   }
-  const messaging = getMessaging(app);
-  onMessage(messaging, (payload) => {
+  try {
+    const supported = await isSupported().catch(() => false);
+    if (!supported) {
+      return;
+    }
+    const messaging = getMessaging(app);
+    onMessage(messaging, (payload) => {
     console.log("FCM Utils: Message received in foreground: ", payload);
     
     // Play custom sound based on notification type/data
@@ -142,8 +147,10 @@ export const onForegroundMessage = () => {
         window.location.href = url;
         notification.close();
       };
-    }
-  });
+    });
+  } catch (e) {
+    console.warn("FCM Utils: Could not attach foreground message listener:", e);
+  }
 };
 
 /**

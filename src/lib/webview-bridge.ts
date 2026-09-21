@@ -5,14 +5,12 @@ if (typeof window !== 'undefined') {
   // Authentication Callbacks
   (window as any).onGoogleSignInSuccess = (data: any) => {
     console.log("Flutter Bridge: onGoogleSignInSuccess received", data?.email);
-    const event = new CustomEvent('nativeGoogleSignIn', { detail: data });
-    window.dispatchEvent(event);
+    window.dispatchEvent(new CustomEvent('nativeGoogleSignIn', { detail: data }));
   };
 
   (window as any).onGoogleSignInError = (error: string) => {
     console.warn("Flutter Bridge: onGoogleSignInError received", error);
-    const event = new CustomEvent('nativeGoogleSignInError', { detail: { error } });
-    window.dispatchEvent(event);
+    window.dispatchEvent(new CustomEvent('nativeGoogleSignInError', { detail: { error } }));
   };
 
   // Payment Callbacks
@@ -20,8 +18,7 @@ if (typeof window !== 'undefined') {
 
   (window as any).onNativeRazorpaySuccess = (paymentDetails: any) => {
     console.log("Flutter Bridge: onNativeRazorpaySuccess received", paymentDetails?.razorpay_payment_id);
-    const event = new CustomEvent('nativePaymentSuccess', { detail: paymentDetails });
-    window.dispatchEvent(event);
+    window.dispatchEvent(new CustomEvent('nativePaymentSuccess', { detail: paymentDetails }));
 
     if (activeRazorpayOptions && typeof activeRazorpayOptions.handler === 'function') {
       try {
@@ -34,8 +31,7 @@ if (typeof window !== 'undefined') {
 
   (window as any).onNativeRazorpayError = (errorDetails: any) => {
     console.warn("Flutter Bridge: onNativeRazorpayError received", errorDetails);
-    const event = new CustomEvent('nativePaymentError', { detail: errorDetails });
-    window.dispatchEvent(event);
+    window.dispatchEvent(new CustomEvent('nativePaymentError', { detail: errorDetails }));
 
     if (activeRazorpayOptions && activeRazorpayOptions.modal && typeof activeRazorpayOptions.modal.ondismiss === 'function') {
       try {

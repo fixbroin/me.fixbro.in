@@ -260,6 +260,17 @@ if (booking.additionalCharges && booking.additionalCharges.length > 0) {
   doc.text("Thank you for choosing " + defaultCompanyDetails.name + "!", 105, pageHeight - 15, { align: "center" });
   doc.text("This is a computer generated invoice and does not require a signature.", 105, pageHeight - 10, { align: "center" });
 
-  doc.save(`invoice-${booking.bookingId}.pdf`); 
+  const fileName = `invoice-${booking.bookingId}.pdf`;
+  if (typeof window !== 'undefined' && (window as any).isFlutterNativeApp && (window as any).FlutterBridge) {
+    const dataUri = doc.output('datauristring');
+    (window as any).FlutterBridge.postMessage(JSON.stringify({
+      action: 'downloadFile',
+      url: dataUri,
+      fileName: fileName
+    }));
+    return "success";
+  }
+
+  doc.save(fileName); 
   return "success";
 };

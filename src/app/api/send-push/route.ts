@@ -131,6 +131,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No FCM tokens found for this user' }, { status: 200 });
     }
 
+    // Determine the optimal Android channel & sound based on push notification type
+    const isAdminNotification = ['admin_provider_deposit_alert', 'admin_wallet_complaint_alert', 'new_review', 'new_inquiry', 'custom_request'].includes(pushType);
+    const isProviderNotification = ['provider_assigned', 'withdrawal_status', 'provider_wallet_deposit', 'provider_wallet_refund'].includes(pushType);
+    
+    let targetChannelId = 'wecanfix_orders_channel';
+    if (isAdminNotification) {
+      targetChannelId = 'wecanfix_admin_channel';
+    } else if (isProviderNotification) {
+      targetChannelId = 'wecanfix_provider_channel';
+    }
+
+    const isOrderSound = sound === 'order' || ['booking_created', 'booking_completed', 'provider_assigned', 'admin_wallet_complaint_alert'].includes(pushType);
+    const targetSoundName = isOrderSound ? 'order_sound' : 'default_notification';
+
     // 2. Prepare the message
     const messagePayload = {
       notification: {
@@ -138,9 +152,41 @@ export async function POST(request: Request) {
         body: finalBody,
       },
       data: {
+        title: finalTitle,
+        body: finalBody,
         click_action: href || '/',
+        url: href || '/',
+        targetUrl: href || '/',
         icon: icon || '/android-chrome-192x192.png',
-        sound: sound || 'default', // Pass internal sound identifier
+        sound: isOrderSound ? 'order' : 'default',
+        type: customType || pushType || 'order_status',
+        channelKey: targetChannelId,
+        channel_id: targetChannelId,
+        priority: 'high',
+      },
+      android: {
+        priority: 'high' as const,
+        notification: {
+          title: finalTitle,
+          body: finalBody,
+          channelId: targetChannelId,
+          sound: targetSoundName,
+          priority: 'max' as const,
+          defaultVibrateTimings: true,
+          defaultSound: false,
+        },
+        data: {
+          title: finalTitle,
+          body: finalBody,
+          url: href || '/',
+          targetUrl: href || '/',
+          click_action: href || '/',
+          sound: isOrderSound ? 'order' : 'default',
+          type: customType || pushType || 'order_status',
+          channelKey: targetChannelId,
+          channel_id: targetChannelId,
+          priority: 'high',
+        }
       },
       // Essential for background handling in modern browsers
       webpush: {
