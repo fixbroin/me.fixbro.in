@@ -1,0 +1,32 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.wecanfix.app.wecanfix_mobile",
+      "sha256_cert_fingerprints": [
+        "29:F4:06:F5:18:0B:9C:B9:3E:63:33:C2:20:79:FB:A3:2E:89:2E:BF:DF:EB:AE:77:DD:D5:34:C5:23:54:33:CC"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.wecanfix.app.wecanfix_mobile.provider",
+      "sha256_cert_fingerprints": [
+        "29:F4:06:F5:18:0B:9C:B9:3E:63:33:C2:20:79:FB:A3:2E:89:2E:BF:DF:EB:AE:77:DD:D5:34:C5:23:54:33:CC"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.wecanfix.app.wecanfix_mobile.admin",
+      "sha256_cert_fingerprints": [
+        "29:F4:06:F5:18:0B:9C:B9:3E:63:33:C2:20:79:FB:A3:2E:89:2E:BF:DF:EB:AE:77:DD:D5:34:C5:23:54:33:CC"
+      ]
+    }
+  }
+]
