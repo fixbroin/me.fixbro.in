@@ -50,7 +50,17 @@ const GoogleIcon = () => (
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, logIn, signInWithGoogle, handleSuccessfulAuth, isLoading: authContextIsLoading, isInitialAuthCheckComplete } = useAuth();
+  const { 
+    user, 
+    adminRole,
+    adminPermissions,
+    isSuperAdmin,
+    logIn, 
+    signInWithGoogle, 
+    handleSuccessfulAuth, 
+    isLoading: authContextIsLoading, 
+    isInitialAuthCheckComplete 
+  } = useAuth();
   const { config, isLoading: isLoadingConfig } = useApplicationConfig();
   const { settings: globalSettings, isLoading: isLoadingSettings } = useGlobalSettings();
   const searchParams = useSearchParams();
@@ -105,10 +115,16 @@ export default function LoginPage() {
     // Only redirect if the user is fully authenticated and NOT in the middle of profile completion
     if (user && !authContextIsLoading) {
       const redirectPathFromQuery = searchParams.get('redirect');
-      const finalRedirectPath = redirectPathFromQuery || (user.email === ADMIN_EMAIL ? '/admin' : '/');
+      const isAdminUser = Boolean(
+        user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ||
+        isSuperAdmin ||
+        adminRole ||
+        adminPermissions
+      );
+      const finalRedirectPath = redirectPathFromQuery || (isAdminUser ? '/admin' : '/');
       router.push(finalRedirectPath);
     }
-  }, [user, authContextIsLoading, router, searchParams]);
+  }, [user, authContextIsLoading, router, searchParams, isSuperAdmin, adminRole, adminPermissions]);
 
   const isSigningInWithNativeRef = useRef(false);
 
