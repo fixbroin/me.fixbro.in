@@ -315,7 +315,7 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
 
             <Separator className="my-4"/>
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 mb-3">
                 <div className="flex items-center gap-2">
                   <ShoppingCart className="h-5 w-5 text-primary" />
                   <h3 className="text-lg font-semibold">User Cart</h3>
@@ -338,65 +338,71 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
                 </div>
               ) : cartItems.length > 0 ? (
                 <div className="space-y-3">
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     {cartItems.map((item) => {
                       const effectivePrice = item.discountedPrice !== undefined ? item.discountedPrice : item.price;
                       const itemTotal = effectivePrice * item.quantity;
                       return (
                         <div
                           key={item.serviceId}
-                          className="flex items-center gap-3 p-3 border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors"
+                          className="p-3 sm:p-3.5 border rounded-2xl bg-muted/20 hover:bg-muted/30 transition-colors flex flex-col sm:flex-row sm:items-center gap-3"
                         >
-                          <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 border">
-                            {item.imageUrl ? (
-                              <AppImage
-                                src={item.imageUrl}
-                                alt={item.name}
-                                fill
-                                sizes="64px"
-                                className="object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                                <Package className="h-6 w-6 opacity-40" />
+                          {/* Top / Left Section: Image + Details */}
+                          <div className="flex items-start sm:items-center gap-3 flex-grow min-w-0">
+                            <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-muted flex-shrink-0 border shadow-xs">
+                              {item.imageUrl ? (
+                                <AppImage
+                                  src={item.imageUrl}
+                                  alt={item.name}
+                                  fill
+                                  sizes="64px"
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                  <Package className="h-6 w-6 opacity-40" />
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex-grow min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <h4 className="font-bold text-sm text-foreground truncate">{item.name}</h4>
+                                {item.slug && (
+                                  <Link
+                                    href={`/service/${item.slug}`}
+                                    target="_blank"
+                                    className="text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
+                                    title="View Service Page"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </Link>
+                                )}
                               </div>
-                            )}
-                          </div>
-                          <div className="flex-grow min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-bold text-sm text-foreground truncate">{item.name}</h4>
-                              {item.slug && (
-                                <Link
-                                  href={`/service/${item.slug}`}
-                                  target="_blank"
-                                  className="text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
-                                  title="View Service Page"
-                                >
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                </Link>
+                              {item.description && (
+                                <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{item.description}</p>
                               )}
-                            </div>
-                            {item.description && (
-                              <p className="text-xs text-muted-foreground line-clamp-1">{item.description}</p>
-                            )}
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs font-medium text-muted-foreground">
-                                Qty: <strong className="text-foreground">{item.quantity}</strong>
-                              </span>
-                              <span className="text-xs text-muted-foreground">•</span>
-                              <span className="text-xs font-semibold text-primary">
-                                {symbol}{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} each
-                              </span>
-                              {item.discountedPrice !== undefined && item.discountedPrice < item.price && (
-                                <span className="text-[10px] text-muted-foreground line-through">
-                                  {symbol}{item.price.toLocaleString('en-IN')}
+                              <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-1.5 text-xs">
+                                <span className="font-semibold text-muted-foreground bg-background/80 px-2 py-0.5 rounded border text-[11px]">
+                                  Qty: <strong className="text-foreground">{item.quantity}</strong>
                                 </span>
-                              )}
+                                <span className="text-muted-foreground hidden sm:inline">•</span>
+                                <span className="font-semibold text-primary">
+                                  {symbol}{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} each
+                                </span>
+                                {item.discountedPrice !== undefined && item.discountedPrice < item.price && (
+                                  <span className="text-[10px] text-muted-foreground line-through">
+                                    {symbol}{item.price.toLocaleString('en-IN')}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div className="text-right flex-shrink-0">
-                            <span className="text-[10px] text-muted-foreground block uppercase font-bold tracking-wider">Item Total</span>
-                            <span className="font-bold text-sm text-foreground">
+
+                          {/* Bottom on mobile / Right on desktop: Item Total */}
+                          <div className="flex sm:flex-col justify-between sm:justify-center items-center sm:items-end pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50 flex-shrink-0">
+                            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Item Total</span>
+                            <span className="font-black text-sm sm:text-base text-foreground">
                               {symbol}{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </div>
@@ -406,9 +412,9 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
                   </div>
 
                   {/* Cart Total Summary */}
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-primary/5 border border-primary/20">
-                    <span className="font-bold text-sm text-foreground">Estimated Cart Total:</span>
-                    <span className="font-black text-base text-primary">
+                  <div className="flex items-center justify-between p-3.5 rounded-2xl bg-primary/5 border border-primary/20">
+                    <span className="font-bold text-xs sm:text-sm text-foreground">Estimated Cart Total:</span>
+                    <span className="font-black text-base sm:text-lg text-primary">
                       {symbol}{cartTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
