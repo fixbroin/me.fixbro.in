@@ -345,10 +345,10 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
                       return (
                         <div
                           key={item.serviceId}
-                          className="p-3 sm:p-3.5 border rounded-2xl bg-muted/20 hover:bg-muted/30 transition-colors flex flex-col sm:flex-row sm:items-center gap-3"
+                          className="p-3 sm:p-3.5 border rounded-2xl bg-muted/20 hover:bg-muted/30 transition-colors flex flex-col sm:flex-row sm:items-center gap-3 w-full min-w-0 overflow-hidden"
                         >
                           {/* Top / Left Section: Image + Details */}
-                          <div className="flex items-start sm:items-center gap-3 flex-grow min-w-0">
+                          <div className="flex items-start sm:items-center gap-3 w-full min-w-0 flex-grow">
                             <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-muted flex-shrink-0 border shadow-xs">
                               {item.imageUrl ? (
                                 <AppImage
@@ -365,14 +365,16 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
                               )}
                             </div>
 
-                            <div className="flex-grow min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <h4 className="font-bold text-sm text-foreground truncate">{item.name}</h4>
+                            <div className="flex-grow min-w-0 w-full">
+                              <div className="flex items-start justify-between gap-1.5 w-full min-w-0">
+                                <h4 className="font-bold text-sm text-foreground line-clamp-2 leading-snug break-words flex-grow min-w-0">
+                                  {item.name}
+                                </h4>
                                 {item.slug && (
                                   <Link
                                     href={`/service/${item.slug}`}
                                     target="_blank"
-                                    className="text-muted-foreground hover:text-primary transition-colors flex-shrink-0"
+                                    className="text-muted-foreground hover:text-primary transition-colors flex-shrink-0 mt-0.5 p-0.5"
                                     title="View Service Page"
                                   >
                                     <ExternalLink className="h-3.5 w-3.5" />
@@ -380,18 +382,18 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
                                 )}
                               </div>
                               {item.description && (
-                                <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{item.description}</p>
+                                <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5 break-words">{item.description}</p>
                               )}
-                              <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-1.5 text-xs">
-                                <span className="font-semibold text-muted-foreground bg-background/80 px-2 py-0.5 rounded border text-[11px]">
+                              <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-1.5 text-xs w-full min-w-0">
+                                <span className="font-semibold text-muted-foreground bg-background/80 px-2 py-0.5 rounded border text-[11px] flex-shrink-0">
                                   Qty: <strong className="text-foreground">{item.quantity}</strong>
                                 </span>
                                 <span className="text-muted-foreground hidden sm:inline">•</span>
-                                <span className="font-semibold text-primary">
+                                <span className="font-semibold text-primary flex-shrink-0">
                                   {symbol}{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} each
                                 </span>
                                 {item.discountedPrice !== undefined && item.discountedPrice < item.price && (
-                                  <span className="text-[10px] text-muted-foreground line-through">
+                                  <span className="text-[10px] text-muted-foreground line-through flex-shrink-0">
                                     {symbol}{item.price.toLocaleString('en-IN')}
                                   </span>
                                 )}
@@ -400,7 +402,7 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
                           </div>
 
                           {/* Bottom on mobile / Right on desktop: Item Total */}
-                          <div className="flex sm:flex-col justify-between sm:justify-center items-center sm:items-end pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50 flex-shrink-0">
+                          <div className="flex sm:flex-col justify-between sm:justify-center items-center sm:items-end pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50 flex-shrink-0 w-full sm:w-auto">
                             <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Item Total</span>
                             <span className="font-black text-sm sm:text-base text-foreground">
                               {symbol}{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
