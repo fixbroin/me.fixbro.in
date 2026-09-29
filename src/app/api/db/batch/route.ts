@@ -9,6 +9,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
     }
 
+    // IMMUTABILITY GUARD FOR DEMO ADMIN:
+    if (user.role === 'demo_admin') {
+      return NextResponse.json({
+        success: false,
+        error: 'Demo Mode: Database modifications are disabled in demo mode. All actions are simulated.'
+      }, { status: 403 });
+    }
+
     const { operations = [] } = await request.json();
 
     // Verify access for all operations in the batch first

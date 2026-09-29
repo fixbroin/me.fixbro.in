@@ -24,6 +24,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
   }
 
+  if (user.role === 'demo_admin') {
+    return NextResponse.json({ success: false, error: 'Demo Mode: Database modifications are disabled in demo mode.' }, { status: 403 });
+  }
+
   try {
     const data = await request.json();
     const pool = await getPool();
@@ -40,6 +44,10 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
   }
 
+  if (user.role === 'demo_admin') {
+    return NextResponse.json({ success: false, error: 'Demo Mode: Database modifications are disabled in demo mode.' }, { status: 403 });
+  }
+
   try {
     const { id, data } = await request.json();
     const pool = await getPool();
@@ -54,6 +62,10 @@ export async function DELETE(request: NextRequest) {
   const user = await verifyRequest(request);
   if (!user || !isUserAdmin(user)) {
     return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
+  }
+
+  if (user.role === 'demo_admin') {
+    return NextResponse.json({ success: false, error: 'Demo Mode: Database modifications are disabled in demo mode.' }, { status: 403 });
   }
 
   try {

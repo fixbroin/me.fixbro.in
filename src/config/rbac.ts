@@ -1,5 +1,5 @@
 
-export type AdminRole = 'super_admin' | 'staff_admin' | 'booking_admin' | 'finance_admin' | 'content_admin' | 'staff';
+export type AdminRole = 'super_admin' | 'staff_admin' | 'booking_admin' | 'finance_admin' | 'content_admin' | 'staff' | 'demo_admin';
 
 export type AdminPermission = {
   read: boolean;

@@ -80,7 +80,7 @@ export function isUserAdmin(user: RequestUser): boolean {
   const ADMIN_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || '').toLowerCase().trim();
   const userEmail = (user.email || '').toLowerCase().trim();
 
-  const adminRoles = ['super_admin', 'superadmin', 'finance_admin', 'admin', 'staff'];
+  const adminRoles = ['super_admin', 'superadmin', 'demo_admin', 'staff_admin', 'booking_admin', 'finance_admin', 'content_admin', 'admin', 'staff'];
   const hasAdminRole = !!(user.role && adminRoles.includes(user.role));
   const isEnvAdminEmail = !!(ADMIN_EMAIL && userEmail && userEmail === ADMIN_EMAIL);
 

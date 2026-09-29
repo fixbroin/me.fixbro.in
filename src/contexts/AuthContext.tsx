@@ -51,6 +51,7 @@ interface AuthContextType {
   adminPermissions: AdminPermissions | null;
   adminRole: AdminRole | null;
   isSuperAdmin: boolean;
+  isDemoAdmin: boolean;
   isLoading: boolean;
   isInitialAuthCheckComplete: boolean;
   providerStatus: ProviderApplicationStatus | null;
@@ -107,6 +108,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const [adminPermissions, setAdminPermissions] = useState<AdminPermissions | null>(null);
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isDemoAdmin, setIsDemoAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialAuthCheckComplete, setIsInitialAuthCheckComplete] = useState(false);
   const [adminCheckCompleteFor, setAdminCheckCompleteFor] = useState<string | null>(null);
@@ -197,18 +199,25 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
           const data = docSnap.data();
           if (data.status === 'active') {
             setAdminRole(data.role || 'staff');
-            // Self-healing: If they are a super_admin but missing the permissions object, give them full access
             if (data.role === 'super_admin') {
               setAdminPermissions(SUPER_ADMIN_PERMISSIONS);
               setIsSuperAdmin(true);
+              setIsDemoAdmin(false);
+            } else if (data.role === 'demo_admin') {
+              // Demo Super Admin gets full explore access, but credentials remain masked and DB writes are blocked
+              setAdminPermissions(SUPER_ADMIN_PERMISSIONS);
+              setIsSuperAdmin(false);
+              setIsDemoAdmin(true);
             } else {
               setAdminPermissions(data.permissions || null);
               setIsSuperAdmin(false);
+              setIsDemoAdmin(false);
             }
           } else {
             setAdminRole(null);
             setAdminPermissions(null);
             setIsSuperAdmin(false);
+            setIsDemoAdmin(false);
           }
         } else if (user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
           // BOOTSTRAP SUPER ADMIN with full permissions
@@ -225,22 +234,26 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
           setAdminRole('super_admin');
           setAdminPermissions(SUPER_ADMIN_PERMISSIONS);
           setIsSuperAdmin(true);
+          setIsDemoAdmin(false);
         } else {
           setAdminRole(null);
           setAdminPermissions(null);
           setIsSuperAdmin(false);
+          setIsDemoAdmin(false);
         }
         setAdminCheckCompleteFor(user.uid);
       }, (error) => {
         console.error("AuthContext: Error fetching admin data:", error);
         setAdminPermissions(null);
         setIsSuperAdmin(false);
+        setIsDemoAdmin(false);
         setAdminCheckCompleteFor(user.uid);
       });
       return () => unsubscribe();
     } else {
       setAdminPermissions(null);
       setIsSuperAdmin(false);
+      setIsDemoAdmin(false);
       setAdminCheckCompleteFor(null);
     }
   }, [user]);
@@ -262,6 +275,12 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
         localStorage.setItem('wecanfix_user_email', user.email);
       }
 
+      if (adminRole === 'demo_admin') {
+        localStorage.setItem('wecanfix_is_demo_admin', 'true');
+      } else {
+        localStorage.removeItem('wecanfix_is_demo_admin');
+      }
+
       const name = firestoreUser?.displayName || user.displayName || '';
       if (name) {
         localStorage.setItem('wecanfix_user_name', name);
@@ -272,6 +291,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
         localStorage.removeItem('wecanfix_user_name');
         localStorage.removeItem('wecanfix_user_uid');
         localStorage.removeItem('wecanfix_user_email');
+        localStorage.removeItem('wecanfix_is_demo_admin');
       }
     }
   }, [user, adminRole, providerStatus, firestoreUser, isInitialAuthCheckComplete]);
@@ -348,7 +368,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
           // Find the best admin route based on their permissions
           const adminData = adminDocSnap.data();
           let permissionsToUse = adminData?.permissions;
-          if (adminData?.role === 'super_admin') {
+          if (adminData?.role === 'super_admin' || adminData?.role === 'demo_admin') {
               permissionsToUse = SUPER_ADMIN_PERMISSIONS;
           }
           finalRedirectPath = getFirstAccessiblePath(permissionsToUse);
@@ -819,6 +839,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('wecanfix_user_role');
         localStorage.removeItem('wecanfix_user_name');
+        localStorage.removeItem('wecanfix_is_demo_admin');
       }
       toast({ title: "Logged Out", description: "You have been logged out." });
       router.push('/auth/login');
@@ -852,6 +873,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       adminPermissions,
       adminRole,
       isSuperAdmin,
+      isDemoAdmin,
       isLoading,
       isInitialAuthCheckComplete,
       providerStatus,
@@ -870,7 +892,7 @@ export const AuthProvider: React.FC<PropsWithChildren> = ({ children }) => {
       cancelProfileCompletion,
       setUser,
     };
-  }, [user, firestoreUser, adminPermissions, adminRole, isSuperAdmin, isLoading, isInitialAuthCheckComplete, providerStatus, isAdminLoading, authActionRedirectPath, internalTriggerAuthRedirect, signUp, logIn, logOut, signInWithGoogle, handleSuccessfulAuth, isCompletingProfile, isCompletingProfileAsAdmin, userCredentialForProfileCompletion, completeProfileSetup, cancelProfileCompletion, setUser]);
+  }, [user, firestoreUser, adminPermissions, adminRole, isSuperAdmin, isDemoAdmin, isLoading, isInitialAuthCheckComplete, providerStatus, isAdminLoading, authActionRedirectPath, internalTriggerAuthRedirect, signUp, logIn, logOut, signInWithGoogle, handleSuccessfulAuth, isCompletingProfile, isCompletingProfileAsAdmin, userCredentialForProfileCompletion, completeProfileSetup, cancelProfileCompletion, setUser]);
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 };

@@ -61,6 +61,7 @@ export default function AdminLayout({ children }: PropsWithChildren) {
   // Format role name for display (e.g. "super_admin" -> "Master")
   const roleDisplayLabel = useMemo(() => {
     if (adminRole === 'super_admin') return "Master";
+    if (adminRole === 'demo_admin') return "Demo Super Admin";
     if (adminRole === 'booking_admin') return "Operations";
     if (adminRole === 'finance_admin') return "Finance";
     if (adminRole === 'content_admin') return "Content";
@@ -344,10 +345,17 @@ export default function AdminLayout({ children }: PropsWithChildren) {
                   <SidebarTrigger className="hidden md:inline-flex rounded-full h-10 w-10 bg-muted/50 hover:bg-primary hover:text-primary-foreground transition-all duration-200" />
                   <div className="flex items-center gap-2">
                     <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-800 dark:text-slate-100">Admin Panel</h1>
-                    <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
-                       <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                       <span className="text-[10px] font-black text-primary uppercase tracking-widest length-none">Verified</span>
-                    </div>
+                    {adminRole === 'demo_admin' ? (
+                      <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30">
+                         <span className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-pulse" />
+                         <span className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest length-none">Demo Admin</span>
+                      </div>
+                    ) : (
+                      <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                         <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                         <span className="text-[10px] font-black text-primary uppercase tracking-widest length-none">Verified</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -438,6 +446,18 @@ export default function AdminLayout({ children }: PropsWithChildren) {
               </div>
             </div>
           </header>
+          {adminRole === 'demo_admin' && (
+            <div className="bg-gradient-to-r from-purple-700 via-indigo-600 to-purple-800 text-white px-4 py-2 shadow-md flex items-center justify-between sticky top-16 z-[25]">
+              <div className="flex items-center gap-2.5 max-w-7xl mx-auto w-full">
+                <span className="px-2 py-0.5 rounded-md bg-white/20 text-[10px] font-black uppercase tracking-wider whitespace-nowrap shadow-xs">
+                  🎮 Demo Super Admin
+                </span>
+                <span className="text-[11px] sm:text-xs text-white/95 font-medium">
+                  Full exploration mode active. Credentials remain securely masked. All database creations, edits, and deletions are simulated and protected from saving.
+                </span>
+              </div>
+            </div>
+          )}
           <main className="p-4 sm:p-3 lg:p-8 pb-20 md:pb-8 relative flex-grow">
             <Suspense fallback={<AdminPageLoader />}>
               {children}

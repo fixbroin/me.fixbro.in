@@ -49,7 +49,7 @@ import {
   CheckCheck,
   ChevronsUpDown
 } from "lucide-react";
-import { AdminPermissions, PERMISSION_MODULES, DEFAULT_PERMISSIONS } from '@/config/rbac';
+import { AdminPermissions, PERMISSION_MODULES, DEFAULT_PERMISSIONS, SUPER_ADMIN_PERMISSIONS } from '@/config/rbac';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import { 
   AlertDialog, 
@@ -85,7 +85,7 @@ interface AdminUser {
 }
 
 export default function ManageAdminsPage() {
-  const { isSuperAdmin, user: currentUser } = useAuth();
+  const { isSuperAdmin, isDemoAdmin, user: currentUser } = useAuth();
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
@@ -129,7 +129,7 @@ export default function ManageAdminsPage() {
   const [isRolePickerOpen, setIsRolePickerOpen] = useState(false);
 
   useEffect(() => {
-    if (!isSuperAdmin) return;
+    if (!isSuperAdmin && !isDemoAdmin) return;
 
     const q = query(collection(db, 'admins'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -142,7 +142,7 @@ export default function ManageAdminsPage() {
     });
 
     return () => unsubscribe();
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, isDemoAdmin]);
 
   const handlePermissionChange = (moduleId: string, type: 'read' | 'create' | 'write' | 'delete', checked: boolean) => {
     setNewAdmin(prev => {
@@ -327,6 +327,17 @@ export default function ManageAdminsPage() {
     if (!editingAdmin) return;
     setIsUpdating(true);
     try {
+      if (isDemoAdmin) {
+        toast({ 
+          title: "Demo Mode Notice", 
+          description: "In the demo version, updating staff accounts is simulated and cannot be saved.", 
+          variant: "destructive" 
+        });
+        setIsUpdating(false);
+        setIsEditDialogOpen(false);
+        return;
+      }
+
       if (editPassword.trim()) {
         if (!validatePassword(editPassword.trim())) {
           toast({ 
@@ -350,7 +361,7 @@ export default function ManageAdminsPage() {
             name: editingAdmin.name,
             password: editPassword.trim(),
             role: editingAdmin.role,
-            permissions: editingAdmin.permissions,
+            permissions: (editingAdmin.role === 'super_admin' || editingAdmin.role === 'demo_admin') ? SUPER_ADMIN_PERMISSIONS : editingAdmin.permissions,
           })
         });
 
@@ -360,7 +371,7 @@ export default function ManageAdminsPage() {
         }
       } else {
         await updateDoc(doc(db, 'admins', editingAdmin.id), {
-          permissions: editingAdmin.permissions,
+          permissions: (editingAdmin.role === 'super_admin' || editingAdmin.role === 'demo_admin') ? SUPER_ADMIN_PERMISSIONS : editingAdmin.permissions,
           role: editingAdmin.role // allow role update too
         });
       }
@@ -394,20 +405,34 @@ export default function ManageAdminsPage() {
 
     setIsAdding(true);
     try {
+      if (isDemoAdmin) {
+        toast({ 
+          title: "Demo Mode Notice", 
+          description: "In the demo version, creating staff accounts is simulated and cannot be saved.", 
+          variant: "destructive" 
+        });
+        setIsAdding(false);
+        return;
+      }
+
       const token = await currentUser?.getIdToken();
+      const adminPayload = {
+        ...newAdmin,
+        permissions: (newAdmin.role === 'super_admin' || newAdmin.role === 'demo_admin') ? SUPER_ADMIN_PERMISSIONS : newAdmin.permissions
+      };
       const response = await fetch('/api/admin/manage-staff', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(newAdmin)
+        body: JSON.stringify(adminPayload)
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        toast({ title: "Success", description: "Staff account created successfully" });
+        toast({ title: "Success", description: "Account created successfully" });
         setNewAdmin({ 
             email: '', 
             name: '', 
@@ -439,6 +464,15 @@ export default function ManageAdminsPage() {
 
   const handleDeleteAdmin = async (uid: string) => {
     try {
+      if (isDemoAdmin) {
+        toast({ 
+          title: "Demo Mode Notice", 
+          description: "In the demo version, removing staff accounts is simulated and cannot be saved.", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
       const token = await currentUser?.getIdToken();
       const response = await fetch('/api/admin/manage-staff', {
         method: 'DELETE',
@@ -461,7 +495,7 @@ export default function ManageAdminsPage() {
     }
   };
 
-  if (!isSuperAdmin) {
+  if (!isSuperAdmin && !isDemoAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
         <ShieldAlert className="h-16 w-16 text-destructive mb-4" />
@@ -569,6 +603,8 @@ export default function ManageAdminsPage() {
                                             ? "Staff Admin (Custom Permissions)" 
                                             : newAdmin.role === "super_admin" 
                                             ? "Super Admin (All Permissions)" 
+                                            : newAdmin.role === "demo_admin"
+                                            ? "Demo Super Admin (Full View & Explore - No DB Writes)"
                                             : "Select Role..."}
                                     </span>
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -592,7 +628,10 @@ export default function ManageAdminsPage() {
                                             }}
                                             type="button"
                                         >
-                                            <span className="text-sm font-medium">Staff Admin (Custom Permissions)</span>
+                                            <div className="flex flex-col text-left">
+                                                <span className="text-sm font-medium">Staff Admin (Custom Permissions)</span>
+                                                <span className="text-[11px] text-muted-foreground">Select granular module permissions</span>
+                                            </div>
                                             {newAdmin.role === "staff_admin" && (
                                                 <Check className="absolute right-3 top-3 h-4 w-4 text-green-500" />
                                             )}
@@ -601,14 +640,42 @@ export default function ManageAdminsPage() {
                                             variant={newAdmin.role === "super_admin" ? "secondary" : "ghost"}
                                             className="w-full justify-start text-left h-auto py-3 px-3 relative"
                                             onClick={() => {
-                                                setNewAdmin({...newAdmin, role: "super_admin"});
+                                                setNewAdmin({
+                                                    ...newAdmin, 
+                                                    role: "super_admin",
+                                                    permissions: JSON.parse(JSON.stringify(SUPER_ADMIN_PERMISSIONS))
+                                                });
                                                 setIsRolePickerOpen(false);
                                             }}
                                             type="button"
                                         >
-                                            <span className="text-sm font-medium">Super Admin (All Permissions)</span>
+                                            <div className="flex flex-col text-left">
+                                                <span className="text-sm font-medium">Super Admin (All Permissions)</span>
+                                                <span className="text-[11px] text-muted-foreground">Full unmasked access and real database writes</span>
+                                            </div>
                                             {newAdmin.role === "super_admin" && (
                                                 <Check className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                                            )}
+                                        </Button>
+                                        <Button
+                                            variant={newAdmin.role === "demo_admin" ? "secondary" : "ghost"}
+                                            className="w-full justify-start text-left h-auto py-3 px-3 relative"
+                                            onClick={() => {
+                                                setNewAdmin({
+                                                    ...newAdmin, 
+                                                    role: "demo_admin",
+                                                    permissions: JSON.parse(JSON.stringify(SUPER_ADMIN_PERMISSIONS))
+                                                });
+                                                setIsRolePickerOpen(false);
+                                            }}
+                                            type="button"
+                                        >
+                                            <div className="flex flex-col text-left">
+                                                <span className="text-sm font-medium text-purple-700 dark:text-purple-300">Demo Super Admin (Full View - No DB Writes)</span>
+                                                <span className="text-[11px] text-muted-foreground">Full access to explore, credentials masked, zero DB mutations</span>
+                                            </div>
+                                            {newAdmin.role === "demo_admin" && (
+                                                <Check className="absolute right-3 top-3 h-4 w-4 text-purple-600" />
                                             )}
                                         </Button>
                                     </div>
@@ -619,7 +686,7 @@ export default function ManageAdminsPage() {
                 </CardContent>
             </Card>
 
-            {newAdmin.role !== 'super_admin' && (
+            {newAdmin.role !== 'super_admin' && newAdmin.role !== 'demo_admin' && (
                 <Card className="border-none shadow-xl rounded-[2rem] bg-card overflow-hidden">
                     <CardHeader className="bg-primary/5 pb-3">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -800,6 +867,26 @@ export default function ManageAdminsPage() {
                     </Button>
                 </div>
             )}
+
+            {newAdmin.role === 'demo_admin' && (
+                <div className="p-4 rounded-[2rem] bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 space-y-4">
+                    <div className="flex items-center space-x-2">
+                        <ShieldCheck className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                        <span className="font-black uppercase text-xs tracking-widest text-purple-600 dark:text-purple-400">Demo Super Admin Access</span>
+                    </div>
+                    <p className="text-xs font-bold leading-relaxed text-slate-700 dark:text-slate-300">
+                        Demo Super Admins receive full permissions across all modules, forms, and dialogs for exploration. Sensitive credentials remain masked and all create, edit, and delete operations are simulated and protected from saving to the database.
+                    </p>
+                    <Button 
+                        className="w-full h-12 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black uppercase text-xs tracking-widest shadow-lg shadow-purple-600/20"
+                        onClick={handleAddAdmin}
+                        disabled={isAdding}
+                    >
+                        {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />}
+                        Create Demo Super Admin
+                    </Button>
+                </div>
+            )}
         </div>
 
         {/* Admin List */}
@@ -831,9 +918,11 @@ export default function ManageAdminsPage() {
                           <span className="font-bold text-sm group-hover:text-primary transition-colors">{admin.name}</span>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className={`text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded ${
-                                admin.role === 'super_admin' ? 'bg-amber-500/10 text-amber-600' : 'bg-primary/10 text-primary'
+                                admin.role === 'super_admin' ? 'bg-amber-500/10 text-amber-600' : 
+                                admin.role === 'demo_admin' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20' :
+                                'bg-primary/10 text-primary'
                             }`}>
-                                {admin.role.replace('_', ' ')}
+                                {admin.role === 'demo_admin' ? 'Demo Super Admin' : admin.role.replace('_', ' ')}
                             </span>
                           </div>
                         </div>
@@ -895,14 +984,14 @@ export default function ManageAdminsPage() {
                           1. Cannot delete yourself (admin.id !== currentUser?.uid).
                           2. If the target is the PRIMARY Main Admin (ADMIN_EMAIL):
                              - Only the Main Admin themselves can delete a record with this email (to clean up ghosts/duplicates).
-                          3. If the target is ANOTHER Super Admin:
+                          3. If the target is ANOTHER Super Admin or Demo Admin:
                              - Only the PRIMARY Main Admin can delete them.
                         */}
                         {admin.id !== currentUser?.uid && (
                           // Case A: I am the Primary Main Admin - I can delete anyone (except my active self)
                           (currentUser?.email === ADMIN_EMAIL) || 
-                          // Case B: I am another admin - I can ONLY delete staff/staff_admins (not main admin, not other super admins)
-                          (admin.role !== 'super_admin' && admin.email !== ADMIN_EMAIL)
+                          // Case B: I am another admin - I can ONLY delete staff/staff_admins (not main admin, not other super admins, not demo admins)
+                          (admin.role !== 'super_admin' && admin.role !== 'demo_admin' && admin.email !== ADMIN_EMAIL)
                         ) && (
                             <PermissionGuard moduleId="manage_admins" action="delete">
                               <AlertDialog>
@@ -948,6 +1037,13 @@ export default function ManageAdminsPage() {
                         {admin.role === 'super_admin' && admin.email !== ADMIN_EMAIL && admin.id !== currentUser?.uid && currentUser?.email !== ADMIN_EMAIL && (
                             <div className="inline-flex items-center px-2 py-1 rounded bg-slate-500/10 text-[9px] font-black text-slate-600 uppercase">
                                 <Lock className="h-3 w-3 mr-1" /> Protected
+                            </div>
+                        )}
+
+                        {/* Visual indicator for protected Demo Admins when viewed by regular staff admins */}
+                        {admin.role === 'demo_admin' && admin.email !== ADMIN_EMAIL && admin.id !== currentUser?.uid && currentUser?.email !== ADMIN_EMAIL && (
+                            <div className="inline-flex items-center px-2 py-1 rounded bg-purple-500/10 text-[9px] font-black text-purple-600 uppercase">
+                                <Lock className="h-3 w-3 mr-1" /> Protected Demo
                             </div>
                         )}
                       </TableCell>
@@ -1008,6 +1104,20 @@ export default function ManageAdminsPage() {
               </div>
             </div>
           </DialogHeader>
+
+          {/* Role and status indicator */}
+          {editingAdmin && (
+            <div className="px-6 py-2.5 bg-muted/20 border-b border-muted/30 flex items-center justify-between text-xs">
+              <span className="font-bold text-muted-foreground uppercase text-[10px] tracking-wider">Account Role</span>
+              <span className={`font-black uppercase text-[10px] px-2 py-0.5 rounded ${
+                editingAdmin.role === 'demo_admin' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20' :
+                editingAdmin.role === 'super_admin' ? 'bg-amber-500/10 text-amber-600' :
+                'bg-primary/10 text-primary'
+              }`}>
+                {editingAdmin.role === 'demo_admin' ? 'Demo Super Admin (Simulated Writes)' : editingAdmin.role.replace('_', ' ')}
+              </span>
+            </div>
+          )}
 
           {/* Optional password reset field */}
           <div className="px-6 py-3 border-b border-muted/30 bg-muted/10">

@@ -10,6 +10,28 @@ import {
 } from '@/app/actions/dbActions';
 import { Timestamp, isTimestamp } from './timestamp';
 import { auth } from './firebase';
+import { toast } from '@/hooks/use-toast';
+
+let lastDemoToastTime = 0;
+function notifyDemoAdminBlocked() {
+  if (typeof window === 'undefined') return;
+  const now = Date.now();
+  if (now - lastDemoToastTime > 2500) {
+    lastDemoToastTime = now;
+    toast({
+      title: "Demo Mode Notice",
+      description: "In the demo version, create, edit, and delete operations are simulated and cannot be saved to the database.",
+      variant: "destructive"
+    });
+  }
+}
+
+function isDemoAdminBlocked(): boolean {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('wecanfix_is_demo_admin') === 'true';
+  }
+  return false;
+}
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
@@ -298,6 +320,14 @@ export async function getDocs(queryRef: CollectionReference | Query): Promise<Qu
 }
 
 export async function addDoc(collectionRef: CollectionReference, data: any) {
+  if (isDemoAdminBlocked()) {
+    notifyDemoAdminBlocked();
+    const fakeId = 'demo_' + Math.random().toString(36).substring(2, 10);
+    return {
+      id: fakeId,
+      path: `${collectionRef.path}/${fakeId}`
+    };
+  }
   const cleanData = serializeClientData(data);
   const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
@@ -316,6 +346,10 @@ export async function addDoc(collectionRef: CollectionReference, data: any) {
 }
 
 export async function setDoc(docRef: DocumentReference, data: any, options?: any) {
+  if (isDemoAdminBlocked()) {
+    notifyDemoAdminBlocked();
+    return { success: true };
+  }
   const parts = docRef.path.split('/');
   const collectionPath = parts.slice(0, -1).join('/');
   const docId = parts.pop() || '';
@@ -333,6 +367,10 @@ export async function setDoc(docRef: DocumentReference, data: any, options?: any
 }
 
 export async function updateDoc(docRef: DocumentReference, data: any) {
+  if (isDemoAdminBlocked()) {
+    notifyDemoAdminBlocked();
+    return { success: true };
+  }
   const parts = docRef.path.split('/');
   const collectionPath = parts.slice(0, -1).join('/');
   const docId = parts.pop() || '';
@@ -350,6 +388,10 @@ export async function updateDoc(docRef: DocumentReference, data: any) {
 }
 
 export async function deleteDoc(docRef: DocumentReference) {
+  if (isDemoAdminBlocked()) {
+    notifyDemoAdminBlocked();
+    return { success: true };
+  }
   const res = await fetch(getApiUrl('/api/db/mutate'), {
     method: 'POST',
     headers: await getAuthHeaders(),
@@ -386,6 +428,10 @@ export function writeBatch(dbInstance: any) {
       operations.push({ action: 'deleteDoc', collection: collectionPath, id: docId });
     },
     commit: async () => {
+      if (isDemoAdminBlocked()) {
+        notifyDemoAdminBlocked();
+        return;
+      }
       const res = await fetch(getApiUrl('/api/db/batch'), {
         method: 'POST',
         headers: await getAuthHeaders(),
@@ -436,6 +482,10 @@ export async function runTransaction(dbInstance: any, updateFunction: (transacti
   const result = await updateFunction(transaction);
 
   if (writes.length > 0) {
+    if (isDemoAdminBlocked()) {
+      notifyDemoAdminBlocked();
+      return result;
+    }
     await executeDbBatch(writes);
   }
 

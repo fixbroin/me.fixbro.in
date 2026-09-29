@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
       email: email.toLowerCase(),
       name: name,
       role: role || 'staff_admin',
-      permissions: role === 'super_admin' ? SUPER_ADMIN_PERMISSIONS : permissions,
+      permissions: (role === 'super_admin' || role === 'demo_admin') ? SUPER_ADMIN_PERMISSIONS : permissions,
       status: 'active',
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
@@ -143,9 +143,9 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ error: 'The primary super admin cannot be removed.' }, { status: 403 });
       }
 
-      // 2. PROTECT OTHER SUPER ADMINS (Only the Main Admin can delete other Super Admins)
-      if (targetRole === 'super_admin' && decodedToken.email !== primaryAdminEmail) {
-        return NextResponse.json({ error: 'Only the Primary Admin can remove other Super Admins.' }, { status: 403 });
+      // 2. PROTECT OTHER SUPER ADMINS & DEMO ADMINS (Only the Main Admin can delete other Super Admins or Demo Admins)
+      if ((targetRole === 'super_admin' || targetRole === 'demo_admin') && decodedToken.email !== primaryAdminEmail) {
+        return NextResponse.json({ error: 'Only the Primary Admin can remove Super Admins or Demo Admins.' }, { status: 403 });
       }
 
       await adminDb.collection('admins').doc(uid).delete();
