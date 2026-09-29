@@ -92,6 +92,7 @@ const checkIsLoggingEnabled = async (isProvider: boolean): Promise<boolean> => {
 };
 
 import { triggerRefresh } from './revalidateUtils';
+import { getPlatformSource } from './webview-bridge';
 
 export const logUserActivity = async (
   eventType: UserActivityEventType,
@@ -122,6 +123,8 @@ export const logUserActivity = async (
         finalDisplayName = userId ? "Registered User" : "Guest User";
     }
 
+    const platformInfo = getPlatformSource();
+
     const activityData: any = {
       userId: userId || null,
       guestId: guestId || null,
@@ -130,6 +133,9 @@ export const logUserActivity = async (
       eventData: removeUndefinedProps(eventData),
       timestamp: Timestamp.now(),
       userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'server',
+      source: platformInfo.source,
+      platform: platformInfo.platform,
+      appVariant: platformInfo.appVariant || null,
     };
 
     const userActivitiesCollectionRef = collection(db, 'userActivities');

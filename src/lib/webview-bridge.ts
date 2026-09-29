@@ -90,11 +90,81 @@ if (typeof window !== 'undefined') {
  */
 export const isWebView = (): boolean => {
   if (typeof window === 'undefined') return false;
-  return !!(
+  
+  if (
+    (window as any).isFlutterNativeApp ||
+    (window as any).FlutterBridge ||
+    (window as any).flutter_inappwebview
+  ) {
+    try { sessionStorage.setItem('is_flutter_app', 'true'); } catch (e) {}
+    return true;
+  }
+
+  const ua = (navigator.userAgent || '').toLowerCase();
+  if (ua.includes('wecanfixapp') || ua.includes('wecanfix') || ua.includes('flutter')) {
+    try { sessionStorage.setItem('is_flutter_app', 'true'); } catch (e) {}
+    return true;
+  }
+
+  try {
+    if (sessionStorage.getItem('is_flutter_app') === 'true') return true;
+  } catch (e) {}
+
+  return false;
+};
+
+/**
+ * Detects if the current user session is running inside the Flutter mobile app or a standard web browser.
+ */
+export const getPlatformSource = (): { source: 'app' | 'web'; platform: string; appVariant?: string } => {
+  if (typeof window === 'undefined') {
+    return { source: 'web', platform: 'Web (Server)' };
+  }
+
+  // 1. Direct Flutter bridge check
+  const isFlutter = Boolean(
     (window as any).isFlutterNativeApp ||
     (window as any).FlutterBridge ||
     (window as any).flutter_inappwebview
   );
+
+  const rawVariant = (window as any).flutterAppVariant;
+
+  // 2. User-Agent check (wecanfixapp or Flutter token)
+  const ua = (navigator.userAgent || '').toLowerCase();
+  const isAppUA = ua.includes('wecanfixapp') || ua.includes('wecanfix') || ua.includes('flutter');
+
+  // 3. Session storage persistence across page redirects
+  let isSessionApp = false;
+  let sessionVariant: string | null = null;
+  try {
+    isSessionApp = sessionStorage.getItem('is_flutter_app') === 'true';
+    sessionVariant = sessionStorage.getItem('flutter_app_variant');
+  } catch (e) {}
+
+  if (isFlutter || isAppUA || isSessionApp) {
+    const variant = rawVariant || sessionVariant || 'customer';
+    try {
+      sessionStorage.setItem('is_flutter_app', 'true');
+      sessionStorage.setItem('flutter_app_variant', variant);
+    } catch (e) {}
+
+    const variantLabel = variant ? (variant.charAt(0).toUpperCase() + variant.slice(1)) : 'Android';
+    return {
+      source: 'app',
+      platform: `App (${variantLabel})`,
+      appVariant: variant,
+    };
+  }
+
+  // 4. Standard Browser Web detection
+  const isMobile = /android|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(ua);
+  const isTablet = /(ipad|tablet|(android(?!.*mobile))|(windows(?!.*phone)(.*touch))|kindle|playbook|silk|(puffin(?!.*(IP|AP|WP))))/i.test(ua);
+
+  return {
+    source: 'web',
+    platform: isTablet ? 'Web (Tablet)' : isMobile ? 'Web (Mobile)' : 'Web (Desktop)',
+  };
 };
 
 /**

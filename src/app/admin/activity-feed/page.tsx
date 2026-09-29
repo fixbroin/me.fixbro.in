@@ -7,7 +7,7 @@ import {
   Loader2, Activity, UserCircle, Home, ShoppingCart, FileText, UserPlus, 
   Tag, Zap, CalendarCheck2, LogOut, Trash2 as TrashIcon, AlertTriangle, 
   Clock, RefreshCcw, ChevronRight, ExternalLink, ShieldCheck, User, Map as MapIcon, PackageSearch,
-  CheckCircle, XCircle, PlayCircle
+  CheckCircle, XCircle, PlayCircle, Smartphone, Globe
 } from "lucide-react";
 import type { UserActivity, FirestoreUser } from '@/types/firestore';
 import { db } from '@/lib/firebase';
@@ -75,6 +75,62 @@ const EventBadge = ({ eventType }: { eventType: UserActivity['eventType'] }) => 
   );
 };
 
+const getSourceBadgeInfo = (activity: UserActivity) => {
+  if (activity.source === 'app') {
+    return {
+      isApp: true,
+      label: activity.platform || 'App (Android)',
+      sub: activity.appVariant ? activity.appVariant.toUpperCase() : 'APP',
+    };
+  }
+  if (activity.source === 'web') {
+    return {
+      isApp: false,
+      label: activity.platform || 'Direct Web',
+      sub: 'WEB',
+    };
+  }
+
+  // Fallback for earlier logs using User-Agent
+  const ua = (activity.userAgent || '').toLowerCase();
+  if (ua.includes('wecanfixapp') || ua.includes('wecanfix') || ua.includes('flutter')) {
+    return {
+      isApp: true,
+      label: 'App (Android)',
+      sub: 'APP',
+    };
+  }
+  return {
+    isApp: false,
+    label: 'Direct Web',
+    sub: 'WEB',
+  };
+};
+
+const PlatformBadge = ({ activity }: { activity: UserActivity }) => {
+  const info = getSourceBadgeInfo(activity);
+  if (info.isApp) {
+    return (
+      <div
+        title={`Visit from Mobile App: ${info.label}`}
+        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-black text-[9px] uppercase tracking-wider shadow-xs whitespace-nowrap"
+      >
+        <Smartphone className="h-2.5 w-2.5 shrink-0" />
+        <span>{info.label}</span>
+      </div>
+    );
+  }
+  return (
+    <div
+      title={`Visit from Standard Web Browser: ${info.label}`}
+      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-blue-500/25 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[9px] uppercase tracking-wider shadow-xs whitespace-nowrap"
+    >
+      <Globe className="h-2.5 w-2.5 shrink-0" />
+      <span>{info.label}</span>
+    </div>
+  );
+};
+
 const formatTimestamp = (timestamp?: any): string => {
   const millis = getTimestampMillis(timestamp);
   if (!millis) return 'N/A';
@@ -91,6 +147,7 @@ export default function AdminActivityFeedPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isClearing, setIsClearing] = useState(false);
   const [userNames, setUserNames] = useState<Record<string, string>>({});
+  const [platformFilter, setPlatformFilter] = useState<'all' | 'web' | 'app'>('all');
   const { toast } = useToast();
 
   const [outOfZoneRequests, setOutOfZoneRequests] = useState<UserActivity[]>([]);
@@ -260,6 +317,42 @@ export default function AdminActivityFeedPage() {
       return isProvider;
     });
   }, [displayActivities]);
+
+  const customerCounts = useMemo(() => {
+    let web = 0;
+    let app = 0;
+    customerActivities.forEach(a => {
+      if (getSourceBadgeInfo(a).isApp) app++;
+      else web++;
+    });
+    return { total: customerActivities.length, web, app };
+  }, [customerActivities]);
+
+  const providerCounts = useMemo(() => {
+    let web = 0;
+    let app = 0;
+    providerActivities.forEach(a => {
+      if (getSourceBadgeInfo(a).isApp) app++;
+      else web++;
+    });
+    return { total: providerActivities.length, web, app };
+  }, [providerActivities]);
+
+  const filteredCustomerActivities = useMemo(() => {
+    if (platformFilter === 'all') return customerActivities;
+    return customerActivities.filter(a => {
+      const isApp = getSourceBadgeInfo(a).isApp;
+      return platformFilter === 'app' ? isApp : !isApp;
+    });
+  }, [customerActivities, platformFilter]);
+
+  const filteredProviderActivities = useMemo(() => {
+    if (platformFilter === 'all') return providerActivities;
+    return providerActivities.filter(a => {
+      const isApp = getSourceBadgeInfo(a).isApp;
+      return platformFilter === 'app' ? isApp : !isApp;
+    });
+  }, [providerActivities, platformFilter]);
 
   const handleClearAllActivities = async () => {
     setIsClearing(true);
@@ -449,7 +542,11 @@ export default function AdminActivityFeedPage() {
     }
   };
 
-  const renderActivityList = (activitiesList: GroupedUserActivity[], typeLabel: string) => {
+  const renderActivityList = (
+    activitiesList: GroupedUserActivity[], 
+    typeLabel: string,
+    counts: { total: number; web: number; app: number }
+  ) => {
     if (isLoading && activities.length === 0) {
       return (
         <div className="flex flex-col justify-center items-center h-[400px] space-y-4">
@@ -459,68 +556,128 @@ export default function AdminActivityFeedPage() {
       );
     }
 
-    if (activitiesList.length === 0) {
-      return (
-        <div className="text-center py-32 bg-muted/5">
-          <Activity className="h-16 w-16 mx-auto text-muted-foreground/20 mb-6" />
-          <p className="text-xl font-bold tracking-tight">No {typeLabel} Captured</p>
-          <p className="text-muted-foreground text-sm mt-1">Activities will appear here after the next sync.</p>
-        </div>
-      );
-    }
-
     return (
       <>
-        <div className="hidden md:block overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow className="hover:bg-transparent border-none">
-                <TableHead className="w-[180px] pl-8 py-5 text-[10px] font-black uppercase tracking-widest">Type</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest">Interaction</TableHead>
-                <TableHead className="text-[10px] font-black uppercase tracking-widest">User Identity</TableHead>
-                <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest">Timestamp</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <AnimatePresence initial={false}>
-                {activitiesList.map((activity, idx) => (
-                  <motion.tr
-                    key={activity.id}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.3, delay: idx < 10 ? idx * 0.05 : 0 }}
-                    className="group border-b border-muted/40 transition-all hover:bg-primary/[0.02]"
-                  >
-                    <TableCell className="pl-8 py-4">
-                      <EventBadge eventType={activity.eventType} />
-                    </TableCell>
-                    <TableCell className="font-medium text-slate-700 dark:text-slate-300">
-                      {renderEventData(activity)}
-                    </TableCell>
-                    <TableCell>
-                      {renderUserCell(activity)}
-                    </TableCell>
-                    <TableCell className="text-right pr-8">
-                      <div className="flex flex-col items-end gap-0.5">
-                        <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
-                          {formatActivityTimestamp(activity.timestamp)}
-                        </span>
-                      </div>
-                    </TableCell>
-                  </motion.tr>
-                ))}
-              </AnimatePresence>
-            </TableBody>
-          </Table>
+        {/* Source Platform Filter Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 px-6 sm:px-8 border-b bg-muted/15">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Source:</span>
+            <div className="flex items-center gap-1 bg-muted p-1 rounded-xl border border-border/60">
+              <Button
+                variant={platformFilter === 'all' ? 'secondary' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-7 px-3 text-xs font-bold rounded-lg transition-all",
+                  platformFilter === 'all' && "bg-background text-foreground shadow-xs font-extrabold"
+                )}
+                onClick={() => setPlatformFilter('all')}
+              >
+                All ({counts.total})
+              </Button>
+              <Button
+                variant={platformFilter === 'web' ? 'secondary' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-7 px-3 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
+                  platformFilter === 'web' 
+                    ? "bg-background text-blue-600 dark:text-blue-400 shadow-xs font-extrabold" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setPlatformFilter('web')}
+              >
+                <Globe className="h-3 w-3" />
+                Web ({counts.web})
+              </Button>
+              <Button
+                variant={platformFilter === 'app' ? 'secondary' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-7 px-3 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5",
+                  platformFilter === 'app' 
+                    ? "bg-background text-emerald-600 dark:text-emerald-400 shadow-xs font-extrabold" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setPlatformFilter('app')}
+              >
+                <Smartphone className="h-3 w-3" />
+                App ({counts.app})
+              </Button>
+            </div>
+          </div>
+
+          <div className="text-[11px] font-bold text-muted-foreground">
+            Showing <strong className="text-foreground">{activitiesList.length}</strong> {typeLabel.toLowerCase()}
+          </div>
         </div>
 
-        {/* Mobile View: Cards */}
-        <div className="md:hidden">
-          <AnimatePresence initial={false}>
-            {activitiesList.map((activity, idx) => renderMobileCard(activity, idx))}
-          </AnimatePresence>
-        </div>
+        {activitiesList.length === 0 ? (
+          <div className="text-center py-32 bg-muted/5">
+            <Activity className="h-16 w-16 mx-auto text-muted-foreground/20 mb-6" />
+            <p className="text-xl font-bold tracking-tight">No {typeLabel} Captured</p>
+            <p className="text-muted-foreground text-sm mt-1">
+              {platformFilter !== 'all' 
+                ? `No activities captured from ${platformFilter.toUpperCase()} source. Switch to "All" to view all events.` 
+                : 'Activities will appear here after the next sync.'}
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow className="hover:bg-transparent border-none">
+                    <TableHead className="w-[160px] pl-8 py-5 text-[10px] font-black uppercase tracking-widest">Type</TableHead>
+                    <TableHead className="w-[150px] text-[10px] font-black uppercase tracking-widest">Source</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest">Interaction</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase tracking-widest">User Identity</TableHead>
+                    <TableHead className="text-right pr-8 text-[10px] font-black uppercase tracking-widest">Timestamp</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <AnimatePresence initial={false}>
+                    {activitiesList.map((activity, idx) => (
+                      <motion.tr
+                        key={activity.id}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.3, delay: idx < 10 ? idx * 0.05 : 0 }}
+                        className="group border-b border-muted/40 transition-all hover:bg-primary/[0.02]"
+                      >
+                        <TableCell className="pl-8 py-4">
+                          <EventBadge eventType={activity.eventType} />
+                        </TableCell>
+                        <TableCell>
+                          <PlatformBadge activity={activity} />
+                        </TableCell>
+                        <TableCell className="font-medium text-slate-700 dark:text-slate-300">
+                          {renderEventData(activity)}
+                        </TableCell>
+                        <TableCell>
+                          {renderUserCell(activity)}
+                        </TableCell>
+                        <TableCell className="text-right pr-8">
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className="text-[11px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
+                              {formatActivityTimestamp(activity.timestamp)}
+                            </span>
+                          </div>
+                        </TableCell>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile View: Cards */}
+            <div className="md:hidden">
+              <AnimatePresence initial={false}>
+                {activitiesList.map((activity, idx) => renderMobileCard(activity, idx))}
+              </AnimatePresence>
+            </div>
+          </>
+        )}
       </>
     );
   };
@@ -557,9 +714,12 @@ export default function AdminActivityFeedPage() {
       transition={{ duration: 0.3, delay: idx < 10 ? idx * 0.05 : 0 }}
       className="p-5 border-b last:border-none bg-card hover:bg-muted/30 transition-colors"
     >
-      <div className="flex justify-between items-start mb-4">
-        <EventBadge eventType={activity.eventType} />
-        <div className="text-right">
+      <div className="flex justify-between items-start mb-4 gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <EventBadge eventType={activity.eventType} />
+          <PlatformBadge activity={activity} />
+        </div>
+        <div className="text-right shrink-0">
           <p className="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tighter">
             {formatActivityTimestamp(activity.timestamp)}
           </p>
@@ -668,7 +828,7 @@ export default function AdminActivityFeedPage() {
         <TabsContent value="customer-feed">
           <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
             <CardContent className="p-0">
-              {renderActivityList(customerActivities, 'Customer Events')}
+              {renderActivityList(filteredCustomerActivities, 'Customer Events', customerCounts)}
             </CardContent>
           </Card>
         </TabsContent>
@@ -676,7 +836,7 @@ export default function AdminActivityFeedPage() {
         <TabsContent value="provider-feed">
           <Card className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden bg-card">
             <CardContent className="p-0">
-              {renderActivityList(providerActivities, 'Provider Events')}
+              {renderActivityList(filteredProviderActivities, 'Provider Events', providerCounts)}
             </CardContent>
           </Card>
         </TabsContent>

@@ -8,6 +8,7 @@ import { logUserActivity } from '@/lib/activityLogger';
 import { getGuestId } from '@/lib/guestIdManager';
 import { useAuth } from '@/hooks/useAuth';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { getPlatformSource } from '@/lib/webview-bridge';
 
 const isBot = (): boolean => {
   if (typeof window === 'undefined') return true;
@@ -67,12 +68,15 @@ const PageViewTracker = () => {
       // Log visitor info
       const logVisitor = async () => {
         try {
+          const platformInfo = getPlatformSource();
           await fetch('/api/log-visitor-info', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               pathname: fullUrl,
               userAgent: navigator.userAgent,
+              source: platformInfo.source,
+              platform: platformInfo.platform,
             }),
           });
         } catch (error) {

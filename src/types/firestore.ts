@@ -989,6 +989,9 @@ export interface UserActivity {
   deviceType?: 'mobile' | 'tablet' | 'desktop' | 'unknown'; // Updated to include unknown
   browser?: { name?: string; version?: string };
   os?: { name?: string; version?: string };
+  source?: 'app' | 'web';
+  platform?: string;
+  appVariant?: string;
 }
 
 // Visitor Info Log (newly added)
