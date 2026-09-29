@@ -60,6 +60,14 @@ export default function DatabaseToolsPage() {
   };
 
   const handleClearCache = async () => {
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      showToast({
+        title: "Demo Mode Notice",
+        description: "Disk cache clearing is simulated in demo version.",
+      });
+      return;
+    }
+
     setIsClearingCache(true);
     showToast({ title: "Clearing Disk Cache", description: "Deleting Next.js fetch-cache files..." });
     try {
@@ -82,6 +90,15 @@ export default function DatabaseToolsPage() {
   }, []);
 
   const handleExportDb = async () => {
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      showToast({
+        title: "Demo Mode Notice",
+        description: "Database backup download is disabled in the demo version to protect sensitive user and system data.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsExportingDb(true);
     showToast({ title: "Exporting Database", description: "Generating your backup file..." });
 
@@ -110,6 +127,16 @@ export default function DatabaseToolsPage() {
 
   const handleImportDb = async () => {
     if (!dbFile) return;
+
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      showToast({
+        title: "Demo Mode Notice",
+        description: "Database restore is disabled in the demo version.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsImportingDb(true);
     showToast({ title: "Importing Database", description: "Wiping existing tables and restoring data..." });
 
@@ -151,6 +178,15 @@ export default function DatabaseToolsPage() {
   };
 
   const handleExportImages = async () => {
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      showToast({
+        title: "Demo Mode Notice",
+        description: "Images backup download is disabled in the demo version to protect server storage.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsExportingImages(true);
     showToast({ title: "Backing Up Images", description: "Compressing public/uploads folder into a ZIP..." });
 
@@ -179,6 +215,16 @@ export default function DatabaseToolsPage() {
 
   const handleImportImages = async () => {
     if (!imagesFile) return;
+
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      showToast({
+        title: "Demo Mode Notice",
+        description: "Images restore is disabled in the demo version.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsImportingImages(true);
     showToast({ title: "Restoring Images", description: "Extracting ZIP archive and restoring directories..." });
 
@@ -211,6 +257,15 @@ export default function DatabaseToolsPage() {
   const [isMigratingFirebase, setIsMigratingFirebase] = useState(false);
 
   const handleMigrateFirebase = async () => {
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      showToast({
+        title: "Demo Mode Notice",
+        description: "Firebase migration is disabled in the demo version.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsMigratingFirebase(true);
     showToast({ title: "Migrating Data", description: "Fetching documents from Firebase Firestore and merging into MySQL..." });
 

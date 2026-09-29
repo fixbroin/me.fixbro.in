@@ -11,6 +11,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
   }
 
+  if (user.role === 'demo_admin') {
+    return NextResponse.json({ success: false, error: 'Demo Super Admin cannot export server images backup.' }, { status: 403 });
+  }
+
   try {
     let baseDir = process.cwd();
     if (baseDir.includes(path.join('.next', 'standalone')) || baseDir.endsWith('standalone')) {

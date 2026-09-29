@@ -16,7 +16,11 @@ const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "wecanfix.in@gmail.co
 
 export async function POST(request: Request) {
   try {
-    const { bookingDocId, cancelledBy } = await request.json();
+    const { bookingDocId, cancelledBy, isDemoAdmin } = await request.json();
+
+    if (isDemoAdmin || cancelledBy === 'demo_admin') {
+      return NextResponse.json({ success: true, demo: true, message: 'Demo mode: post-process bypassed.' });
+    }
 
     if (!bookingDocId) {
       return NextResponse.json({ error: 'Missing bookingDocId' }, { status: 400 });

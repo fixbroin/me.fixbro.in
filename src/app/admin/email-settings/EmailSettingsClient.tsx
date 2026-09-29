@@ -69,6 +69,17 @@ export default function EmailSettingsClient({ initialTemplates }: EmailSettingsC
     setTestingTemplateId(templateId);
     setTestEmailDialogOpen(false);
 
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      toast({
+        title: "Demo Mode Notice",
+        description: `Test email to ${testEmailAddress.trim()} simulated in Demo Mode. No real email was sent.`,
+        className: "bg-amber-100 border-amber-300 text-amber-800 font-medium"
+      });
+      setTestingTemplateId(null);
+      setTestEmailTemplateId(null);
+      return;
+    }
+
     try {
       const result = await sendTestEmailAction(templateId, testEmailAddress.trim());
       if (result.success) {
@@ -102,6 +113,14 @@ export default function EmailSettingsClient({ initialTemplates }: EmailSettingsC
     const updated = templates.map(t => t.id === template.id ? { ...t, isEnabled: checked } : t);
     setTemplates(updated);
 
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      toast({
+        title: "Demo Mode Notice",
+        description: `Demo Mode: "${template.title}" status toggled in preview. Not saved to database.`,
+      });
+      return;
+    }
+
     startTransition(async () => {
       const result = await updateEmailTemplateAction(template.id, checked, template.subject, template.body);
       if (result.success) {
@@ -129,6 +148,20 @@ export default function EmailSettingsClient({ initialTemplates }: EmailSettingsC
 
   const handleSaveTemplate = async () => {
     if (!editingTemplate) return;
+
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      setTemplates(prev => prev.map(t => 
+        t.id === editingTemplate.id 
+          ? { ...t, subject: subjectInput, body: bodyInput } 
+          : t
+      ));
+      setEditingTemplate(null);
+      toast({
+        title: "Demo Mode Notice",
+        description: `Demo Mode: Template "${editingTemplate.title}" saved in preview. Not saved to database.`,
+      });
+      return;
+    }
 
     startTransition(async () => {
       const result = await updateEmailTemplateAction(
@@ -161,6 +194,14 @@ export default function EmailSettingsClient({ initialTemplates }: EmailSettingsC
 
   const handleResetTemplate = async (templateId: string) => {
     if (!confirm("Are you sure you want to reset this template to its default subject and content?")) return;
+
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      toast({
+        title: "Demo Mode Notice",
+        description: "Demo Mode: Template reset is simulated. Not modified in database.",
+      });
+      return;
+    }
 
     startTransition(async () => {
       const result = await resetEmailTemplateAction(templateId);

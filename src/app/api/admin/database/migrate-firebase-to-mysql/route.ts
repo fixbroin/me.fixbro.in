@@ -76,6 +76,10 @@ export async function POST(req: NextRequest) {
     if (!user || !isUserAdmin(user)) {
       return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
     }
+
+    if (user.role === 'demo_admin') {
+      return NextResponse.json({ success: false, error: 'Demo Super Admin cannot run database migration.' }, { status: 403 });
+    }
     const firestore = getRealFirestore();
     const pool = await getPool();
     const summary: Record<string, number> = {};

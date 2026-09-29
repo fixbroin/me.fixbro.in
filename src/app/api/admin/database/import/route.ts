@@ -11,6 +11,10 @@ export async function POST(req: NextRequest) {
     if (!user || !isUserAdmin(user)) {
       return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
     }
+
+    if (user.role === 'demo_admin') {
+      return NextResponse.json({ success: false, error: 'Demo Super Admin cannot import database.' }, { status: 403 });
+    }
     let importData: any = null;
     const contentType = req.headers.get('content-type') || '';
 

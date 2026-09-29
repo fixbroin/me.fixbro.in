@@ -520,6 +520,26 @@ export default function AdminImageGalleryPage() {
     setIsUploadingCustom(true);
     setCustomUploadProgress(10);
 
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      const mockNewItems: CustomGalleryImage[] = Array.from(files).map((f, i) => ({
+        id: `demo-custom-${Date.now()}-${i}`,
+        name: f.name,
+        imageUrl: URL.createObjectURL(f),
+        uploadFolder: 'custom',
+        fileSize: f.size,
+        createdAt: new Date(),
+      }));
+      setCustomImages(prev => [...mockNewItems, ...prev]);
+      toast({
+        title: "Demo Mode Notice",
+        description: "In the demo version, custom image uploads are simulated and not saved to the server or database.",
+      });
+      setIsUploadingCustom(false);
+      setCustomUploadProgress(0);
+      e.target.value = '';
+      return;
+    }
+
     try {
       const token = await auth.currentUser?.getIdToken();
       let completedCount = 0;
@@ -636,6 +656,16 @@ export default function AdminImageGalleryPage() {
 
   const handleExecuteDeleteCustomImage = async () => {
     if (!deleteCandidate) return;
+
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      setCustomImages(prev => prev.filter(item => item.id !== deleteCandidate.id));
+      toast({
+        title: "Demo Mode Notice",
+        description: "In the demo version, deleting custom images is simulated and not saved.",
+      });
+      setDeleteCandidate(null);
+      return;
+    }
 
     setIsDeletingCustom(true);
     try {
@@ -858,6 +888,18 @@ export default function AdminImageGalleryPage() {
 
   const handleExecuteImageChange = async () => {
     if (!selectedItem || !previewFile) return;
+
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      const simulatedUrl = previewUrl || (previewFile ? URL.createObjectURL(previewFile) : selectedItem.imageUrl);
+      setItems(prev => prev.map(item => item.id === selectedItem.id ? { ...item, imageUrl: simulatedUrl } : item));
+      toast({
+        title: "Demo Mode Notice",
+        description: `Image change for "${selectedItem.title}" simulated in preview. Not saved to server storage or database.`,
+      });
+      setIsUploadModalOpen(false);
+      restoreScrollPosition();
+      return;
+    }
 
     setIsUploading(true);
     setUploadProgress(20);

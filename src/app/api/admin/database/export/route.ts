@@ -55,6 +55,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
     }
 
+    if (user.role === 'demo_admin') {
+      return NextResponse.json({ success: false, error: 'Demo Super Admin cannot export live database backup.' }, { status: 403 });
+    }
+
     const pool = await getPool();
     const exportData: Record<string, any[]> = {};
 

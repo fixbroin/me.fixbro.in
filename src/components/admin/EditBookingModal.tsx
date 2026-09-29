@@ -370,6 +370,17 @@ export default function EditBookingModal({ bookingId, isOpen, onOpenChange, onSu
       toast({ title: "Validation Error", description: "You must have at least one service in the booking.", variant: "destructive" });
       return;
     }
+
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      toast({
+        title: "Demo Mode Notice",
+        description: "In the demo version, updating bookings is simulated and not saved to the database. Real notifications are disabled.",
+      });
+      onSuccess?.();
+      onOpenChange(false);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {

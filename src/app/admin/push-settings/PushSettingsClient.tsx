@@ -72,6 +72,17 @@ export default function PushSettingsClient({ initialTemplates }: PushSettingsCli
     setTestingTemplateId(templateId);
     setTestPushDialogOpen(false);
 
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      toast({
+        title: "Demo Mode Notice",
+        description: `Test push notification simulated in Demo Mode. No real FCM notification was sent.`,
+        className: "bg-amber-100 border-amber-300 text-amber-800 font-medium"
+      });
+      setTestingTemplateId(null);
+      setTestPushTemplateId(null);
+      return;
+    }
+
     try {
       const result = await sendTestPushAction(templateId, adminUid);
       if (result.success) {
@@ -131,6 +142,14 @@ export default function PushSettingsClient({ initialTemplates }: PushSettingsCli
       prev.map(t => t.id === template.id ? { ...t, isEnabled: checked } : t)
     );
 
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      toast({
+        title: "Demo Mode Notice",
+        description: `Demo Mode: "${template.title}" notification status toggled in preview. Not saved to database.`,
+      });
+      return;
+    }
+
     startTransition(async () => {
       const result = await togglePushTemplateAction(template.id, checked);
       if (result.success) {
@@ -159,6 +178,18 @@ export default function PushSettingsClient({ initialTemplates }: PushSettingsCli
 
   const handleSaveTemplate = async () => {
     if (!editingTemplate) return;
+
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      setTemplates(prev => 
+        prev.map(t => t.id === editingTemplate.id ? { ...t, subject: editSubject, body: editBody } : t)
+      );
+      setEditingTemplate(null);
+      toast({
+        title: "Demo Mode Notice",
+        description: `Demo Mode: Template saved in preview. Not saved to database.`,
+      });
+      return;
+    }
 
     startTransition(async () => {
       const result = await updatePushTemplateAction(
@@ -189,6 +220,14 @@ export default function PushSettingsClient({ initialTemplates }: PushSettingsCli
 
   const handleResetTemplate = async (templateId: string) => {
     if (!confirm("Are you sure you want to reset this template to default title and body?")) return;
+
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      toast({
+        title: "Demo Mode Notice",
+        description: "Demo Mode: Resetting template is simulated. Not modified in database.",
+      });
+      return;
+    }
 
     startTransition(async () => {
       const result = await resetPushTemplateAction(templateId);
@@ -222,6 +261,19 @@ export default function PushSettingsClient({ initialTemplates }: PushSettingsCli
         title: "No Users Selected",
         description: "Please select at least one user to send this push notification to."
       });
+      return;
+    }
+
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      toast({
+        title: "Demo Mode Notice",
+        description: "Demo Mode: Marketing push broadcast simulated. No real messages were sent.",
+      });
+      setMarketingTitle('');
+      setMarketingBody('');
+      setMarketingHref('');
+      setMarketingImageUrl('');
+      setSelectedUids([]);
       return;
     }
 

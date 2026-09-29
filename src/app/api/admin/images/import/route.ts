@@ -11,6 +11,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
   }
 
+  if (user.role === 'demo_admin') {
+    return NextResponse.json({ success: false, error: 'Demo Super Admin cannot restore images.' }, { status: 403 });
+  }
+
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;

@@ -192,6 +192,13 @@ export default function AdminBookingsPage() {
   const [bookingToEditId, setBookingToEditId] = useState<string | null>(null);
 
   const handleSyncIDs = async () => {
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      toast({
+        title: "Demo Mode Notice",
+        description: "In the demo version, ID synchronization is simulated.",
+      });
+      return;
+    }
     setIsSyncing(true);
     try {
       const result = await resequenceBookingNumbers();
@@ -210,6 +217,13 @@ export default function AdminBookingsPage() {
   };
 
   const handleInitialize = async () => {
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      toast({
+        title: "Demo Mode Notice",
+        description: "In the demo version, initialization is simulated.",
+      });
+      return;
+    }
     setIsInitializing(true);
     try {
       const result = await initializeBookingNumbers();
@@ -381,6 +395,26 @@ export default function AdminBookingsPage() {
   const handleStatusChange = async (booking: FirestoreBooking, newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
     if (!booking.id) return;
 
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      const extraTotal = (additionalCharges && additionalCharges.length > 0) ? additionalCharges.reduce((sum, c) => sum + c.amount, 0) : 0;
+      const updateData: any = { 
+        status: newStatus,
+        totalAmount: (booking.totalAmount || 0) + extraTotal,
+        paymentMethod: finalizedPaymentMethod || booking.paymentMethod
+      };
+      setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, ...updateData } : b));
+      if (selectedBooking?.id === booking.id) {
+        setSelectedBooking(prev => prev ? { ...prev, ...updateData } : null);
+      }
+      toast({
+        title: "Demo Mode Notice",
+        description: `Booking status changed to "${newStatus}" in preview. Not saved to database.`,
+      });
+      setIsCompleteDialogOpen(false);
+      setBookingToComplete(null);
+      return;
+    }
+
     if (newStatus === 'Completed' && !finalizedPaymentMethod) {
         setBookingToComplete(booking);
         setIsCompleteDialogOpen(true);
@@ -429,6 +463,18 @@ export default function AdminBookingsPage() {
 
   const handleDeleteBooking = async (booking: FirestoreBooking) => {
     if (!booking.id) return;
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      setBookings(prev => prev.filter(b => b.id !== booking.id));
+      if (selectedBooking?.id === booking.id) {
+        setIsDetailsModalOpen(false);
+        setSelectedBooking(null);
+      }
+      toast({
+        title: "Demo Mode Notice",
+        description: "Booking deletion simulated in preview. Not removed from database.",
+      });
+      return;
+    }
     setIsDeleting(booking.id);
     try {
       await deleteDoc(doc(db, "bookings", booking.id));
@@ -488,6 +534,22 @@ export default function AdminBookingsPage() {
   };
 
   const handleConfirmAssignment = async (bookingId: string, providerId: string, providerName: string) => {
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      const updateData = { 
+        providerId, 
+        status: "AssignedToProvider" as BookingStatus, 
+      };
+      setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, ...updateData } : b));
+      if (selectedBooking?.id === bookingId) {
+        setSelectedBooking(prev => prev ? { ...prev, ...updateData } : null);
+      }
+      toast({
+        title: "Demo Mode Notice",
+        description: `Demo Mode: Booking assignment to ${providerName} simulated in preview.`,
+      });
+      setIsAssignModalOpen(false);
+      return;
+    }
     setIsUpdatingStatus(bookingId);
     try {
       const updateData = { 
@@ -513,6 +575,21 @@ export default function AdminBookingsPage() {
 
   const handleUnassignProvider = async (booking: FirestoreBooking) => {
     if (!booking.id) return;
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      const updateData = { 
+        providerId: undefined, 
+        status: "Confirmed" as BookingStatus, 
+      };
+      setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, ...updateData } : b));
+      if (selectedBooking?.id === booking.id) {
+        setSelectedBooking(prev => prev ? { ...prev, ...updateData } : null);
+      }
+      toast({
+        title: "Demo Mode Notice",
+        description: "Demo Mode: Unassigning provider simulated in preview.",
+      });
+      return;
+    }
     setIsUpdatingStatus(booking.id);
     try {
       const updateData = { 
@@ -568,6 +645,28 @@ export default function AdminBookingsPage() {
   const handleRescheduleConfirm = async (newDate: string, newSlot: string, newEndTime: string) => {
     if (!bookingToReschedule?.id) return;
     
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      const updateData = {
+        status: "Rescheduled" as BookingStatus,
+        scheduledDate: newDate,
+        scheduledTimeSlot: newSlot,
+        estimatedEndTime: newEndTime,
+        previousScheduledDate: bookingToReschedule.scheduledDate,
+        previousScheduledTimeSlot: bookingToReschedule.scheduledTimeSlot,
+      };
+      setBookings(prev => prev.map(b => b.id === bookingToReschedule.id ? { ...b, ...updateData } : b));
+      if (selectedBooking?.id === bookingToReschedule.id) {
+        setSelectedBooking(prev => prev ? { ...prev, ...updateData } : null);
+      }
+      toast({
+        title: "Demo Mode Notice",
+        description: "Demo Mode: Booking rescheduling simulated in preview. Not saved to database.",
+      });
+      setIsRescheduleDialogOpen(false);
+      setBookingToReschedule(null);
+      return;
+    }
+
     setIsUpdatingStatus(bookingToReschedule.id);
     try {
         const updateData = {
