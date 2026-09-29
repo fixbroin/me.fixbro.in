@@ -124,9 +124,66 @@ export default function LoginSettingsPage() {
               <CardDescription>Enable or disable the available login methods for users.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FormField control={form.control} name="enableEmailPasswordLogin" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm"><div className="space-y-0.5"><FormLabel className="text-base">Email & Password</FormLabel></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSaving} /></FormControl></FormItem>)}/>
-              <FormField control={form.control} name="enableOtpLogin" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm"><div className="space-y-0.5"><FormLabel className="text-base">Phone Number with OTP</FormLabel></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSaving} /></FormControl></FormItem>)}/>
-              <FormField control={form.control} name="enableGoogleLogin" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm"><div className="space-y-0.5"><FormLabel className="text-base">Google / Gmail Login</FormLabel></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSaving} /></FormControl></FormItem>)}/>
+              <FormField control={form.control} name="enableEmailPasswordLogin" render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                  <div className="space-y-0.5"><FormLabel className="text-base">Email & Password</FormLabel></div>
+                  <FormControl>
+                    <PermissionGuard
+                      moduleId="login_settings"
+                      action="write"
+                      fallback={
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          field.value ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {field.value ? "Enabled" : "Disabled"}
+                        </span>
+                      }
+                    >
+                      <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSaving} />
+                    </PermissionGuard>
+                  </FormControl>
+                </FormItem>
+              )}/>
+              <FormField control={form.control} name="enableOtpLogin" render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                  <div className="space-y-0.5"><FormLabel className="text-base">Phone Number with OTP</FormLabel></div>
+                  <FormControl>
+                    <PermissionGuard
+                      moduleId="login_settings"
+                      action="write"
+                      fallback={
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          field.value ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {field.value ? "Enabled" : "Disabled"}
+                        </span>
+                      }
+                    >
+                      <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSaving} />
+                    </PermissionGuard>
+                  </FormControl>
+                </FormItem>
+              )}/>
+              <FormField control={form.control} name="enableGoogleLogin" render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                  <div className="space-y-0.5"><FormLabel className="text-base">Google / Gmail Login</FormLabel></div>
+                  <FormControl>
+                    <PermissionGuard
+                      moduleId="login_settings"
+                      action="write"
+                      fallback={
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          field.value ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {field.value ? "Enabled" : "Disabled"}
+                        </span>
+                      }
+                    >
+                      <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSaving} />
+                    </PermissionGuard>
+                  </FormControl>
+                </FormItem>
+              )}/>
             </CardContent>
           </Card>
           

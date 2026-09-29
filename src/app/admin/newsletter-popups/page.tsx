@@ -188,7 +188,21 @@ export default function AdminNewsletterPopupsPage() {
                       <TableCell><Badge variant="secondary">{popup.popupType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</Badge></TableCell>
                       <TableCell className="max-w-xs truncate" title={popup.title}>{popup.title || "N/A"}</TableCell>
                       <TableCell className="text-center">
-                        <Switch checked={popup.isActive} onCheckedChange={() => handleToggleActive(popup)} disabled={isSubmitting || !hasActionPermission(adminPermissions, 'newsletter_popups', 'write')} aria-label={`Toggle active status for ${popup.name}`} />
+                        <PermissionGuard 
+                          moduleId="newsletter_popups" 
+                          action="write"
+                          fallback={
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              popup.isActive
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                : 'bg-muted text-muted-foreground'
+                            }`}>
+                              {popup.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          }
+                        >
+                          <Switch checked={popup.isActive} onCheckedChange={() => handleToggleActive(popup)} disabled={isSubmitting} aria-label={`Toggle active status for ${popup.name}`} />
+                        </PermissionGuard>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2 sm:justify-end">

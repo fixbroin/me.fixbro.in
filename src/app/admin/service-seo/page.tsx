@@ -548,11 +548,25 @@ export default function ServiceSeoPage() {
                       {setting.h1_title || "Not set"}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Switch 
-                        checked={setting.isActive !== false} 
-                        onCheckedChange={() => handleToggleActive(setting)} 
-                        disabled={isSubmitting || !hasActionPermission(adminPermissions, 'seo_overrides', 'write')}
-                      />
+                      <PermissionGuard 
+                        moduleId="seo_overrides" 
+                        action="write"
+                        fallback={
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            setting.isActive !== false
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {setting.isActive !== false ? 'Active' : 'Inactive'}
+                          </span>
+                        }
+                      >
+                        <Switch 
+                          checked={setting.isActive !== false} 
+                          onCheckedChange={() => handleToggleActive(setting)} 
+                          disabled={isSubmitting}
+                        />
+                      </PermissionGuard>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

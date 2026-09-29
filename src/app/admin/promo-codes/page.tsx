@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAdminStats } from "@/hooks/useAdminStats";
 import { triggerRefresh } from '@/lib/revalidateUtils';
+import PermissionGuard from '@/components/admin/PermissionGuard';
 
 export default function AdminPromoCodesPage() {
   const { config: appConfig } = useApplicationConfig();
@@ -265,12 +266,16 @@ export default function AdminPromoCodesPage() {
             <CardDescription>Create, edit, and manage promotional discount codes for customers.</CardDescription>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button onClick={handleSyncUsageHistory} variant="outline" disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
-              <History className="mr-2 h-4 w-4" /> Recalculate & Sync
-            </Button>
-            <Button onClick={handleAddPromoCode} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Promo Code
-            </Button>
+            <PermissionGuard moduleId="promo_codes" action="write">
+              <Button onClick={handleSyncUsageHistory} variant="outline" disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
+                <History className="mr-2 h-4 w-4" /> Recalculate & Sync
+              </Button>
+            </PermissionGuard>
+            <PermissionGuard moduleId="promo_codes" action="create">
+              <Button onClick={handleAddPromoCode} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Promo Code
+              </Button>
+            </PermissionGuard>
           </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -317,45 +322,63 @@ export default function AdminPromoCodesPage() {
                         {code.validUntil ? formatDateForIndia(code.validUntil) : <span title="Not set"><XCircle className="h-4 w-4 text-muted-foreground/70 mx-auto" /></span>}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Switch
-                          checked={code.isActive}
-                          onCheckedChange={() => handleToggleActive(code)}
-                          disabled={isSubmitting}
-                          aria-label={`Toggle active status for ${code.code}`}
-                        />
+                        <PermissionGuard 
+                          moduleId="promo_codes" 
+                          action="write"
+                          fallback={
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              code.isActive
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                : 'bg-muted text-muted-foreground'
+                            }`}>
+                              {code.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          }
+                        >
+                          <Switch
+                            checked={code.isActive}
+                            onCheckedChange={() => handleToggleActive(code)}
+                            disabled={isSubmitting}
+                            aria-label={`Toggle active status for ${code.code}`}
+                          />
+                        </PermissionGuard>
                       </TableCell>
                        <TableCell className="text-center">
                         {code.isHidden ? <span title="Hidden"><EyeOff className="h-5 w-5 text-muted-foreground mx-auto" /></span> : <span title="Visible"><Eye className="h-5 w-5 text-green-500 mx-auto" /></span>}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2 sm:justify-end">
-                          <Button variant="outline" size="icon" onClick={() => handleEditPromoCode(code)} disabled={isSubmitting}>
-                            <Edit className="h-4 w-4" /> <span className="sr-only">Edit</span>
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="icon" disabled={isSubmitting}>
-                                <Trash2 className="h-4 w-4" /> <span className="sr-only">Delete</span>
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete the promo code &quot;{code.code}&quot;.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeletePromoCode(code.id)}
-                                  disabled={isSubmitting}
-                                  className="bg-destructive hover:bg-destructive/90">
-                                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <PermissionGuard moduleId="promo_codes" action="write">
+                            <Button variant="outline" size="icon" onClick={() => handleEditPromoCode(code)} disabled={isSubmitting}>
+                              <Edit className="h-4 w-4" /> <span className="sr-only">Edit</span>
+                            </Button>
+                          </PermissionGuard>
+                          <PermissionGuard moduleId="promo_codes" action="delete">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="icon" disabled={isSubmitting}>
+                                  <Trash2 className="h-4 w-4" /> <span className="sr-only">Delete</span>
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete the promo code &quot;{code.code}&quot;.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeletePromoCode(code.id)}
+                                    disabled={isSubmitting}
+                                    className="bg-destructive hover:bg-destructive/90">
+                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </PermissionGuard>
                         </div>
                       </TableCell>
                     </TableRow>

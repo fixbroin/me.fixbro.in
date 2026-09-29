@@ -2,13 +2,14 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Database, UploadCloud, Download, Loader2, AlertTriangle, MessageSquare, Smartphone, KeyRound, Server, BarChart2, Tv, ListChecks, HelpCircle, FileText, Code, FacebookIcon, Megaphone, Save } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
@@ -23,6 +24,8 @@ import { useMarketingSettings } from '@/hooks/useMarketingSettings'; // Use the 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs
 import { defaultMarketingValues } from '@/hooks/useMarketingSettings'; // Import defaults
 import PermissionGuard from '@/components/admin/PermissionGuard';
+import { useAuth } from '@/hooks/useAuth';
+import { maskSecret, maskApiKey, isMaskedValue } from '@/lib/credentialMasking';
 
 const marketingSettingsSchema = z.object({
   // Google
@@ -73,8 +76,10 @@ const MARKETING_CONFIG_DOC_ID = "marketingConfiguration";
 
 export default function MarketingSettingsPage() {
   const { toast } = useToast();
+  const { isSuperAdmin } = useAuth();
   const { settings, isLoading, error: settingsError } = useMarketingSettings();
   const [isSaving, setIsSaving] = useState(false);
+  const rawSettingsRef = useRef<MarketingSettings | null>(null);
 
   const form = useForm<MarketingSettingsFormData>({
     resolver: zodResolver(marketingSettingsSchema),
@@ -83,6 +88,7 @@ export default function MarketingSettingsPage() {
 
   useEffect(() => {
     if (!isLoading && settings) {
+      rawSettingsRef.current = settings;
       form.reset({
         ...defaultMarketingValues,
         ...settings,
@@ -102,6 +108,31 @@ export default function MarketingSettingsPage() {
         ...data,
         updatedAt: Timestamp.now(),
       };
+
+      // Credential Safety: If not super admin or if values are masked, restore raw DB values
+      const raw = rawSettingsRef.current;
+      if (raw) {
+        if (!isSuperAdmin || isMaskedValue(dataToSave.metaConversionApi?.accessToken)) {
+          if (dataToSave.metaConversionApi) {
+            dataToSave.metaConversionApi.accessToken = raw.metaConversionApi?.accessToken || '';
+          }
+        }
+        if (!isSuperAdmin || isMaskedValue(dataToSave.whatsAppApiToken)) {
+          dataToSave.whatsAppApiToken = raw.whatsAppApiToken || '';
+        }
+        if (!isSuperAdmin || isMaskedValue(dataToSave.whatsAppVerifyToken)) {
+          dataToSave.whatsAppVerifyToken = raw.whatsAppVerifyToken || '';
+        }
+        if (!isSuperAdmin || isMaskedValue(dataToSave.firebaseAdminSdkJson)) {
+          dataToSave.firebaseAdminSdkJson = raw.firebaseAdminSdkJson || '';
+        }
+        if (!isSuperAdmin || isMaskedValue(dataToSave.firebaseClientConfig?.apiKey)) {
+          if (dataToSave.firebaseClientConfig) {
+            dataToSave.firebaseClientConfig.apiKey = raw.firebaseClientConfig?.apiKey || '';
+          }
+        }
+      }
+
       await setDoc(settingsDocRef, dataToSave, { merge: true });
       await triggerRefresh('marketing-settings');
       await triggerRefresh('global-cache');
@@ -209,7 +240,33 @@ export default function MarketingSettingsPage() {
                  <FormField control={form.control} name="metaPixelId" render={({ field }) => (<FormItem><FormLabel>Meta Pixel ID</FormLabel><FormControl><Input placeholder="Your Meta Pixel ID" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
                  <h4 className="text-md font-semibold pt-2">Meta Conversion API (CAPI)</h4>
                  <FormField control={form.control} name="metaConversionApi.pixelId" render={({ field }) => (<FormItem><FormLabel>CAPI Pixel ID</FormLabel><FormControl><Input placeholder="Pixel ID for CAPI (often same as above)" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
-                 <FormField control={form.control} name="metaConversionApi.accessToken" render={({ field }) => (<FormItem><FormLabel>CAPI Access Token</FormLabel><FormControl><Input type="password" placeholder="Your CAPI Access Token" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
+                 <FormField
+                    control={form.control}
+                    name="metaConversionApi.accessToken"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>CAPI Access Token</FormLabel>
+                          {!isSuperAdmin && (
+                            <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                              🔒 Super Admin Only
+                            </Badge>
+                          )}
+                        </div>
+                        <FormControl>
+                          <Input
+                            type="password"
+                            placeholder="Your CAPI Access Token"
+                            {...field}
+                            value={isSuperAdmin ? (field.value || '') : (field.value ? maskSecret(field.value) : '')}
+                            readOnly={!isSuperAdmin}
+                            disabled={!isSuperAdmin}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                  <FormField control={form.control} name="metaConversionApi.testEventCode" render={({ field }) => (<FormItem><FormLabel>CAPI Test Event Code (Optional)</FormLabel><FormControl><Input placeholder="TESTXXXXX" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
               </CardContent></Card>
             </TabsContent>
@@ -281,7 +338,31 @@ export default function MarketingSettingsPage() {
                     Full Client Config (for reference, usually auto-managed)
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="firebaseClientConfig.apiKey" render={({ field }) => ( <FormItem> <FormLabel>API Key</FormLabel> <FormControl><Input {...field} value={field.value || ''} /></FormControl> </FormItem> )}/>
+                    <FormField
+                      control={form.control}
+                      name="firebaseClientConfig.apiKey"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center justify-between">
+                            <FormLabel>API Key</FormLabel>
+                            {!isSuperAdmin && (
+                              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                                🔒 Super Admin Only
+                              </Badge>
+                            )}
+                          </div>
+                          <FormControl>
+                            <Input
+                              type={isSuperAdmin ? "text" : "password"}
+                              {...field}
+                              value={isSuperAdmin ? (field.value || '') : (field.value ? maskApiKey(field.value, 6) : '')}
+                              readOnly={!isSuperAdmin}
+                              disabled={!isSuperAdmin}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                     <FormField control={form.control} name="firebaseClientConfig.authDomain" render={({ field }) => ( <FormItem> <FormLabel>Auth Domain</FormLabel> <FormControl><Input {...field} value={field.value || ''} /></FormControl> </FormItem> )}/>
                     <FormField control={form.control} name="firebaseClientConfig.projectId" render={({ field }) => ( <FormItem> <FormLabel>Project ID</FormLabel> <FormControl><Input {...field} value={field.value || ''} /></FormControl> </FormItem> )}/>
                     <FormField control={form.control} name="firebaseClientConfig.storageBucket" render={({ field }) => ( <FormItem> <FormLabel>Storage Bucket</FormLabel> <FormControl><Input {...field} value={field.value || ''} /></FormControl> </FormItem> )}/>
@@ -294,14 +375,23 @@ export default function MarketingSettingsPage() {
                     name="firebaseAdminSdkJson"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Admin SDK JSON</FormLabel>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>Admin SDK JSON</FormLabel>
+                          {!isSuperAdmin && (
+                            <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                              🔒 Super Admin Only
+                            </Badge>
+                          )}
+                        </div>
                         <FormControl>
                           <Textarea
                             placeholder="Paste your Firebase Admin SDK JSON here"
                             {...field}
-                            value={field.value || ''}
+                            value={isSuperAdmin ? (field.value || '') : (field.value ? "••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••" : '')}
                             rows={10}
                             className="font-mono text-xs"
+                            readOnly={!isSuperAdmin}
+                            disabled={!isSuperAdmin}
                           />
                         </FormControl>
                         <FormDescription className="text-destructive">
@@ -322,10 +412,61 @@ export default function MarketingSettingsPage() {
                   <CardDescription>Enter your credentials from Meta for Business.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <FormField control={form.control} name="whatsAppApiToken" render={({ field }) => (<FormItem><FormLabel>API Token</FormLabel><FormControl><Input type="password" placeholder="WhatsApp API Token" {...field} value={field.value || ''} /></FormControl></FormItem>)} />
+                  <FormField
+                    control={form.control}
+                    name="whatsAppApiToken"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>API Token</FormLabel>
+                          {!isSuperAdmin && (
+                            <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                              🔒 Super Admin Only
+                            </Badge>
+                          )}
+                        </div>
+                        <FormControl>
+                          <Input
+                            type="password"
+                            placeholder="WhatsApp API Token"
+                            {...field}
+                            value={isSuperAdmin ? (field.value || '') : (field.value ? maskSecret(field.value) : '')}
+                            readOnly={!isSuperAdmin}
+                            disabled={!isSuperAdmin}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
                   <FormField control={form.control} name="whatsAppPhoneNumberId" render={({ field }) => (<FormItem><FormLabel>Phone Number ID</FormLabel><FormControl><Input placeholder="Your WhatsApp Phone Number ID" {...field} value={field.value || ''} /></FormControl></FormItem>)} />
                   <FormField control={form.control} name="whatsAppBusinessAccountId" render={({ field }) => (<FormItem><FormLabel>Business Account ID</FormLabel><FormControl><Input placeholder="Your WhatsApp Business Account ID" {...field} value={field.value || ''} /></FormControl></FormItem>)} />
-                  <FormField control={form.control} name="whatsAppVerifyToken" render={({ field }) => (<FormItem><FormLabel>Webhook Verify Token</FormLabel><FormControl><Input placeholder="A secure, random string" {...field} value={field.value || ''} /></FormControl><FormDescription>A secret string you create. You'll enter this in the Meta developer portal to verify your webhook.</FormDescription></FormItem>)} />
+                  <FormField
+                    control={form.control}
+                    name="whatsAppVerifyToken"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>Webhook Verify Token</FormLabel>
+                          {!isSuperAdmin && (
+                            <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                              🔒 Super Admin Only
+                            </Badge>
+                          )}
+                        </div>
+                        <FormControl>
+                          <Input
+                            type={isSuperAdmin ? "text" : "password"}
+                            placeholder="A secure, random string"
+                            {...field}
+                            value={isSuperAdmin ? (field.value || '') : (field.value ? maskSecret(field.value) : '')}
+                            readOnly={!isSuperAdmin}
+                            disabled={!isSuperAdmin}
+                          />
+                        </FormControl>
+                        <FormDescription>A secret string you create. You'll enter this in the Meta developer portal to verify your webhook.</FormDescription>
+                      </FormItem>
+                    )}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>

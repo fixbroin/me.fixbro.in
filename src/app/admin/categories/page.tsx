@@ -300,12 +300,26 @@ export default function AdminCategoriesPage() {
                         <TableCell className="text-xs text-muted-foreground">{category.slug}</TableCell>
                         <TableCell className="text-center">{category.order}</TableCell>
                         <TableCell className="text-center">
-                            <Switch 
-                                checked={category.isActive === undefined ? true : category.isActive}
-                                onCheckedChange={() => handleToggleActive(category)}
-                                disabled={isSubmitting || !hasActionPermission(adminPermissions, 'categories', 'write')}
-                                aria-label={`Toggle status for ${category.name}`}
-                            />
+                            <PermissionGuard 
+                                moduleId="categories" 
+                                action="write"
+                                fallback={
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                    (category.isActive === undefined || category.isActive)
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                      : 'bg-muted text-muted-foreground'
+                                  }`}>
+                                    {(category.isActive === undefined || category.isActive) ? 'Active' : 'Inactive'}
+                                  </span>
+                                }
+                            >
+                              <Switch 
+                                  checked={category.isActive === undefined ? true : category.isActive}
+                                  onCheckedChange={() => handleToggleActive(category)}
+                                  disabled={isSubmitting}
+                                  aria-label={`Toggle status for ${category.name}`}
+                              />
+                            </PermissionGuard>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2 sm:justify-end">

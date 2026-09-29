@@ -31,6 +31,8 @@ import { Badge } from '@/components/ui/badge';
 import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import PermissionGuard from '@/components/admin/PermissionGuard';
+import { useAuth } from '@/hooks/useAuth';
+import { maskSecret, isMaskedValue } from '@/lib/credentialMasking';
 
 const WEB_SETTINGS_DOC_ID = "global";
 const WEB_SETTINGS_COLLECTION = "webSettings";
@@ -198,6 +200,9 @@ export default function WebSettingsPage() {
     }
   });
 
+  const { isSuperAdmin } = useAuth();
+  const rawStorageSecretRef = useRef<string>('');
+
   // Media Storage Configuration
   const [storageDriver, setStorageDriver] = useState<'local' | 'remote'>('local');
   const [remoteUploadUrl, setRemoteUploadUrl] = useState<string>('');
@@ -256,7 +261,10 @@ export default function WebSettingsPage() {
           const sData = storageSnap.data() as any;
           if (sData.driver) setStorageDriver(sData.driver);
           if (sData.remoteUploadUrl) setRemoteUploadUrl(sData.remoteUploadUrl);
-          if (sData.remoteSecretKey) setRemoteSecretKey(sData.remoteSecretKey);
+          if (sData.remoteSecretKey) {
+            rawStorageSecretRef.current = sData.remoteSecretKey;
+            setRemoteSecretKey(sData.remoteSecretKey);
+          }
         }
       } catch (sErr) {
         console.warn("Error loading storage config:", sErr);
@@ -645,10 +653,14 @@ export default function WebSettingsPage() {
   const handleSaveStorageConfig = async () => {
     setIsSaving(true);
     try {
+      const secretToSave = (!isSuperAdmin || isMaskedValue(remoteSecretKey))
+        ? (rawStorageSecretRef.current || remoteSecretKey)
+        : remoteSecretKey.trim();
+
       await setDoc(doc(db, "webSettings", "storageConfiguration"), {
         driver: storageDriver,
         remoteUploadUrl: remoteUploadUrl.trim(),
-        remoteSecretKey: remoteSecretKey.trim(),
+        remoteSecretKey: secretToSave,
         updatedAt: Timestamp.now(),
       }, { merge: true });
       await triggerRefresh('web-settings');
@@ -1426,13 +1438,22 @@ export default function WebSettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs font-semibold">Security Secret Key</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">Security Secret Key</Label>
+                      {!isSuperAdmin && (
+                        <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                          🔒 Super Admin Only
+                        </Badge>
+                      )}
+                    </div>
                     <Input 
                       type="password"
                       placeholder="e.g. wecanfix_secure_key_123" 
-                      value={remoteSecretKey}
+                      value={isSuperAdmin ? remoteSecretKey : (remoteSecretKey ? maskSecret(remoteSecretKey) : "")}
                       onChange={(e) => setRemoteSecretKey(e.target.value)}
                       className="font-mono text-xs"
+                      readOnly={!isSuperAdmin}
+                      disabled={!isSuperAdmin}
                     />
                     <p className="text-[11px] text-muted-foreground">A secret password shared between your VPS and Shared Hosting upload script to block unauthorized uploads.</p>
                   </div>

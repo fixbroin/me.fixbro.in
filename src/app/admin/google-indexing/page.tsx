@@ -176,11 +176,25 @@ export default function GoogleIndexingDashboard() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">VPS Cron Active</CardTitle>
-                  <Switch
-                    checked={!isBulkIndexingComplete}
-                    onCheckedChange={handleToggleCron}
-                    disabled={isSubmitting}
-                  />
+                  <PermissionGuard 
+                    moduleId="seo_overrides" 
+                    action="write"
+                    fallback={
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        !isBulkIndexingComplete
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {!isBulkIndexingComplete ? "Running" : "Stopped"}
+                      </span>
+                    }
+                  >
+                    <Switch
+                      checked={!isBulkIndexingComplete}
+                      onCheckedChange={handleToggleCron}
+                      disabled={isSubmitting}
+                    />
+                  </PermissionGuard>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">

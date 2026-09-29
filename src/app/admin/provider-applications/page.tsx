@@ -306,28 +306,46 @@ export default function AdminProviderApplicationsPage() {
                 {app.status.replace(/_/g, ' ')}
               </Badge>
               {app.status === 'approved' && (
-                <div
-                  onClick={() => handleToggleOnline(app)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold transition-all cursor-pointer select-none",
-                    app.isOnline !== false
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800"
-                      : "bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400"
-                  )}
-                  title={app.isOnline !== false ? "Provider is Online. Click switch to set Offline." : "Provider is Offline. Click switch to set Online."}
+                <PermissionGuard
+                  moduleId="provider_applications"
+                  action="write"
+                  fallback={
+                    <div
+                      className={cn(
+                        "flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold select-none",
+                        app.isOnline !== false
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800"
+                          : "bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400"
+                      )}
+                    >
+                      <span className={cn("h-1.5 w-1.5 rounded-full", app.isOnline !== false ? "bg-emerald-500 animate-pulse" : "bg-zinc-400")} />
+                      <span>{app.isOnline !== false ? "Online" : "Offline"}</span>
+                    </div>
+                  }
                 >
-                  <span className={cn("h-1.5 w-1.5 rounded-full", app.isOnline !== false ? "bg-emerald-500 animate-pulse" : "bg-zinc-400")} />
-                  <span>{app.isOnline !== false ? "Online" : "Offline"}</span>
-                  {isTogglingOnlineId === app.id ? (
-                    <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
-                  ) : (
-                    <Switch
-                      checked={app.isOnline !== false}
-                      onCheckedChange={() => handleToggleOnline(app)}
-                      className="scale-[0.55] origin-center data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-zinc-300 dark:data-[state=unchecked]:bg-zinc-700 pointer-events-none -mr-1.5"
-                    />
-                  )}
-                </div>
+                  <div
+                    onClick={() => handleToggleOnline(app)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold transition-all cursor-pointer select-none",
+                      app.isOnline !== false
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800"
+                        : "bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400"
+                    )}
+                    title={app.isOnline !== false ? "Provider is Online. Click switch to set Offline." : "Provider is Offline. Click switch to set Online."}
+                  >
+                    <span className={cn("h-1.5 w-1.5 rounded-full", app.isOnline !== false ? "bg-emerald-500 animate-pulse" : "bg-zinc-400")} />
+                    <span>{app.isOnline !== false ? "Online" : "Offline"}</span>
+                    {isTogglingOnlineId === app.id ? (
+                      <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
+                    ) : (
+                      <Switch
+                        checked={app.isOnline !== false}
+                        onCheckedChange={() => handleToggleOnline(app)}
+                        className="scale-[0.55] origin-center data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-zinc-300 dark:data-[state=unchecked]:bg-zinc-700 pointer-events-none -mr-1.5"
+                      />
+                    )}
+                  </div>
+                </PermissionGuard>
               )}
             </div>
           </div>
@@ -537,28 +555,46 @@ export default function AdminProviderApplicationsPage() {
                           <div className="flex items-center gap-2 flex-wrap whitespace-nowrap">
                             <Badge variant={getStatusBadgeVariant(app.status)} className={`text-[10px] capitalize shrink-0 ${app.status === 'approved' ? 'bg-green-500 text-white' : ''}`}>{app.status.replace(/_/g, ' ')}</Badge>
                             {app.status === 'approved' && (
-                              <div
-                                onClick={() => handleToggleOnline(app)}
-                                className={cn(
-                                  "flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold transition-all cursor-pointer select-none",
-                                  app.isOnline !== false
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800"
-                                    : "bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400"
-                                )}
-                                title={app.isOnline !== false ? "Provider is Online. Click switch to set Offline." : "Provider is Offline. Click switch to set Online."}
+                              <PermissionGuard
+                                moduleId="provider_applications"
+                                action="write"
+                                fallback={
+                                  <div
+                                    className={cn(
+                                      "flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold select-none",
+                                      app.isOnline !== false
+                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800"
+                                        : "bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400"
+                                    )}
+                                  >
+                                    <span className={cn("h-1.5 w-1.5 rounded-full", app.isOnline !== false ? "bg-emerald-500 animate-pulse" : "bg-zinc-400")} />
+                                    <span>{app.isOnline !== false ? "Online" : "Offline"}</span>
+                                  </div>
+                                }
                               >
-                                <span className={cn("h-1.5 w-1.5 rounded-full", app.isOnline !== false ? "bg-emerald-500 animate-pulse" : "bg-zinc-400")} />
-                                <span>{app.isOnline !== false ? "Online" : "Offline"}</span>
-                                {isTogglingOnlineId === app.id ? (
-                                  <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
-                                ) : (
-                                  <Switch
-                                    checked={app.isOnline !== false}
-                                    onCheckedChange={() => handleToggleOnline(app)}
-                                    className="scale-[0.55] origin-center data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-zinc-300 dark:data-[state=unchecked]:bg-zinc-700 pointer-events-none -mr-1.5"
-                                  />
-                                )}
-                              </div>
+                                <div
+                                  onClick={() => handleToggleOnline(app)}
+                                  className={cn(
+                                    "flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold transition-all cursor-pointer select-none",
+                                    app.isOnline !== false
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800"
+                                      : "bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400"
+                                  )}
+                                  title={app.isOnline !== false ? "Provider is Online. Click switch to set Offline." : "Provider is Offline. Click switch to set Online."}
+                                >
+                                  <span className={cn("h-1.5 w-1.5 rounded-full", app.isOnline !== false ? "bg-emerald-500 animate-pulse" : "bg-zinc-400")} />
+                                  <span>{app.isOnline !== false ? "Online" : "Offline"}</span>
+                                  {isTogglingOnlineId === app.id ? (
+                                    <Loader2 className="h-2.5 w-2.5 animate-spin text-muted-foreground" />
+                                  ) : (
+                                    <Switch
+                                      checked={app.isOnline !== false}
+                                      onCheckedChange={() => handleToggleOnline(app)}
+                                      className="scale-[0.55] origin-center data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-zinc-300 dark:data-[state=unchecked]:bg-zinc-700 pointer-events-none -mr-1.5"
+                                    />
+                                  )}
+                                </div>
+                              </PermissionGuard>
                             )}
                           </div>
                         </TableCell>

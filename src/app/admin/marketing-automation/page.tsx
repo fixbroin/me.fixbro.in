@@ -257,7 +257,30 @@ export default function MarketingAutomationPage() {
     <Card>
       <CardHeader><CardTitle className="flex items-center">{icon}{title}</CardTitle><CardDescription>{description}</CardDescription></CardHeader>
       <CardContent className="space-y-6">
-        <FormField control={form.control} name={`${id}Enabled`} render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-4"><div className="space-y-0.5"><FormLabel className="text-base flex items-center"><Mail className="mr-2 h-4 w-4"/>Enable "{title}"</FormLabel></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSaving || isTestSending} /></FormControl></FormItem>)}/>
+        <FormField control={form.control} name={`${id}Enabled`} render={({ field }) => (
+          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+            <div className="space-y-0.5">
+              <FormLabel className="text-base flex items-center"><Mail className="mr-2 h-4 w-4"/>Enable "{title}"</FormLabel>
+            </div>
+            <FormControl>
+              <PermissionGuard
+                moduleId="marketing_automation"
+                action="write"
+                fallback={
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    field.value
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                      : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {field.value ? "Enabled" : "Disabled"}
+                  </span>
+                }
+              >
+                <Switch checked={field.value} onCheckedChange={field.onChange} disabled={isSaving || isTestSending} />
+              </PermissionGuard>
+            </FormControl>
+          </FormItem>
+        )}/>
         {form.watch(`${id}Enabled`) && (
           <div className="pl-4 border-l-2 ml-2 space-y-4">
             {id !== 'recurringEngagement' && renderDelayInputs(`${id}Delay`, "Send After")}

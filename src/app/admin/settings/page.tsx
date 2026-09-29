@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Settings, Save, Loader2, AlertCircle, MapPin as MapIcon, MailIcon, PlaySquare, Percent, Ban, Users, Clock, DollarSign, CreditCard, Bell, Plus, Trash2, CalendarDays, Edit3, Activity, Globe, User } from "lucide-react";
@@ -23,6 +23,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Check, Copy, ChevronsUpDown, Search as SearchIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import PermissionGuard from '@/components/admin/PermissionGuard';
+import { useAuth } from '@/hooks/useAuth';
+import { hasActionPermission } from '@/config/rbac';
+import { maskSecret, maskApiKey, isMaskedValue } from '@/lib/credentialMasking';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const APP_CONFIG_COLLECTION = "webSettings";
@@ -161,8 +165,48 @@ const ALL_TIMEZONES = generateTimezones();
 
 export default function AdminSettingsPage() {
   const { toast } = useToast();
+  const { isSuperAdmin, adminPermissions } = useAuth();
+  const rawDBSettingsRef = useRef<Partial<AppSettings>>({});
   const [settings, setSettings] = useState<AppSettings>(defaultAppSettings);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const SettingSwitch = ({
+    id,
+    name,
+    checked,
+    onCheckedChange,
+    disabled,
+    ariaLabel
+  }: {
+    id?: string;
+    name?: string;
+    checked?: boolean;
+    onCheckedChange: (c: boolean) => void;
+    disabled?: boolean;
+    ariaLabel?: string;
+  }) => {
+    const isChecked = !!checked;
+    return (
+      <PermissionGuard
+        moduleId="settings"
+        action="write"
+        fallback={
+          <Badge variant={isChecked ? "default" : "secondary"} className={isChecked ? "bg-green-600 hover:bg-green-600" : ""}>
+            {isChecked ? "Enabled" : "Disabled"}
+          </Badge>
+        }
+      >
+        <Switch
+          id={id}
+          name={name || id}
+          checked={isChecked}
+          onCheckedChange={onCheckedChange}
+          disabled={disabled || !hasActionPermission(adminPermissions, 'settings', 'write')}
+          aria-label={ariaLabel}
+        />
+      </PermissionGuard>
+    );
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -288,6 +332,7 @@ export default function AdminSettingsPage() {
       const docSnap = await getDoc(settingsDocRef);
       if (docSnap.exists()) {
         const firestoreData = docSnap.data() as Partial<AppSettings>;
+        rawDBSettingsRef.current = { ...firestoreData };
         
         const mergedSettings = { 
           ...defaultAppSettings, 
@@ -676,6 +721,21 @@ export default function AdminSettingsPage() {
       }
     }
 
+    // Credential Protection: Never commit masked placeholder values back to database
+    const sensitiveKeys: (keyof AppSettings)[] = [
+      'googleMapsApiKey', 'smtpPass', 
+      'razorpayKeyId', 'razorpayKeySecret', 'razorpayWebhookSecret',
+      'stripePublishableKey', 'stripeSecretKey', 'stripeWebhookSecret'
+    ];
+    for (const key of sensitiveKeys) {
+      const currentVal = (settingsToSave as any)[key];
+      if (!isSuperAdmin || isMaskedValue(currentVal)) {
+        if (rawDBSettingsRef.current && rawDBSettingsRef.current[key] !== undefined) {
+          (settingsToSave as any)[key] = rawDBSettingsRef.current[key];
+        }
+      }
+    }
+
     // Ensure isVisitingChargeTaxInclusive is false if conditions aren't met
     if (!settingsToSave.enableTaxOnVisitingCharge || (settingsToSave.visitingChargeTaxPercent || 0) <= 0) {
         settingsToSave.isVisitingChargeTaxInclusive = false;
@@ -725,7 +785,7 @@ export default function AdminSettingsPage() {
         <div key={day} className="p-4 border rounded-lg space-y-3">
           <div className="flex justify-between items-center">
             <Label className="capitalize text-lg font-medium">{day}</Label>
-            <Switch
+            <SettingSwitch
               checked={dayAvail.isEnabled}
               onCheckedChange={(checked) => handleSwitchChange(`weeklyAvailability.${day}.isEnabled`, checked)}
               disabled={isSaving}
@@ -1188,7 +1248,7 @@ export default function AdminSettingsPage() {
                       Apply a visiting charge if booking total is below a set minimum.
                     </p>
                   </div>
-                  <Switch
+                  <SettingSwitch
                     id="enableMinimumBookingPolicy"
                     name="enableMinimumBookingPolicy" 
                     checked={settings.enableMinimumBookingPolicy}
@@ -1258,7 +1318,7 @@ export default function AdminSettingsPage() {
                                 <Label htmlFor="enableTaxOnVisitingCharge" className="text-base font-normal">Enable Tax</Label>
                                 <p className="text-xs text-muted-foreground">Apply tax to the visiting charge amount.</p>
                             </div>
-                            <Switch
+                            <SettingSwitch
                                 id="enableTaxOnVisitingCharge"
                                 name="enableTaxOnVisitingCharge"
                                 checked={settings.enableTaxOnVisitingCharge}
@@ -1362,7 +1422,7 @@ export default function AdminSettingsPage() {
                       Show or hide the main slideshow on the homepage.
                     </p>
                   </div>
-                  <Switch
+                  <SettingSwitch
                     id="enableHeroCarousel"
                     name="enableHeroCarousel" 
                     checked={settings.enableHeroCarousel}
@@ -1379,7 +1439,7 @@ export default function AdminSettingsPage() {
                           Automatically transition between slides.
                         </p>
                       </div>
-                      <Switch
+                      <SettingSwitch
                         id="enableCarouselAutoplay"
                         name="enableCarouselAutoplay"
                         checked={settings.enableCarouselAutoplay}
@@ -1416,7 +1476,7 @@ export default function AdminSettingsPage() {
                       Track page visits, IP addresses, city, country, browser, and ISP data to show in Visitor Info tab. Disable to stop visitor tracking and reduce database connection usage.
                     </p>
                   </div>
-                  <Switch
+                  <SettingSwitch
                     id="enableVisitorLogging"
                     name="enableVisitorLogging" 
                     checked={settings.enableVisitorLogging}
@@ -1431,7 +1491,7 @@ export default function AdminSettingsPage() {
                       Keep track of user and provider online status (last seen timestamp). Disable to save database connection limit.
                     </p>
                   </div>
-                  <Switch
+                  <SettingSwitch
                     id="enableUserPresence"
                     name="enableUserPresence" 
                     checked={settings.enableUserPresence}
@@ -1446,7 +1506,7 @@ export default function AdminSettingsPage() {
                       Allow mobile virtual keyboards to show text recommendations and autocompletes. Disable to keep suggestions bar hidden.
                     </p>
                   </div>
-                  <Switch
+                  <SettingSwitch
                     id="enableKeyboardSuggestions"
                     name="enableKeyboardSuggestions" 
                     checked={settings.enableKeyboardSuggestions ?? true}
@@ -1459,15 +1519,23 @@ export default function AdminSettingsPage() {
               <div className="space-y-4 p-4 border rounded-md shadow-sm">
                 <h3 className="text-lg font-semibold flex items-center"><MapIcon className="mr-2 h-5 w-5 text-muted-foreground"/>Google Maps Configuration</h3>
                  <div className="space-y-2">
-                    <Label htmlFor="googleMapsApiKey">Google Maps API Key</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="googleMapsApiKey">Google Maps API Key</Label>
+                      {!isSuperAdmin && (
+                        <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                          🔒 Super Admin Only
+                        </Badge>
+                      )}
+                    </div>
                     <Input
                       id="googleMapsApiKey"
                       name="googleMapsApiKey"
-                      type="text"
-                      value={settings.googleMapsApiKey}
+                      type={isSuperAdmin ? "text" : "password"}
+                      value={isSuperAdmin ? settings.googleMapsApiKey : (settings.googleMapsApiKey ? maskApiKey(settings.googleMapsApiKey, 6) : "")}
                       onChange={handleInputChange}
-                      placeholder="Enter your Google Maps API Key"
-                      disabled={isSaving}
+                      placeholder={isSuperAdmin ? "Enter your Google Maps API Key" : "••••••••••••••••••••"}
+                      disabled={isSaving || !isSuperAdmin}
+                      readOnly={!isSuperAdmin}
                     />
                     <p className="text-xs text-muted-foreground">Used for address selection and location-based features.</p>
                   </div>
@@ -1495,8 +1563,24 @@ export default function AdminSettingsPage() {
                         <Input id="smtpUser" name="smtpUser" value={settings.smtpUser} onChange={handleInputChange} placeholder="Your SMTP username" disabled={isSaving}/>
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="smtpPass">SMTP Password</Label>
-                        <Input id="smtpPass" name="smtpPass" type="password" value={settings.smtpPass} onChange={handleInputChange} placeholder="Your SMTP password" disabled={isSaving}/>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="smtpPass">SMTP Password</Label>
+                          {!isSuperAdmin && (
+                            <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                              🔒 Super Admin Only
+                            </Badge>
+                          )}
+                        </div>
+                        <Input 
+                          id="smtpPass" 
+                          name="smtpPass" 
+                          type="password" 
+                          value={isSuperAdmin ? settings.smtpPass : (settings.smtpPass ? maskSecret(settings.smtpPass) : "")} 
+                          onChange={handleInputChange} 
+                          placeholder="Your SMTP password" 
+                          disabled={isSaving || !isSuperAdmin}
+                          readOnly={!isSuperAdmin}
+                        />
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">Used for sending booking confirmations and other system emails.</p>
@@ -1504,10 +1588,12 @@ export default function AdminSettingsPage() {
 
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-              <Button onClick={() => handleSaveSettings("General")} disabled={isSaving}>
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save General Settings
-              </Button>
+              <PermissionGuard moduleId="settings" action="write">
+                <Button onClick={() => handleSaveSettings("General")} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Save General Settings
+                </Button>
+              </PermissionGuard>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -1526,7 +1612,7 @@ export default function AdminSettingsPage() {
                     Allow customers to pay using online methods like UPI, Cards, Netbanking.
                   </p>
                 </div>
-                <Switch
+                <SettingSwitch
                   id="enableOnlinePayment"
                   name="enableOnlinePayment" 
                   checked={settings.enableOnlinePayment}
@@ -1544,7 +1630,7 @@ export default function AdminSettingsPage() {
                         <Label className="text-md font-bold">Razorpay Payment Gateway</Label>
                         <p className="text-xs text-muted-foreground">Enable Razorpay checkout payments.</p>
                       </div>
-                      <Switch
+                      <SettingSwitch
                         id="enableRazorpay"
                         name="enableRazorpay"
                         checked={settings.enableRazorpay}
@@ -1555,38 +1641,63 @@ export default function AdminSettingsPage() {
                     {settings.enableRazorpay && (
                       <div className="space-y-4 pt-2 border-t border-dashed">
                         <div className="space-y-2">
-                          <Label htmlFor="razorpayKeyId">Razorpay Key ID</Label>
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="razorpayKeyId">Razorpay Key ID</Label>
+                            {!isSuperAdmin && (
+                              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                                🔒 Super Admin Only
+                              </Badge>
+                            )}
+                          </div>
                           <Input
                             id="razorpayKeyId"
                             name="razorpayKeyId"
-                            value={settings.razorpayKeyId || ""}
+                            type={isSuperAdmin ? "text" : "password"}
+                            value={isSuperAdmin ? (settings.razorpayKeyId || "") : (settings.razorpayKeyId ? maskApiKey(settings.razorpayKeyId, 8) : "")}
                             onChange={handleInputChange}
                             placeholder="rzp_live_xxxxxxxxxxxxxx"
-                            disabled={isSaving}
+                            disabled={isSaving || !isSuperAdmin}
+                            readOnly={!isSuperAdmin}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="razorpayKeySecret">Razorpay Key Secret</Label>
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="razorpayKeySecret">Razorpay Key Secret</Label>
+                            {!isSuperAdmin && (
+                              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                                🔒 Super Admin Only
+                              </Badge>
+                            )}
+                          </div>
                           <Input
                             id="razorpayKeySecret"
                             name="razorpayKeySecret"
                             type="password"
-                            value={settings.razorpayKeySecret || ""}
+                            value={isSuperAdmin ? (settings.razorpayKeySecret || "") : (settings.razorpayKeySecret ? maskSecret(settings.razorpayKeySecret) : "")}
                             onChange={handleInputChange}
                             placeholder="••••••••••••••••••••••"
-                            disabled={isSaving}
+                            disabled={isSaving || !isSuperAdmin}
+                            readOnly={!isSuperAdmin}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="razorpayWebhookSecret">Razorpay Webhook Secret</Label>
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="razorpayWebhookSecret">Razorpay Webhook Secret</Label>
+                            {!isSuperAdmin && (
+                              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                                🔒 Super Admin Only
+                              </Badge>
+                            )}
+                          </div>
                           <Input
                             id="razorpayWebhookSecret"
                             name="razorpayWebhookSecret"
                             type="password"
-                            value={settings.razorpayWebhookSecret || ""}
+                            value={isSuperAdmin ? (settings.razorpayWebhookSecret || "") : (settings.razorpayWebhookSecret ? maskSecret(settings.razorpayWebhookSecret) : "")}
                             onChange={handleInputChange}
                             placeholder="••••••••••••••••••••••"
-                            disabled={isSaving}
+                            disabled={isSaving || !isSuperAdmin}
+                            readOnly={!isSuperAdmin}
                           />
                           <p className="text-[10px] text-muted-foreground leading-normal mt-1">
                             Required to authenticate webhook callbacks from Razorpay.
@@ -1628,7 +1739,7 @@ export default function AdminSettingsPage() {
                         <Label className="text-md font-bold">Stripe Payment Gateway</Label>
                         <p className="text-xs text-muted-foreground">Enable Stripe checkout payments.</p>
                       </div>
-                      <Switch
+                      <SettingSwitch
                         id="enableStripe"
                         name="enableStripe"
                         checked={settings.enableStripe}
@@ -1639,38 +1750,63 @@ export default function AdminSettingsPage() {
                     {settings.enableStripe && (
                       <div className="space-y-4 pt-2 border-t border-dashed">
                         <div className="space-y-2">
-                          <Label htmlFor="stripePublishableKey">Stripe Publishable Key</Label>
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="stripePublishableKey">Stripe Publishable Key</Label>
+                            {!isSuperAdmin && (
+                              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                                🔒 Super Admin Only
+                              </Badge>
+                            )}
+                          </div>
                           <Input
                             id="stripePublishableKey"
                             name="stripePublishableKey"
-                            value={settings.stripePublishableKey || ""}
+                            type={isSuperAdmin ? "text" : "password"}
+                            value={isSuperAdmin ? (settings.stripePublishableKey || "") : (settings.stripePublishableKey ? maskApiKey(settings.stripePublishableKey, 8) : "")}
                             onChange={handleInputChange}
                             placeholder="pk_live_xxxxxxxxxxxxxx"
-                            disabled={isSaving}
+                            disabled={isSaving || !isSuperAdmin}
+                            readOnly={!isSuperAdmin}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="stripeSecretKey">Stripe Secret Key</Label>
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="stripeSecretKey">Stripe Secret Key</Label>
+                            {!isSuperAdmin && (
+                              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                                🔒 Super Admin Only
+                              </Badge>
+                            )}
+                          </div>
                           <Input
                             id="stripeSecretKey"
                             name="stripeSecretKey"
                             type="password"
-                            value={settings.stripeSecretKey || ""}
+                            value={isSuperAdmin ? (settings.stripeSecretKey || "") : (settings.stripeSecretKey ? maskSecret(settings.stripeSecretKey) : "")}
                             onChange={handleInputChange}
                             placeholder="sk_live_xxxxxxxxxxxxxx"
-                            disabled={isSaving}
+                            disabled={isSaving || !isSuperAdmin}
+                            readOnly={!isSuperAdmin}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="stripeWebhookSecret">Stripe Webhook Secret</Label>
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="stripeWebhookSecret">Stripe Webhook Secret</Label>
+                            {!isSuperAdmin && (
+                              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
+                                🔒 Super Admin Only
+                              </Badge>
+                            )}
+                          </div>
                           <Input
                             id="stripeWebhookSecret"
                             name="stripeWebhookSecret"
                             type="password"
-                            value={settings.stripeWebhookSecret || ""}
+                            value={isSuperAdmin ? (settings.stripeWebhookSecret || "") : (settings.stripeWebhookSecret ? maskSecret(settings.stripeWebhookSecret) : "")}
                             onChange={handleInputChange}
                             placeholder="whsec_xxxxxxxxxxxxxx"
-                            disabled={isSaving}
+                            disabled={isSaving || !isSuperAdmin}
+                            readOnly={!isSuperAdmin}
                           />
                           <p className="text-[10px] text-muted-foreground leading-normal mt-1">
                             Required to authenticate webhook callbacks from Stripe.
@@ -1714,7 +1850,7 @@ export default function AdminSettingsPage() {
                     Allow customers to opt for paying after the service is completed.
                   </p>
                 </div>
-                <Switch
+                <SettingSwitch
                   id="enableCOD"
                   name="enableCOD" 
                   checked={settings.enableCOD}
@@ -1724,10 +1860,12 @@ export default function AdminSettingsPage() {
               </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-              <Button onClick={() => handleSaveSettings("Payment")} disabled={isSaving}>
-                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save Payment Settings
-              </Button>
+              <PermissionGuard moduleId="settings" action="write">
+                <Button onClick={() => handleSaveSettings("Payment")} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Save Payment Settings
+                </Button>
+              </PermissionGuard>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -1771,10 +1909,12 @@ export default function AdminSettingsPage() {
                     </div>
                 </CardContent>
                 <CardFooter className="border-t px-6 py-4">
+                  <PermissionGuard moduleId="settings" action="write">
                     <Button onClick={() => handleSaveSettings("Provider")} disabled={isSaving}>
-                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        Save Provider Settings
+                      {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      Save Provider Settings
                     </Button>
+                  </PermissionGuard>
                 </CardFooter>
             </Card>
         </TabsContent>
@@ -1829,7 +1969,7 @@ export default function AdminSettingsPage() {
                     Prevent customers from booking too close to the current time.
                   </p>
                 </div>
-                <Switch
+                <SettingSwitch
                   id="enableLimitLateBookings"
                   name="enableLimitLateBookings"
                   checked={settings.enableLimitLateBookings}
@@ -1859,10 +1999,12 @@ export default function AdminSettingsPage() {
 
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-              <Button onClick={() => handleSaveSettings("Time Slot")} disabled={isSaving}>
-                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save Time Slot Settings
-              </Button>
+              <PermissionGuard moduleId="settings" action="write">
+                <Button onClick={() => handleSaveSettings("Time Slot")} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Save Time Slot Settings
+                </Button>
+              </PermissionGuard>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -1881,7 +2023,7 @@ export default function AdminSettingsPage() {
                     If disabled, users can cancel freely. If enabled, below rules apply.
                   </p>
                 </div>
-                <Switch
+                <SettingSwitch
                   id="enableCancellationPolicy"
                   name="enableCancellationPolicy" 
                   checked={settings.enableCancellationPolicy}
@@ -1991,7 +2133,7 @@ export default function AdminSettingsPage() {
                         If enabled, cancellations made within this final restricted window before service start will receive a 100% cancellation charge (no refund).
                       </p>
                     </div>
-                    <Switch
+                    <SettingSwitch
                       id="enableFinalCancellationWindow"
                       name="enableFinalCancellationWindow" 
                       checked={settings.enableFinalCancellationWindow}
@@ -2020,10 +2162,12 @@ export default function AdminSettingsPage() {
               )}
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-              <Button onClick={() => handleSaveSettings("Cancellation Policy")} disabled={isSaving}>
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save Cancellation Settings
-              </Button>
+              <PermissionGuard moduleId="settings" action="write">
+                <Button onClick={() => handleSaveSettings("Cancellation Policy")} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Save Cancellation Settings
+                </Button>
+              </PermissionGuard>
             </CardFooter>
           </Card>
         </TabsContent>
@@ -2044,7 +2188,7 @@ export default function AdminSettingsPage() {
                     <span className="text-xs text-primary font-medium">Note: Confirmation, Completion, and Cancellation emails are always sent.</span>
                   </p>
                 </div>
-                <Switch
+                <SettingSwitch
                   id="enableStatusUpdateEmails"
                   name="enableStatusUpdateEmails" 
                   checked={settings.enableStatusUpdateEmails}
@@ -2060,7 +2204,7 @@ export default function AdminSettingsPage() {
                     Send notification and email to users when their account is disabled by the admin.
                   </p>
                 </div>
-                <Switch
+                <SettingSwitch
                   id="enableAccountDisabledEmail"
                   name="enableAccountDisabledEmail" 
                   checked={settings.enableAccountDisabledEmail}
@@ -2076,7 +2220,7 @@ export default function AdminSettingsPage() {
                     Send email to users when their account is activated (unblocked) by the admin.
                   </p>
                 </div>
-                <Switch
+                <SettingSwitch
                   id="enableAccountActivatedEmail"
                   name="enableAccountActivatedEmail" 
                   checked={settings.enableAccountActivatedEmail}
@@ -2122,6 +2266,7 @@ export default function AdminSettingsPage() {
                     setIsProviderPickerOpen(false);
                   }
                 }}>
+                <PermissionGuard moduleId="settings" action="create">
                   <Button 
                     type="button" 
                     size="sm" 
@@ -2143,6 +2288,7 @@ export default function AdminSettingsPage() {
                   >
                     <Plus className="h-4 w-4 mr-2" /> Add Leave / Holiday
                   </Button>
+                </PermissionGuard>
                   <DialogContent className="w-[calc(100%-2rem)] sm:max-w-[480px]">
                     <DialogHeader>
                       <DialogTitle>{editingLeaveId ? "Edit Leave / Holiday" : "Add Leave / Holiday"}</DialogTitle>
@@ -2504,24 +2650,28 @@ export default function AdminSettingsPage() {
                           </td>
                           <td className="p-3 font-medium">{leave.reason}</td>
                           <td className="p-3 text-right flex items-center justify-end gap-2">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEditLeaveClick(leave)}
-                              className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
-                            >
-                              <Edit3 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteLeave(leave.id)}
-                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <PermissionGuard moduleId="settings" action="write">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditLeaveClick(leave)}
+                                className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                              >
+                                <Edit3 className="h-4 w-4" />
+                              </Button>
+                            </PermissionGuard>
+                            <PermissionGuard moduleId="settings" action="delete">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteLeave(leave.id)}
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </PermissionGuard>
                           </td>
                         </tr>
                       ))}

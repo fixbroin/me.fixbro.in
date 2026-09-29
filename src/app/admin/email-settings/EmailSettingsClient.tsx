@@ -20,6 +20,7 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import PermissionGuard from '@/components/admin/PermissionGuard';
 import { 
   Dialog, 
   DialogContent, 
@@ -210,46 +211,60 @@ export default function EmailSettingsClient({ initialTemplates }: EmailSettingsC
               </div>
               <div className="flex flex-wrap items-center gap-3 pt-2 sm:pt-0 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end">
                 <div className="flex items-center space-x-2">
-                  <Switch
-                    checked={template.isEnabled}
-                    onCheckedChange={(checked) => handleToggle(template, checked)}
-                    disabled={isPending}
-                  />
-                  <Label className="text-xs uppercase tracking-wider text-muted-foreground select-none">
-                    {template.isEnabled ? 'Enabled' : 'Disabled'}
-                  </Label>
+                  <PermissionGuard
+                    moduleId="email_settings"
+                    action="write"
+                    fallback={
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        template.isEnabled ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {template.isEnabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    }
+                  >
+                    <Switch
+                      checked={template.isEnabled}
+                      onCheckedChange={(checked) => handleToggle(template, checked)}
+                      disabled={isPending}
+                    />
+                    <Label className="text-xs uppercase tracking-wider text-muted-foreground select-none">
+                      {template.isEnabled ? 'Enabled' : 'Disabled'}
+                    </Label>
+                  </PermissionGuard>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleTestEmailClick(template.id)}
-                    disabled={isPending || testingTemplateId === template.id}
-                    className="h-8 text-xs sm:text-sm border-primary/30 text-primary hover:bg-primary/5"
-                  >
-                    {testingTemplateId === template.id ? 'Sending...' : 'Test Email'}
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleEditClick(template)}
-                    disabled={isPending}
-                    className="h-8 text-xs sm:text-sm"
-                  >
-                    <Edit className="mr-1.5 h-3.5 w-3.5" />
-                    Edit Template
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleResetTemplate(template.id)}
-                    disabled={isPending}
-                    className="h-8 w-8 hover:bg-destructive/10 group/btn"
-                    title="Reset to Default"
-                  >
-                    <RotateCcw className="h-4 w-4 text-muted-foreground group-hover/btn:text-destructive" />
-                  </Button>
-                </div>
+                <PermissionGuard moduleId="email_settings" action="write">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTestEmailClick(template.id)}
+                      disabled={isPending || testingTemplateId === template.id}
+                      className="h-8 text-xs sm:text-sm border-primary/30 text-primary hover:bg-primary/5"
+                    >
+                      {testingTemplateId === template.id ? 'Sending...' : 'Test Email'}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleEditClick(template)}
+                      disabled={isPending}
+                      className="h-8 text-xs sm:text-sm"
+                    >
+                      <Edit className="mr-1.5 h-3.5 w-3.5" />
+                      Edit Template
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleResetTemplate(template.id)}
+                      disabled={isPending}
+                      className="h-8 w-8 hover:bg-destructive/10 group/btn"
+                      title="Reset to Default"
+                    >
+                      <RotateCcw className="h-4 w-4 text-muted-foreground group-hover/btn:text-destructive" />
+                    </Button>
+                  </div>
+                </PermissionGuard>
               </div>
             </CardHeader>
             <CardContent>

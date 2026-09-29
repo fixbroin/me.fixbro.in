@@ -127,11 +127,25 @@ export default function CookieSettingsPage() {
                       </FormDescription>
                     </div>
                     <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        disabled={isSaving}
-                      />
+                      <PermissionGuard 
+                        moduleId="cookie_settings" 
+                        action="write"
+                        fallback={
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            field.value
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {field.value ? "Enabled" : "Disabled"}
+                          </span>
+                        }
+                      >
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          disabled={isSaving}
+                        />
+                      </PermissionGuard>
                     </FormControl>
                   </FormItem>
                 )}

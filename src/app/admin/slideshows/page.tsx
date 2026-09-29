@@ -177,7 +177,19 @@ export default function AdminSlideshowsPage() {
                       </TableCell>
                       <TableCell>{slide.order}</TableCell>
                       <TableCell className="text-center">
-                        <PermissionGuard moduleId="slideshows" action="write">
+                        <PermissionGuard 
+                          moduleId="slideshows" 
+                          action="write"
+                          fallback={
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              slide.isActive
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                : 'bg-muted text-muted-foreground'
+                            }`}>
+                              {slide.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          }
+                        >
                           <Switch 
                             checked={slide.isActive} 
                             onCheckedChange={() => handleToggleActive(slide)} 

@@ -248,11 +248,25 @@ export default function AdminSubCategoriesPage() {
                           <TableCell className="font-medium">{sub.name}</TableCell>
                           <TableCell className="text-center">{sub.order || 0}</TableCell>
                           <TableCell className="text-center">
-                            <Switch 
-                                checked={sub.isActive === undefined ? true : sub.isActive}
-                                onCheckedChange={() => handleToggleActive(sub)}
-                                disabled={isSubmitting}
-                            />
+                            <PermissionGuard 
+                              moduleId="sub_categories" 
+                              action="write"
+                              fallback={
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  (sub.isActive === undefined || sub.isActive)
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                    : 'bg-muted text-muted-foreground'
+                                }`}>
+                                  {(sub.isActive === undefined || sub.isActive) ? 'Active' : 'Inactive'}
+                                </span>
+                              }
+                            >
+                              <Switch 
+                                  checked={sub.isActive === undefined ? true : sub.isActive}
+                                  onCheckedChange={() => handleToggleActive(sub)}
+                                  disabled={isSubmitting}
+                              />
+                            </PermissionGuard>
                           </TableCell>
                           <TableCell className="pr-6">
                             <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2 sm:justify-end">

@@ -565,7 +565,23 @@ export default function SeoOverridesPage() {
                         <TableCell>{setting.cityName}</TableCell><TableCell>{setting.categoryName}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{setting.slug}</TableCell>
                         <TableCell className="text-xs max-w-xs truncate" title={setting.h1_title}>{setting.h1_title || "Not set"}</TableCell>
-                        <TableCell className="text-center"><Switch checked={setting.isActive} onCheckedChange={() => handleToggleActive(setting, 'cityCategory')} disabled={isSubmitting || !hasActionPermission(adminPermissions, 'seo_overrides', 'write')}/></TableCell>
+                        <TableCell className="text-center">
+                          <PermissionGuard 
+                            moduleId="seo_overrides" 
+                            action="write"
+                            fallback={
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                setting.isActive
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                  : 'bg-muted text-muted-foreground'
+                              }`}>
+                                {setting.isActive ? 'Active' : 'Inactive'}
+                              </span>
+                            }
+                          >
+                            <Switch checked={setting.isActive} onCheckedChange={() => handleToggleActive(setting, 'cityCategory')} disabled={isSubmitting}/>
+                          </PermissionGuard>
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <PermissionGuard moduleId="seo_overrides" action="write">
@@ -661,7 +677,23 @@ export default function SeoOverridesPage() {
                           <TableCell>{setting.cityName}</TableCell><TableCell>{setting.areaName}</TableCell><TableCell>{setting.categoryName}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{setting.slug}</TableCell>
                           <TableCell className="text-xs max-w-xs truncate" title={setting.h1_title}>{setting.h1_title || "Not set"}</TableCell>
-                          <TableCell className="text-center"><Switch checked={setting.isActive} onCheckedChange={() => handleToggleActive(setting, 'areaCategory')} disabled={isSubmitting || !hasActionPermission(adminPermissions, 'seo_overrides', 'write')}/></TableCell>
+                          <TableCell className="text-center">
+                            <PermissionGuard 
+                              moduleId="seo_overrides" 
+                              action="write"
+                              fallback={
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  setting.isActive
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                    : 'bg-muted text-muted-foreground'
+                                }`}>
+                                  {setting.isActive ? 'Active' : 'Inactive'}
+                                </span>
+                              }
+                            >
+                              <Switch checked={setting.isActive} onCheckedChange={() => handleToggleActive(setting, 'areaCategory')} disabled={isSubmitting}/>
+                            </PermissionGuard>
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <PermissionGuard moduleId="seo_overrides" action="write">

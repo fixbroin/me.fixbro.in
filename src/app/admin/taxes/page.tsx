@@ -144,9 +144,11 @@ export default function AdminTaxesPage() {
             <CardTitle className="text-2xl flex items-center"><Percent className="mr-2 h-6 w-6 text-primary" />Manage Taxes</CardTitle>
             <CardDescription>Define tax rates to be applied to services.</CardDescription>
           </div>
-          <Button onClick={handleAddTax} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Tax
-          </Button>
+          <PermissionGuard moduleId="taxes" action="create">
+            <Button onClick={handleAddTax} disabled={isSubmitting || isLoading} className="w-full sm:w-auto">
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Tax
+            </Button>
+          </PermissionGuard>
         </CardHeader>
         <CardContent className="pt-6">
           {isLoading ? (
@@ -175,42 +177,60 @@ export default function AdminTaxesPage() {
                     <TableCell className="font-medium">{tax.taxName}</TableCell>
                     <TableCell className="text-center">{tax.taxPercent}%</TableCell>
                     <TableCell className="text-center">
-                      <Switch
-                        checked={tax.isActive}
-                        onCheckedChange={() => handleToggleActive(tax)}
-                        disabled={isSubmitting}
-                        aria-label={`Toggle active status for ${tax.taxName}`}
-                      />
+                      <PermissionGuard 
+                        moduleId="taxes" 
+                        action="write"
+                        fallback={
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            tax.isActive
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {tax.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        }
+                      >
+                        <Switch
+                          checked={tax.isActive}
+                          onCheckedChange={() => handleToggleActive(tax)}
+                          disabled={isSubmitting}
+                          aria-label={`Toggle active status for ${tax.taxName}`}
+                        />
+                      </PermissionGuard>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-2 sm:justify-end">
-                        <Button variant="outline" size="icon" onClick={() => handleEditTax(tax)} disabled={isSubmitting}>
-                          <Edit className="h-4 w-4" /> <span className="sr-only">Edit</span>
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon" disabled={isSubmitting}>
-                              <Trash2 className="h-4 w-4" /> <span className="sr-only">Delete</span>
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete the tax "{tax.taxName}". This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDeleteTax(tax.id)}
-                                disabled={isSubmitting}
-                                className="bg-destructive hover:bg-destructive/90">
-                                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <PermissionGuard moduleId="taxes" action="write">
+                          <Button variant="outline" size="icon" onClick={() => handleEditTax(tax)} disabled={isSubmitting}>
+                            <Edit className="h-4 w-4" /> <span className="sr-only">Edit</span>
+                          </Button>
+                        </PermissionGuard>
+                        <PermissionGuard moduleId="taxes" action="delete">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="icon" disabled={isSubmitting}>
+                                <Trash2 className="h-4 w-4" /> <span className="sr-only">Delete</span>
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will permanently delete the tax "{tax.taxName}". This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteTax(tax.id)}
+                                  disabled={isSubmitting}
+                                  className="bg-destructive hover:bg-destructive/90">
+                                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </PermissionGuard>
                       </div>
                     </TableCell>
                   </TableRow>
