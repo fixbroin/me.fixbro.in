@@ -299,69 +299,98 @@ export default function ProviderDashboardPage() {
 
       <Separator className="bg-muted/50" />
 
-      {/* New Requests Section */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-black flex items-center gap-2">
-            <div className="h-8 w-1.5 rounded-full bg-primary" />
-            New Job Requests
-            <Badge className="ml-2 bg-primary/10 text-primary border-none font-bold">{newJobRequests.length}</Badge>
-          </h2>
-        </div>
-        {newJobRequests.length > 0 ? (
-          <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {newJobRequests.map((job) => (
-              <ProviderJobCard key={job.id} job={job} type="new"
-                onAccept={(id) => updateBookingStatus(id, 'ProviderAccepted')}
-                onReject={(id) => updateBookingStatus(id, 'ProviderRejected')}
-                isProcessingAction={processingBookingAction === job.id}
-                providerWalletBalance={providerWalletBalance}
-                minBalanceForJobs={minBalanceForJobs}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-12 px-6 text-center border-2 border-dashed rounded-2xl bg-muted/5">
-            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <PackageSearch className="h-8 w-8 text-muted-foreground/50" />
+      {/* Dynamic Order: If New Requests exist, show New Requests first. If 0 New Requests and >0 Ongoing, show Ongoing Jobs first! */}
+      {newJobRequests.length > 0 ? (
+        <>
+          {/* New Requests Section */}
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-black flex items-center gap-2">
+                <div className="h-8 w-1.5 rounded-full bg-primary" />
+                New Job Requests
+                <Badge className="ml-2 bg-primary/10 text-primary border-none font-bold">{newJobRequests.length}</Badge>
+              </h2>
             </div>
-            <h3 className="text-lg font-bold">All caught up!</h3>
-            <p className="text-sm text-muted-foreground max-w-xs mx-auto">No new job requests assigned to you at the moment.</p>
-          </div>
-        )}
-      </section>
+            <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {newJobRequests.map((job, idx) => (
+                <ProviderJobCard key={job.id} job={job} type="new" sequenceIndex={idx + 1}
+                  onAccept={(id) => updateBookingStatus(id, 'ProviderAccepted')}
+                  onReject={(id) => updateBookingStatus(id, 'ProviderRejected')}
+                  isProcessingAction={processingBookingAction === job.id}
+                  providerWalletBalance={providerWalletBalance}
+                  minBalanceForJobs={minBalanceForJobs}
+                />
+              ))}
+            </div>
+          </section>
 
-      {/* Ongoing Jobs Section */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-black flex items-center gap-2">
-            <div className="h-8 w-1.5 rounded-full bg-blue-500" />
-            Ongoing Jobs
-            <Badge className="ml-2 bg-blue-500/10 text-blue-500 border-none font-bold">{ongoingJobs.length}</Badge>
-          </h2>
-        </div>
-         {ongoingJobs.length > 0 ? (
-          <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {ongoingJobs.map((job) => (
-              <ProviderJobCard key={job.id} job={job} type="ongoing"
-                onStartWork={(id) => updateBookingStatus(id, 'InProgressByProvider')}
-                onCompleteWork={(id) => updateBookingStatus(id, 'Completed')}
-                isProcessingAction={processingBookingAction === job.id}
-                providerWalletBalance={providerWalletBalance}
-                minBalanceForJobs={minBalanceForJobs}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-12 px-6 text-center border-2 border-dashed rounded-2xl bg-muted/5">
-            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <PlayCircle className="h-8 w-8 text-muted-foreground/50" />
+          {/* Ongoing Jobs Section */}
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-black flex items-center gap-2">
+                <div className="h-8 w-1.5 rounded-full bg-blue-500" />
+                Ongoing Jobs
+                <Badge className="ml-2 bg-blue-500/10 text-blue-500 border-none font-bold">{ongoingJobs.length}</Badge>
+              </h2>
             </div>
-            <h3 className="text-lg font-bold">No active jobs</h3>
-            <p className="text-sm text-muted-foreground max-w-xs mx-auto">You don't have any jobs currently in progress.</p>
-          </div>
-        )}
-      </section>
+            {ongoingJobs.length > 0 ? (
+              <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {ongoingJobs.map((job, idx) => (
+                  <ProviderJobCard key={job.id} job={job} type="ongoing" sequenceIndex={idx + 1}
+                    onStartWork={(id) => updateBookingStatus(id, 'InProgressByProvider')}
+                    onCompleteWork={(id) => updateBookingStatus(id, 'Completed')}
+                    isProcessingAction={processingBookingAction === job.id}
+                    providerWalletBalance={providerWalletBalance}
+                    minBalanceForJobs={minBalanceForJobs}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 px-6 text-center border-2 border-dashed rounded-2xl bg-muted/5">
+                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <PlayCircle className="h-8 w-8 text-muted-foreground/50" />
+                </div>
+                <h3 className="text-lg font-bold">No active jobs</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">You don't have any jobs currently in progress.</p>
+              </div>
+            )}
+          </section>
+        </>
+      ) : (
+        <>
+          {/* Ongoing Jobs Section First when 0 New Requests */}
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-black flex items-center gap-2">
+                <div className="h-8 w-1.5 rounded-full bg-blue-500" />
+                Ongoing Jobs
+                <Badge className="ml-2 bg-blue-500/10 text-blue-500 border-none font-bold">{ongoingJobs.length}</Badge>
+              </h2>
+            </div>
+            {ongoingJobs.length > 0 ? (
+              <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {ongoingJobs.map((job, idx) => (
+                  <ProviderJobCard key={job.id} job={job} type="ongoing" sequenceIndex={idx + 1}
+                    onStartWork={(id) => updateBookingStatus(id, 'InProgressByProvider')}
+                    onCompleteWork={(id) => updateBookingStatus(id, 'Completed')}
+                    isProcessingAction={processingBookingAction === job.id}
+                    providerWalletBalance={providerWalletBalance}
+                    minBalanceForJobs={minBalanceForJobs}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 px-6 text-center border-2 border-dashed rounded-2xl bg-muted/5">
+                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <PackageSearch className="h-8 w-8 text-muted-foreground/50" />
+                </div>
+                <h3 className="text-lg font-bold">All caught up!</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">No new job requests assigned to you at the moment.</p>
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
       {/* Recent Completed Jobs Section */}
       <section className="space-y-4 pb-8">

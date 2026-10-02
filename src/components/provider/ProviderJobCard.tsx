@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Loader2, CheckCircle, XCircle, PlayCircle, ExternalLink, Tag, Clock, Wallet } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, PlayCircle, ExternalLink, Tag, Clock, Wallet, CalendarDays } from "lucide-react";
 import type { FirestoreBooking } from '@/types/firestore';
 import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/contexts/LoadingContext';
@@ -16,6 +16,7 @@ import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 interface ProviderJobCardProps {
   job: FirestoreBooking;
   type: 'new' | 'ongoing' | 'completed';
+  sequenceIndex?: number;
   onAccept?: (bookingId: string) => void;
   onReject?: (bookingId: string) => void;
   onStartWork?: (bookingId: string) => void;
@@ -31,6 +32,72 @@ const formatDateForDisplay = (dateString: string | undefined): string => {
         const date = new Date(dateString.replace(/-/g, '/'));
         return formatDateInTimezone(date, 'Asia/Kolkata');
     } catch (e) { return dateString; }
+};
+
+const getDayUrgency = (dateString?: string) => {
+  if (!dateString) {
+    return {
+      key: 'future',
+      tag: 'UPCOMING',
+      borderClass: 'border-2 border-emerald-500/60 shadow-sm bg-gradient-to-b from-emerald-500/5 via-card to-card',
+      boxClass: 'border-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+      badgeClass: 'bg-emerald-600 text-white font-black',
+      topBarClass: 'bg-emerald-500'
+    };
+  }
+
+  try {
+    const cleanDate = dateString.includes('T') ? dateString.split('T')[0] : dateString;
+    const parts = cleanDate.split('-').map(Number);
+    if (parts.length === 3 && !isNaN(parts[0])) {
+      const scheduledDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      scheduledDate.setHours(0, 0, 0, 0);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const diffMs = scheduledDate.getTime() - today.getTime();
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= 0) {
+        return {
+          key: 'today',
+          tag: 'DUE TODAY (URGENT)',
+          borderClass: 'border-2 border-red-500/80 shadow-md shadow-red-500/15 bg-gradient-to-b from-red-500/5 via-card to-card',
+          boxClass: 'border-2 border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-300',
+          badgeClass: 'bg-red-600 text-white font-black animate-pulse',
+          topBarClass: 'bg-red-500'
+        };
+      } else if (diffDays === 1) {
+        return {
+          key: 'tomorrow',
+          tag: 'DUE TOMORROW',
+          borderClass: 'border-2 border-amber-500/70 shadow-sm shadow-amber-500/10 bg-gradient-to-b from-amber-500/5 via-card to-card',
+          boxClass: 'border-2 border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-300',
+          badgeClass: 'bg-amber-500 text-amber-950 font-black',
+          topBarClass: 'bg-amber-500'
+        };
+      } else if (diffDays === 2) {
+        return {
+          key: 'day_after',
+          tag: 'NEXT DAY',
+          borderClass: 'border-2 border-emerald-500/60 shadow-sm bg-gradient-to-b from-emerald-500/5 via-card to-card',
+          boxClass: 'border-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+          badgeClass: 'bg-emerald-600 text-white font-black',
+          topBarClass: 'bg-emerald-500'
+        };
+      }
+    }
+  } catch (e) {}
+
+  return {
+    key: 'future',
+    tag: 'UPCOMING',
+    borderClass: 'border-2 border-emerald-500/60 shadow-sm bg-gradient-to-b from-emerald-500/5 via-card to-card',
+    boxClass: 'border-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+    badgeClass: 'bg-emerald-600 text-white font-black',
+    topBarClass: 'bg-emerald-500'
+  };
 };
 
 const getStatusBadgeVariant = (status: FirestoreBooking['status']) => {
@@ -75,6 +142,7 @@ const getStatusBadgeClass = (status: FirestoreBooking['status']) => {
 const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
   job,
   type,
+  sequenceIndex,
   onAccept,
   onReject,
   onStartWork,
@@ -90,6 +158,8 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
   const { config: appConfig } = useApplicationConfig();
   const providerFeeType = appConfig?.providerFeeType || 'percentage';
   const providerFeeValue = Number(appConfig?.providerFeeValue || 0);
+
+  const urgency = getDayUrgency(job.scheduledDate);
 
   const getCommission = (amount: number, feeType: string, feeVal: number) => {
     if (feeType === 'percentage') {
@@ -134,16 +204,30 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
   };
 
   return (
-    <Card className="shadow-sm hover:shadow-md transition-shadow">
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-lg font-semibold">{job.services.map(s => s.name).join(', ')}</CardTitle>
-           <Badge variant={getStatusBadgeVariant(job.status)} className={`capitalize text-xs ${getStatusBadgeClass(job.status)}`}>
+    <Card className={cn("relative overflow-hidden transition-all duration-300", type !== 'completed' ? urgency.borderClass : "shadow-sm hover:shadow-md")}>
+      {type !== 'completed' && (
+        <div className={cn("h-1.5 w-full absolute top-0 left-0 right-0", urgency.topBarClass)} />
+      )}
+
+      <CardHeader className="pt-4 pb-3">
+        <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+          <div className="flex items-center gap-2">
+            {sequenceIndex !== undefined && type !== 'completed' && (
+              <Badge className={cn("text-[11px] px-2.5 py-0.5 rounded-full shadow-xs uppercase tracking-wide", urgency.badgeClass)}>
+                #{sequenceIndex} {urgency.tag}
+              </Badge>
+            )}
+          </div>
+          <Badge variant={getStatusBadgeVariant(job.status)} className={`capitalize text-xs ${getStatusBadgeClass(job.status)}`}>
             {job.status.replace(/([A-Z])/g, ' $1').replace('Provider ', '')}
           </Badge>
         </div>
-        <CardDescription className="text-xs">
-          ID: {job.bookingId} | Customer: {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked - Add Money to Reveal]" : !isAccepted ? "[Hidden until Accepted]" : job.customerName}
+
+        <div className="flex justify-between items-start pt-1">
+          <CardTitle className="text-lg font-bold leading-tight">{job.services.map(s => s.name).join(', ')}</CardTitle>
+        </div>
+        <CardDescription className="text-xs mt-1">
+          ID: <strong className="text-foreground">{job.bookingId}</strong> | Customer: {isJobCompleted ? "[Hidden for Privacy]" : isLowBalance ? "[Locked - Add Money to Reveal]" : !isAccepted ? "[Hidden until Accepted]" : job.customerName}
         </CardDescription>
       </CardHeader>
       <CardContent className="text-sm space-y-1">
@@ -157,9 +241,21 @@ const ProviderJobCard: React.FC<ProviderJobCardProps> = ({
             ))}
           </ul>
         </div>
-        <p><strong>Date:</strong> {formatDateForDisplay(job.scheduledDate)} at {job.scheduledTimeSlot}</p>
+
+        {/* Highlighted Date & Time Slot Box */}
+        <div className={cn("p-2.5 rounded-xl flex items-center justify-between gap-2 my-2 font-bold text-xs flex-wrap sm:flex-nowrap", type !== 'completed' ? urgency.boxClass : "border bg-muted/30 text-foreground")}>
+          <div className="flex items-center gap-1.5">
+            <CalendarDays className="h-4 w-4 shrink-0 text-primary" />
+            <span><strong>Date:</strong> {formatDateForDisplay(job.scheduledDate)}</span>
+          </div>
+          <div className="flex items-center gap-1.5 border-l border-current/30 pl-2.5">
+            <Clock className="h-4 w-4 shrink-0 text-primary" />
+            <span><strong>Time:</strong> {job.scheduledTimeSlot || 'N/A'}</span>
+          </div>
+        </div>
+
         {job.estimatedEndTime && (
-          <p className="text-green-600 font-medium">
+          <p className="text-green-600 font-medium text-xs">
             <strong>Ends:</strong> {formatDateInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')} {formatTimeInTimezone(new Date(job.estimatedEndTime), 'Asia/Kolkata')}
           </p>
         )}

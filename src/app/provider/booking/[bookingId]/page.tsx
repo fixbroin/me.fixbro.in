@@ -38,6 +38,72 @@ const formatDateForDisplay = (dateString: string | undefined): string => {
     } catch (e) { return dateString; }
 };
 
+const getDayUrgency = (dateString?: string) => {
+  if (!dateString) {
+    return {
+      key: 'future',
+      tag: 'UPCOMING',
+      borderClass: 'border-2 border-emerald-500/60 shadow-sm bg-gradient-to-b from-emerald-500/5 via-card to-card',
+      boxClass: 'border-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+      badgeClass: 'bg-emerald-600 text-white font-black',
+      topBarClass: 'bg-emerald-500'
+    };
+  }
+
+  try {
+    const cleanDate = dateString.includes('T') ? dateString.split('T')[0] : dateString;
+    const parts = cleanDate.split('-').map(Number);
+    if (parts.length === 3 && !isNaN(parts[0])) {
+      const scheduledDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      scheduledDate.setHours(0, 0, 0, 0);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const diffMs = scheduledDate.getTime() - today.getTime();
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= 0) {
+        return {
+          key: 'today',
+          tag: 'DUE TODAY (URGENT)',
+          borderClass: 'border-2 border-red-500/80 shadow-md shadow-red-500/15 bg-gradient-to-b from-red-500/5 via-card to-card',
+          boxClass: 'border-2 border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-300',
+          badgeClass: 'bg-red-600 text-white font-black animate-pulse',
+          topBarClass: 'bg-red-500'
+        };
+      } else if (diffDays === 1) {
+        return {
+          key: 'tomorrow',
+          tag: 'DUE TOMORROW',
+          borderClass: 'border-2 border-amber-500/70 shadow-sm shadow-amber-500/10 bg-gradient-to-b from-amber-500/5 via-card to-card',
+          boxClass: 'border-2 border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-300',
+          badgeClass: 'bg-amber-500 text-amber-950 font-black',
+          topBarClass: 'bg-amber-500'
+        };
+      } else if (diffDays === 2) {
+        return {
+          key: 'day_after',
+          tag: 'NEXT DAY',
+          borderClass: 'border-2 border-emerald-500/60 shadow-sm bg-gradient-to-b from-emerald-500/5 via-card to-card',
+          boxClass: 'border-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+          badgeClass: 'bg-emerald-600 text-white font-black',
+          topBarClass: 'bg-emerald-500'
+        };
+      }
+    }
+  } catch (e) {}
+
+  return {
+    key: 'future',
+    tag: 'UPCOMING',
+    borderClass: 'border-2 border-emerald-500/60 shadow-sm bg-gradient-to-b from-emerald-500/5 via-card to-card',
+    boxClass: 'border-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+    badgeClass: 'bg-emerald-600 text-white font-black',
+    topBarClass: 'bg-emerald-500'
+  };
+};
+
 
 export default function ProviderBookingDetailsPage() {
   const params = useParams();
@@ -295,6 +361,7 @@ export default function ProviderBookingDetailsPage() {
   }
 
   const isJobCompleted = booking.status === 'Completed';
+  const urgency = getDayUrgency(booking.scheduledDate);
 
 
 
@@ -364,12 +431,29 @@ export default function ProviderBookingDetailsPage() {
           </section>
           <Separator />
           <section>
-            <h3 className="text-lg font-semibold mb-2 flex items-center"><CalendarDays className="mr-2 text-primary"/>Schedule</h3>
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <p><strong>Date:</strong> {formatDateForDisplay(booking.scheduledDate)}</p>
-              <p><strong>Time Slot:</strong> {booking.scheduledTimeSlot}</p>
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h3 className="text-lg font-bold flex items-center"><CalendarDays className="mr-2 text-primary"/>Schedule</h3>
+              {!isJobCompleted && (
+                <Badge className={cn("text-xs px-2.5 py-0.5 rounded-full uppercase tracking-wide", urgency.badgeClass)}>
+                  {urgency.tag}
+                </Badge>
+              )}
+            </div>
+
+            {/* Eye-Focus Highlighted Schedule Box */}
+            <div className={cn("p-3.5 sm:p-4 rounded-2xl space-y-2 font-bold my-2", !isJobCompleted ? urgency.boxClass : "border bg-muted/20 text-foreground")}>
+              <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap text-base sm:text-lg">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-5 w-5 shrink-0 text-primary" />
+                  <span><strong>Date:</strong> {formatDateForDisplay(booking.scheduledDate)}</span>
+                </div>
+                <div className="flex items-center gap-2 border-t sm:border-t-0 sm:border-l border-current/30 pt-2 sm:pt-0 sm:pl-3">
+                  <Clock className="h-5 w-5 shrink-0 text-primary" />
+                  <span><strong>Time Slot:</strong> {booking.scheduledTimeSlot || 'N/A'}</span>
+                </div>
+              </div>
               {booking.estimatedEndTime && (
-                <p className="text-green-600 font-bold sm:col-span-2 mt-2">
+                <p className="text-green-600 font-bold text-xs sm:text-sm border-t border-current/20 pt-2 mt-2">
                   <strong>Estimated Completion:</strong> {formatDateInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')} at {formatTimeInTimezone(new Date(booking.estimatedEndTime), 'Asia/Kolkata')}
                 </p>
               )}
@@ -427,13 +511,16 @@ export default function ProviderBookingDetailsPage() {
             <h3 className="text-lg font-semibold mb-2 flex items-center"><DollarSign className="mr-2 text-primary"/>Payment Details</h3>
              <div className="text-sm space-y-1">
                 <p><strong>Subtotal:</strong> {symbol}{booking.subTotal.toFixed(decimals)}</p>
-                {booking.discountAmount && booking.discountAmount > 0 && <p><strong>Discount:</strong> - {symbol}{booking.discountAmount.toFixed(decimals)} ({booking.discountCode})</p>}
+                {Boolean(booking.discountAmount && booking.discountAmount > 0) && (
+                  <p><strong>Discount:</strong> - {symbol}{(booking.discountAmount || 0).toFixed(decimals)} ({booking.discountCode})</p>
+                )}
                 {isCash && booking.appliedPlatformFees && booking.appliedPlatformFees.length > 0 && booking.appliedPlatformFees.map((fee, idx) => (
                    <p key={idx}><strong>{fee.name}:</strong> + {symbol}{(fee.calculatedFeeAmount + fee.taxAmountOnFee).toFixed(decimals)}</p>
                  ))}
-                {booking.visitingCharge && booking.visitingCharge > 0 && <p><strong>Visiting Charge:</strong> + {symbol}{booking.visitingCharge.toFixed(decimals)}</p>}
+                {Boolean(booking.visitingCharge && booking.visitingCharge > 0) && (
+                  <p><strong>Visiting Charge:</strong> + {symbol}{(booking.visitingCharge || 0).toFixed(decimals)}</p>
+                )}
                 
-
 
                 {booking.additionalCharges && booking.additionalCharges.length > 0 && (
                   <div className="bg-amber-50 p-2 rounded-md border border-amber-100 my-2">
@@ -447,7 +534,9 @@ export default function ProviderBookingDetailsPage() {
                   </div>
                 )}
 
-                {isCash && booking.taxAmount && booking.taxAmount > 0 && <p><strong>Tax:</strong> + {symbol}{booking.taxAmount.toFixed(decimals)}</p>}
+                {Boolean(isCash && booking.taxAmount && booking.taxAmount > 0) && (
+                  <p><strong>Tax (GST):</strong> + {symbol}{(booking.taxAmount || 0).toFixed(decimals)}</p>
+                )}
                 <p className="font-bold text-lg text-primary mt-2"><strong>Total Amount:</strong> {symbol}{displayTotal.toFixed(decimals)}</p>
                 <p><strong>Payment Method:</strong> {booking.paymentMethod}</p>
                 {extraChargesTotal > 0 && (

@@ -187,6 +187,18 @@ export default function ProviderMyJobsPage() {
       .sort((a, b) => getBookingScheduledTimestampMillis(b) - getBookingScheduledTimestampMillis(a));
   }, [bookings]);
 
+  const [activeTab, setActiveTab] = useState<string>("new");
+
+  useEffect(() => {
+    if (!isLoadingBookings) {
+      if (newJobRequests.length > 0) {
+        setActiveTab("new");
+      } else if (ongoingJobs.length > 0) {
+        setActiveTab("ongoing");
+      }
+    }
+  }, [newJobRequests.length, ongoingJobs.length, isLoadingBookings]);
+
 
   if (authIsLoading || isLoadingBookings) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -201,7 +213,7 @@ export default function ProviderMyJobsPage() {
         </CardHeader>
       </Card>
       
-      <Tabs defaultValue="new" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="relative mb-6">
           <TabsList className="h-12 w-full justify-start gap-2 bg-transparent p-0 overflow-x-auto no-scrollbar flex-nowrap border-b border-border rounded-none">
              <TabsTrigger 
@@ -234,8 +246,8 @@ export default function ProviderMyJobsPage() {
         <TabsContent value="new" className="mt-0 focus-visible:outline-none">
           {newJobRequests.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
-              {newJobRequests.map(job => (
-                <ProviderJobCard key={job.id} job={job} type="new"
+              {newJobRequests.map((job, idx) => (
+                <ProviderJobCard key={job.id} job={job} type="new" sequenceIndex={idx + 1}
                   onAccept={(id) => updateBookingStatus(id, 'ProviderAccepted')}
                   onReject={(id) => updateBookingStatus(id, 'ProviderRejected')}
                   isProcessingAction={processingBookingAction === job.id}
@@ -250,8 +262,8 @@ export default function ProviderMyJobsPage() {
         <TabsContent value="ongoing">
            {ongoingJobs.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
-              {ongoingJobs.map(job => (
-                <ProviderJobCard key={job.id} job={job} type="ongoing"
+              {ongoingJobs.map((job, idx) => (
+                <ProviderJobCard key={job.id} job={job} type="ongoing" sequenceIndex={idx + 1}
                   onStartWork={(id) => updateBookingStatus(id, 'InProgressByProvider')}
                   onCompleteWork={(id) => updateBookingStatus(id, 'Completed')}
                   isProcessingAction={processingBookingAction === job.id}
