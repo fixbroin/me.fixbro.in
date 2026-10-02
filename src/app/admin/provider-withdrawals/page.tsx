@@ -1211,7 +1211,15 @@ export default function ProviderWithdrawalsPage() {
                           <TableCell>{item.customerName}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             <div>{item.scheduledDate} {item.scheduledTimeSlot ? `| ${item.scheduledTimeSlot}` : ''}</div>
-                            <Badge variant="outline" className="text-[10px] mt-0.5">{item.paymentMethod}</Badge>
+                            {item.paymentMethod?.toLowerCase() === 'online' ? (
+                              <Badge variant="secondary" className="text-[10px] mt-0.5 bg-blue-500/10 text-blue-600 border-blue-500/20 font-bold" title="Online Payment: Held by FixBro, net share credited to provider withdrawable balance">
+                                Online (Withdrawable)
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-[10px] mt-0.5 bg-emerald-500/10 text-emerald-600 border-emerald-500/20 font-bold" title="Pay After Service: Cash collected on-site by provider, fee auto-deducted from prepaid wallet">
+                                Cash Collected (Wallet Fee Deducted)
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-right font-bold">{symbol}{item.totalGross.toFixed(decimals)}</TableCell>
                           <TableCell className="text-right font-bold text-destructive">-{symbol}{item.commission.toFixed(decimals)}</TableCell>
