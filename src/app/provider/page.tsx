@@ -26,6 +26,7 @@ import { logUserActivity } from '@/lib/activityLogger';
 import { updateBookingStatusByProviderAction, getProviderWalletSettingsAction } from '@/app/actions/providerWalletActions';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 import ProviderJobCard from '@/components/provider/ProviderJobCard';
+import { getBookingScheduledTimestampMillis } from '@/lib/bookingUtils';
 
 const formatDateForDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
@@ -223,9 +224,23 @@ export default function ProviderDashboardPage() {
     }
   };
 
-  const newJobRequests = useMemo(() => bookings.filter(b => b.status === 'AssignedToProvider' || b.status === 'Rescheduled'), [bookings]);
-  const ongoingJobs = useMemo(() => bookings.filter(b => b.status === 'ProviderAccepted' || b.status === 'InProgressByProvider'), [bookings]);
-  const completedJobs = useMemo(() => bookings.filter(b => b.status === 'Completed'), [bookings]);
+  const newJobRequests = useMemo(() => {
+    return bookings
+      .filter(b => b.status === 'AssignedToProvider' || b.status === 'Rescheduled')
+      .sort((a, b) => getBookingScheduledTimestampMillis(a) - getBookingScheduledTimestampMillis(b));
+  }, [bookings]);
+
+  const ongoingJobs = useMemo(() => {
+    return bookings
+      .filter(b => b.status === 'ProviderAccepted' || b.status === 'InProgressByProvider')
+      .sort((a, b) => getBookingScheduledTimestampMillis(a) - getBookingScheduledTimestampMillis(b));
+  }, [bookings]);
+
+  const completedJobs = useMemo(() => {
+    return bookings
+      .filter(b => b.status === 'Completed')
+      .sort((a, b) => getBookingScheduledTimestampMillis(b) - getBookingScheduledTimestampMillis(a));
+  }, [bookings]);
 
   if (authIsLoading || isLoadingBookings) {
     return (

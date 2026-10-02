@@ -19,6 +19,7 @@ import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import { updateBookingStatusByProviderAction, getProviderWalletSettingsAction } from '@/app/actions/providerWalletActions';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
+import { getBookingScheduledTimestampMillis } from '@/lib/bookingUtils';
 
 export default function ProviderMyJobsPage() {
   const { user: providerUser, isLoading: authIsLoading } = useAuth();
@@ -162,10 +163,29 @@ export default function ProviderMyJobsPage() {
     }
   };
 
-  const newJobRequests = useMemo(() => bookings.filter(b => b.status === 'AssignedToProvider' || b.status === 'Rescheduled'), [bookings]);
-  const ongoingJobs = useMemo(() => bookings.filter(b => b.status === 'ProviderAccepted' || b.status === 'InProgressByProvider'), [bookings]);
-  const completedJobs = useMemo(() => bookings.filter(b => b.status === 'Completed'), [bookings]);
-  const otherJobs = useMemo(() => bookings.filter(b => b.status === 'ProviderRejected' || b.status === 'Cancelled' || b.status === 'Pending Payment' || b.status === 'Processing'), [bookings]);
+  const newJobRequests = useMemo(() => {
+    return bookings
+      .filter(b => b.status === 'AssignedToProvider' || b.status === 'Rescheduled')
+      .sort((a, b) => getBookingScheduledTimestampMillis(a) - getBookingScheduledTimestampMillis(b));
+  }, [bookings]);
+
+  const ongoingJobs = useMemo(() => {
+    return bookings
+      .filter(b => b.status === 'ProviderAccepted' || b.status === 'InProgressByProvider')
+      .sort((a, b) => getBookingScheduledTimestampMillis(a) - getBookingScheduledTimestampMillis(b));
+  }, [bookings]);
+
+  const completedJobs = useMemo(() => {
+    return bookings
+      .filter(b => b.status === 'Completed')
+      .sort((a, b) => getBookingScheduledTimestampMillis(b) - getBookingScheduledTimestampMillis(a));
+  }, [bookings]);
+
+  const otherJobs = useMemo(() => {
+    return bookings
+      .filter(b => b.status === 'ProviderRejected' || b.status === 'Cancelled' || b.status === 'Pending Payment' || b.status === 'Processing')
+      .sort((a, b) => getBookingScheduledTimestampMillis(b) - getBookingScheduledTimestampMillis(a));
+  }, [bookings]);
 
 
   if (authIsLoading || isLoadingBookings) {

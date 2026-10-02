@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import type { FirestoreUser, Address, UserCart, FirestoreService } from '@/types/firestore';
+import type { FirestoreUser, Address, UserCart, FirestoreService, FirestoreBooking } from '@/types/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -27,14 +27,17 @@ import {
   ShoppingCart,
   Package,
   Clock,
-  ExternalLink
+  ExternalLink,
+  Receipt,
+  Wallet
 } from 'lucide-react';
 import { ScrollArea } from '../ui/scroll-area';
 import AppImage from '@/components/ui/AppImage';
-import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone } from '@/lib/utils';
+import { getTimestampMillis, formatDateInTimezone, formatTimeInTimezone, formatScheduledDate, cn } from '@/lib/utils';
+import { getBookingScheduledTimestampMillis } from '@/lib/bookingUtils';
 import { openWhatsAppChooser } from '@/lib/whatsappUtils';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot } from '@/lib/mysqlDb';
+import { doc, getDoc, onSnapshot, collection, query, where } from '@/lib/mysqlDb';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
 
 interface CartItemDetail {
@@ -155,6 +158,45 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
       return acc + effectivePrice * item.quantity;
     }, 0);
   }, [cartItems]);
+
+  const [userBookings, setUserBookings] = useState<FirestoreBooking[]>([]);
+  const [isLoadingBookings, setIsLoadingBookings] = useState(true);
+
+  useEffect(() => {
+    if (!targetUid) {
+      setIsLoadingBookings(false);
+      return;
+    }
+
+    setIsLoadingBookings(true);
+    const bookingsColRef = collection(db, 'bookings');
+    const q = query(bookingsColRef, where('userId', '==', targetUid));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const bList = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as FirestoreBooking));
+      
+      const active = bList.filter(b => b.status !== 'Completed' && b.status !== 'Cancelled' && b.status !== 'ProviderRejected');
+      const finished = bList.filter(b => b.status === 'Completed' || b.status === 'Cancelled' || b.status === 'ProviderRejected');
+
+      active.sort((a, b) => getBookingScheduledTimestampMillis(a) - getBookingScheduledTimestampMillis(b));
+      finished.sort((a, b) => getBookingScheduledTimestampMillis(b) - getBookingScheduledTimestampMillis(a));
+
+      setUserBookings([...active, ...finished]);
+      setIsLoadingBookings(false);
+    }, (error) => {
+      console.error('Error listening to user bookings:', error);
+      setIsLoadingBookings(false);
+    });
+
+    return () => unsubscribe();
+  }, [targetUid]);
+
+  const bookingStats = useMemo(() => {
+    const completed = userBookings.filter(b => b.status === 'Completed').length;
+    const active = userBookings.filter(b => b.status !== 'Completed' && b.status !== 'Cancelled' && b.status !== 'ProviderRejected').length;
+    const cancelled = userBookings.filter(b => b.status === 'Cancelled' || b.status === 'ProviderRejected').length;
+    return { completed, active, cancelled, total: userBookings.length };
+  }, [userBookings]);
 
   const form = useForm<UserEditFormData>({
     resolver: zodResolver(userEditSchema),
@@ -426,6 +468,122 @@ export default function UserDetailsModal({ user, onClose, onUpdateUser }: UserDe
                   <ShoppingCart className="h-8 w-8 text-muted-foreground/40 mb-2" />
                   <p className="text-xs font-medium text-muted-foreground">User cart is currently empty</p>
                   <p className="text-[11px] text-muted-foreground/70">No services currently added in this user's cart.</p>
+                </div>
+              )}
+            </div>
+
+            {/* User Booking History Section */}
+            <Separator className="my-4"/>
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5 text-primary" />
+                  <h3 className="text-lg font-semibold">Booking History</h3>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary">
+                    {bookingStats.total} {bookingStats.total === 1 ? 'booking' : 'bookings'}
+                  </span>
+                </div>
+                {bookingStats.total > 0 && (
+                  <div className="flex items-center gap-1.5 text-xs font-semibold flex-wrap">
+                    {bookingStats.completed > 0 && (
+                      <span className="bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                        {bookingStats.completed} Completed
+                      </span>
+                    )}
+                    {bookingStats.active > 0 && (
+                      <span className="bg-blue-500/10 text-blue-600 px-2 py-0.5 rounded-full border border-blue-500/20">
+                        {bookingStats.active} Active
+                      </span>
+                    )}
+                    {bookingStats.cancelled > 0 && (
+                      <span className="bg-destructive/10 text-destructive px-2 py-0.5 rounded-full border border-destructive/20">
+                        {bookingStats.cancelled} Cancelled
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {isLoadingBookings ? (
+                <div className="flex items-center justify-center p-6 border rounded-xl bg-muted/20">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
+                  <span className="text-xs text-muted-foreground">Loading user bookings...</span>
+                </div>
+              ) : userBookings.length > 0 ? (
+                <div className="space-y-3">
+                  {userBookings.map((b) => {
+                    const statusClass = 
+                      b.status === 'Completed' ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" :
+                      (b.status === 'Cancelled' || b.status === 'ProviderRejected') ? "bg-destructive/10 text-destructive border-destructive/20" :
+                      "bg-blue-500/10 text-blue-600 border-blue-500/20";
+
+                    return (
+                      <div key={b.id || b.bookingId} className="p-3.5 border rounded-2xl bg-muted/20 space-y-3">
+                        <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-foreground">#{b.bookingId || b.id}</span>
+                            <span className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border capitalize", statusClass)}>
+                              {b.status}
+                            </span>
+                          </div>
+                          <Link 
+                            href={`/admin/bookings?search=${encodeURIComponent(b.bookingId || b.id || '')}`}
+                            target="_blank"
+                            className="text-xs text-primary hover:underline font-semibold flex items-center gap-1"
+                          >
+                            <span>Open</span>
+                            <ExternalLink className="h-3 w-3" />
+                          </Link>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span><strong>Schedule:</strong> {formatScheduledDate(b.scheduledDate, appConfig?.dateFormat)} {b.scheduledTimeSlot ? `| ${b.scheduledTimeSlot}` : ''}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <Wallet className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span><strong>Payment:</strong> {b.paymentMethod || 'Pay After Service'}</span>
+                          </div>
+                        </div>
+
+                        {/* Services List */}
+                        {b.services && b.services.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            {b.services.map((srv, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-xs bg-background/60 p-2 rounded-xl border border-border/30">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {srv.imageUrl ? (
+                                    <div className="relative w-7 h-7 rounded-md overflow-hidden bg-muted shrink-0 border">
+                                      <AppImage src={srv.imageUrl} alt={srv.name} fill sizes="28px" className="object-cover" />
+                                    </div>
+                                  ) : (
+                                    <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  )}
+                                  <span className="font-medium text-foreground truncate">{srv.name}</span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0 ml-2">
+                                  <span className="text-muted-foreground font-semibold">x{srv.quantity}</span>
+                                  <span className="font-bold text-foreground">{symbol}{(srv.pricePerUnit * srv.quantity).toLocaleString('en-IN')}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex justify-between items-center pt-2 border-t border-border/40 text-xs">
+                          <span className="text-muted-foreground">Total Amount:</span>
+                          <span className="font-black text-sm text-primary">{symbol}{(b.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 px-4 border rounded-xl bg-muted/10 text-center">
+                  <Receipt className="h-8 w-8 text-muted-foreground/40 mb-2" />
+                  <p className="text-xs font-medium text-muted-foreground">No bookings found for this user</p>
+                  <p className="text-[11px] text-muted-foreground/70">This user has not placed any booking orders yet.</p>
                 </div>
               )}
             </div>

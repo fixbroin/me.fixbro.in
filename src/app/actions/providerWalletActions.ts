@@ -890,3 +890,212 @@ export async function deleteWalletComplaintAction(complaintId: string) {
     return { success: false, message: error.message || "Failed to delete complaint." };
   }
 }
+
+/**
+ * 12. Revert Provider Booking Earnings & Wallet Deductions (Admin or Automatic on Reassign/Unassign)
+ * Clears/refunds wallet commission deductions for a booking and recalculates provider monthly stats & withdrawable balance.
+ */
+export async function revertProviderBookingEarningsAction(bookingId: string, providerId: string) {
+  try {
+    if (!bookingId || !providerId) {
+      return { success: false, message: "Missing bookingId or providerId." };
+    }
+
+    const providerUserRef = doc(db, 'users', providerId);
+    const providerSnap = await getDoc(providerUserRef);
+    if (!providerSnap.exists()) {
+      return { success: false, message: "Provider user document not found." };
+    }
+    const providerData = providerSnap.data() || {};
+
+    // 1. Check if commission was deducted for this booking
+    const txsQuery = query(
+      collection(db, 'providerWalletTransactions'),
+      where('providerId', '==', providerId),
+      where('bookingId', '==', bookingId)
+    );
+    const txsSnap = await getDocs(txsQuery);
+
+    let totalDeductionRefund = 0;
+    for (const d of txsSnap.docs) {
+      const data = d.data();
+      if (data.type === 'commission_deduction' && data.amount < 0) {
+        totalDeductionRefund += Math.abs(data.amount);
+      }
+    }
+
+    // 2. Refund wallet balance if deductions were made
+    let newBalance = providerData.providerWalletBalance || 0;
+    if (totalDeductionRefund > 0) {
+      newBalance += totalDeductionRefund;
+      await updateDoc(providerUserRef, { providerWalletBalance: newBalance });
+
+      // Add commission_refund transaction
+      await addDoc(collection(db, 'providerWalletTransactions'), {
+        providerId,
+        amount: totalDeductionRefund,
+        type: 'commission_refund',
+        bookingId,
+        description: `Commission & fees refunded for booking #${bookingId} due to reassignment/reversion`,
+        timestamp: Timestamp.now(),
+      });
+    }
+
+    // 3. Recalculate provider's monthlyStats and withdrawableBalance
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
+
+    const configSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
+    const appConfig = configSnap.exists() ? configSnap.data() as any : {};
+
+    // Fetch valid completed bookings for this provider
+    const bookingsQuery = query(
+      collection(db, "bookings"),
+      where("providerId", "==", providerId),
+      where("status", "==", "Completed")
+    );
+    const withdrawalsQuery = query(collection(db, "withdrawalRequests"), where("providerId", "==", providerId));
+
+    const [bookingsSnap, withdrawalsSnap] = await Promise.all([getDocs(bookingsQuery), getDocs(withdrawalsQuery)]);
+
+    let totalNetOnlineEarnings = 0;
+    const mStats = {
+      monthKey,
+      gross: 0,
+      commission: 0,
+      cashCollected: 0,
+      withdrawals: 0,
+      onlineNet: 0,
+      cashCommission: 0,
+      cashNet: 0,
+      onlineGross: 0,
+      onlineCommission: 0,
+      extraCharges: 0
+    };
+
+    bookingsSnap.docs.forEach(d => {
+      if (d.id === bookingId) return; // Explicitly exclude this reverted booking!
+      const b = d.data() as any;
+      const isCash = isCashPayment(b.paymentMethod);
+      const bDate = b.scheduledDate || "";
+
+      const baseGross = (b.subTotal || 0) + (b.visitingCharge || 0) - (b.discountAmount || 0);
+      const extraCharges = (b.additionalCharges || []).reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
+      const totalBookingGross = baseGross + extraCharges;
+
+      if (isCash) {
+        const commission = calculateProviderFee(totalBookingGross, appConfig?.providerFeeType, appConfig?.providerFeeValue);
+        const cashNet = totalBookingGross - commission;
+        if (bDate >= startOfMonthStr) {
+          mStats.gross += totalBookingGross;
+          mStats.commission += commission;
+          mStats.cashCollected += (b.totalAmount || totalBookingGross);
+          mStats.cashCommission += commission;
+          mStats.cashNet += cashNet;
+          if (extraCharges > 0) {
+            mStats.extraCharges = (mStats.extraCharges || 0) + extraCharges;
+          }
+        }
+      } else {
+        const onlineGross = baseGross;
+        const onlineCommission = calculateProviderFee(onlineGross, appConfig?.providerFeeType, appConfig?.providerFeeValue);
+        const onlineNet = onlineGross - onlineCommission;
+        const extraCommission = extraCharges > 0
+          ? (appConfig?.providerFeeType === 'percentage'
+            ? calculateProviderFee(extraCharges, appConfig?.providerFeeType, appConfig?.providerFeeValue)
+            : (extraCharges * (appConfig?.providerExtraFeePercentage || 0)) / 100)
+          : 0;
+
+        totalNetOnlineEarnings += onlineNet;
+
+        if (bDate >= startOfMonthStr) {
+          mStats.gross += totalBookingGross;
+          mStats.commission += (onlineCommission + extraCommission);
+          mStats.onlineGross += onlineGross;
+          mStats.onlineCommission += onlineCommission;
+          mStats.onlineNet += onlineNet;
+          if (extraCharges > 0) {
+            mStats.cashCollected += extraCharges;
+            mStats.cashCommission += extraCommission;
+            mStats.cashNet += Math.max(0, extraCharges - extraCommission);
+            mStats.extraCharges = (mStats.extraCharges || 0) + extraCharges;
+          }
+        }
+      }
+    });
+
+    const withdrawalHistory = withdrawalsSnap.docs.map(d => d.data() as any);
+    const visibleCompletedPayouts = withdrawalHistory
+      .filter(req => req.status === 'completed')
+      .reduce((sum, req) => sum + req.amount, 0);
+
+    const storedTotalPaidOut = providerData.totalPaidOut || 0;
+    const finalTotalPaidOut = Math.max(storedTotalPaidOut, visibleCompletedPayouts);
+
+    const currentPendingAmount = withdrawalHistory
+      .filter(req => ['processing', 'approved', 'pending'].includes(req.status))
+      .reduce((sum, req) => sum + req.amount, 0);
+
+    const realBalance = Math.max(0, totalNetOnlineEarnings - finalTotalPaidOut - currentPendingAmount);
+
+    await updateDoc(providerUserRef, {
+      withdrawableBalance: realBalance,
+      monthlyStats: mStats
+    });
+
+    revalidatePath('/admin/provider-withdrawals');
+    revalidatePath('/provider/earnings');
+    return { success: true, message: `Reverted booking #${bookingId} earnings. Refunded ₹${totalDeductionRefund.toFixed(2)} to provider wallet.` };
+  } catch (error: any) {
+    console.error("Error in revertProviderBookingEarningsAction:", error);
+    return { success: false, message: error.message || "Failed to revert booking earnings." };
+  }
+}
+
+/**
+ * 13. Fetch all completed bookings fee ledger for Admin Panel (/admin/provider-withdrawals)
+ */
+export async function getBookingFeeLedgerAction() {
+  try {
+    const bookingsQuery = query(
+      collection(db, "bookings"),
+      where("status", "==", "Completed"),
+      orderBy("updatedAt", "desc"),
+      limit(100)
+    );
+    const snap = await getDocs(bookingsQuery);
+    const configSnap = await getDoc(doc(db, 'webSettings', 'applicationConfig'));
+    const appConfig = configSnap.exists() ? configSnap.data() as any : {};
+
+    const ledgerItems = snap.docs.map(docSnap => {
+      const b = docSnap.data() as any;
+      const baseGross = (b.subTotal || 0) + (b.visitingCharge || 0) - (b.discountAmount || 0);
+      const extraCharges = (b.additionalCharges || []).reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
+      const totalGross = baseGross + extraCharges;
+      const commission = calculateProviderFee(baseGross, appConfig?.providerFeeType, appConfig?.providerFeeValue) +
+        (extraCharges > 0 ? calculateProviderFee(extraCharges, appConfig?.providerFeeType, appConfig?.providerFeeValue) : 0);
+
+      return {
+        id: docSnap.id,
+        bookingId: b.bookingId || docSnap.id,
+        providerId: b.providerId || 'unassigned',
+        providerName: b.providerName || 'Provider',
+        customerName: b.customerName || 'Customer',
+        scheduledDate: b.scheduledDate || '',
+        scheduledTimeSlot: b.scheduledTimeSlot || '',
+        paymentMethod: b.paymentMethod || 'Pay After Service',
+        totalGross,
+        commission,
+        providerNet: Math.max(0, totalGross - commission),
+        updatedAt: getTimestampMillis(b.updatedAt) || Date.now()
+      };
+    });
+
+    return { success: true, ledger: ledgerItems };
+  } catch (error: any) {
+    console.error("Error in getBookingFeeLedgerAction:", error);
+    return { success: false, ledger: [] };
+  }
+}

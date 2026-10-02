@@ -12,10 +12,10 @@ import type { WithdrawalRequest, WithdrawalStatus, FirestoreNotification, Firest
 import { useToast } from "@/hooks/use-toast";
 import PermissionGuard from '@/components/admin/PermissionGuard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Banknote, RefreshCw, Wallet, History, Settings } from "lucide-react";
+import { Users, Banknote, RefreshCw, Wallet, History, Settings, Receipt, RotateCcw, Search } from "lucide-react";
 import { cn, formatCurrency } from '@/lib/utils';
 import { useApplicationConfig } from '@/hooks/useApplicationConfig';
-import { getProviderWalletDetailsAction } from '@/app/actions/providerWalletActions';
+import { getProviderWalletDetailsAction, getBookingFeeLedgerAction, revertProviderBookingEarningsAction } from '@/app/actions/providerWalletActions';
 import WalletComplaintsTab from '@/components/admin/provider-controls/WalletComplaintsTab';
 import WalletSettingsTab from '@/components/admin/provider-controls/WalletSettingsTab';
 import ProviderWalletAdjustmentModal from '@/components/admin/provider/ProviderWalletAdjustmentModal';
@@ -123,6 +123,76 @@ export default function ProviderWithdrawalsPage() {
   const [walletHistory, setWalletHistory] = useState<any[]>([]);
   const [isLoadingWallet, setIsLoadingWallet] = useState(false);
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
+
+  // Booking Fees Ledger States
+  const [bookingLedger, setBookingLedger] = useState<any[]>([]);
+  const [isLoadingLedger, setIsLoadingLedger] = useState(false);
+  const [ledgerSearch, setLedgerSearch] = useState('');
+  const [showRevertDialog, setShowRevertDialog] = useState(false);
+  const [selectedLedgerBooking, setSelectedLedgerBooking] = useState<any | null>(null);
+  const [isRevertingBooking, setIsRevertingBooking] = useState(false);
+
+  const loadBookingLedger = async () => {
+    setIsLoadingLedger(true);
+    try {
+      const res = await getBookingFeeLedgerAction();
+      if (res.success) {
+        setBookingLedger(res.ledger);
+      }
+    } catch (err) {
+      console.error("Error loading booking fee ledger:", err);
+      toast({ title: "Error", description: "Failed to load booking fee ledger.", variant: "destructive" });
+    } finally {
+      setIsLoadingLedger(false);
+    }
+  };
+
+  const handleRevertBookingFeeExecute = async (bookingItem: any) => {
+    if (!bookingItem || !bookingItem.id || !bookingItem.providerId) return;
+
+    if (typeof window !== 'undefined' && localStorage.getItem('wecanfix_is_demo_admin') === 'true') {
+      toast({
+        title: "Demo Mode Notice",
+        description: "Reverting booking fee is simulated in preview.",
+      });
+      setShowRevertDialog(false);
+      setSelectedLedgerBooking(null);
+      return;
+    }
+
+    setIsRevertingBooking(true);
+    try {
+      const res = await revertProviderBookingEarningsAction(bookingItem.id, bookingItem.providerId);
+      if (res.success) {
+        toast({
+          title: "Fee Reverted & Refunded",
+          description: res.message,
+          className: "bg-green-100 border-green-300 text-green-700 font-medium"
+        });
+        await loadBookingLedger();
+        await loadProviders();
+      } else {
+        toast({
+          title: "Revert Failed",
+          description: res.message,
+          variant: "destructive"
+        });
+      }
+    } catch (err: any) {
+      console.error("Error reverting booking fee:", err);
+      toast({ title: "Error", description: (err as Error).message || "Failed to revert booking fee.", variant: "destructive" });
+    } finally {
+      setIsRevertingBooking(false);
+      setShowRevertDialog(false);
+      setSelectedLedgerBooking(null);
+    }
+  };
+
+  const filteredBookingLedger = bookingLedger.filter(item => 
+    (item.bookingId || '').toLowerCase().includes(ledgerSearch.toLowerCase().trim()) ||
+    (item.providerName || '').toLowerCase().includes(ledgerSearch.toLowerCase().trim()) ||
+    (item.customerName || '').toLowerCase().includes(ledgerSearch.toLowerCase().trim())
+  );
 
   const filteredProvidersForSelect = providers.filter(p => 
     (p.displayName || '').toLowerCase().includes(providerSearch.toLowerCase()) || 
@@ -444,6 +514,13 @@ export default function ProviderWithdrawalsPage() {
               className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
             >
               <Users className="mr-2 h-4 w-4"/> Provider Balances
+            </TabsTrigger>
+            <TabsTrigger 
+              value="booking_fees" 
+              onClick={loadBookingLedger}
+              className="relative h-12 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 font-semibold text-muted-foreground shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none whitespace-nowrap"
+            >
+              <Receipt className="mr-2 h-4 w-4"/> Booking Fees Ledger
             </TabsTrigger>
             <TabsTrigger 
               value="wallet_complaints" 
@@ -1071,10 +1148,128 @@ export default function ProviderWithdrawalsPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="booking_fees">
+          <Card>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <Receipt className="h-5 w-5 text-primary" />
+                  Booking Fees & Commission Ledger
+                </CardTitle>
+                <CardDescription>
+                  Detailed breakdown of completed bookings, gross amounts, admin fees/commission, and provider net payouts.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search Booking ID or Provider..." 
+                    value={ledgerSearch}
+                    onChange={(e) => setLedgerSearch(e.target.value)}
+                    className="pl-8 h-9 text-xs"
+                  />
+                </div>
+                <Button variant="outline" size="sm" onClick={loadBookingLedger} disabled={isLoadingLedger} className="h-9">
+                  <RefreshCw className={cn("h-4 w-4 mr-1", isLoadingLedger && "animate-spin")} /> Refresh
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingLedger ? (
+                <div className="flex justify-center items-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+                  <span className="text-sm font-medium text-muted-foreground">Loading booking fees ledger...</span>
+                </div>
+              ) : filteredBookingLedger.length === 0 ? (
+                <div className="text-center py-12">
+                  <PackageSearch className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground font-medium">No completed booking fee records found.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border rounded-xl">
+                  <Table>
+                    <TableHeader className="bg-muted/50">
+                      <TableRow>
+                        <TableHead className="font-bold">Booking ID</TableHead>
+                        <TableHead className="font-bold">Provider</TableHead>
+                        <TableHead className="font-bold">Customer</TableHead>
+                        <TableHead className="font-bold">Schedule & Payment</TableHead>
+                        <TableHead className="font-bold text-right">Gross Total</TableHead>
+                        <TableHead className="font-bold text-right text-destructive">Admin Commission</TableHead>
+                        <TableHead className="font-bold text-right text-emerald-600">Provider Net</TableHead>
+                        <TableHead className="font-bold text-center">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredBookingLedger.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-bold text-primary">#{item.bookingId}</TableCell>
+                          <TableCell>
+                            <span className="font-medium text-foreground">{item.providerName}</span>
+                          </TableCell>
+                          <TableCell>{item.customerName}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            <div>{item.scheduledDate} {item.scheduledTimeSlot ? `| ${item.scheduledTimeSlot}` : ''}</div>
+                            <Badge variant="outline" className="text-[10px] mt-0.5">{item.paymentMethod}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-bold">{symbol}{item.totalGross.toFixed(decimals)}</TableCell>
+                          <TableCell className="text-right font-bold text-destructive">-{symbol}{item.commission.toFixed(decimals)}</TableCell>
+                          <TableCell className="text-right font-black text-emerald-600">{symbol}{item.providerNet.toFixed(decimals)}</TableCell>
+                          <TableCell className="text-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedLedgerBooking(item);
+                                setShowRevertDialog(true);
+                              }}
+                              className="h-8 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                              Revert / Delete Fee
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="wallet_settings">
           <WalletSettingsTab />
         </TabsContent>
       </Tabs>
+      
+      <AlertDialog open={showRevertDialog} onOpenChange={setShowRevertDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <RotateCcw className="h-5 w-5" /> Revert Booking Fee & Earnings
+            </AlertDialogTitle>
+            <AlertDialogDescriptionComponent>
+              Are you sure you want to revert earnings and refund wallet commission for Booking <strong className="text-foreground">#{selectedLedgerBooking?.bookingId}</strong> assigned to <strong className="text-foreground">{selectedLedgerBooking?.providerName}</strong>?
+              <br /><br />
+              This will refund any wallet commission deducted for this booking and recalculate the provider's wallet balance and earnings.
+            </AlertDialogDescriptionComponent>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setShowRevertDialog(false); setSelectedLedgerBooking(null); }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => { if (selectedLedgerBooking) handleRevertBookingFeeExecute(selectedLedgerBooking); }}
+              disabled={isRevertingBooking}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              {isRevertingBooking ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+              Confirm Revert Fee
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       <AlertDialog open={showRejectionDialog} onOpenChange={setShowRejectionDialog}>
         <AlertDialogContent>

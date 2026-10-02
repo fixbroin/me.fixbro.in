@@ -38,6 +38,8 @@ import CompleteBookingDialog from '@/components/shared/CompleteBookingDialog';
 import RescheduleBookingDialog from '@/components/shared/RescheduleBookingDialog';
 import { useAdminStats } from '@/hooks/useAdminStats';
 import { initializeBookingNumbers, resequenceBookingNumbers } from '@/lib/systemStatsUtils';
+import { getBookingScheduledTimestampMillis } from '@/lib/bookingUtils';
+import { revertProviderBookingEarningsAction } from '@/app/actions/providerWalletActions';
 import { hasActionPermission } from '@/config/rbac';
 import { useAuth } from '@/hooks/useAuth';
 import PermissionGuard from '@/components/admin/PermissionGuard';
@@ -384,12 +386,35 @@ export default function AdminBookingsPage() {
       });
     }
     
-    return [...filtered].sort((a, b) => {
-      const numA = Number(a.bookingNumber) || 0;
-      const numB = Number(b.bookingNumber) || 0;
-      if (numA !== numB) return numB - numA;
-      return getBookingTimestampMillis(b) - getBookingTimestampMillis(a);
-    });
+    // 3. Nearest-upcoming Sorting Strategy
+    const activeStatuses: string[] = [
+      'Pending Payment',
+      'Confirmed',
+      'Processing',
+      'AssignedToProvider',
+      'ProviderAccepted',
+      'InProgressByProvider',
+      'Rescheduled'
+    ];
+
+    if (filterStatus === 'Completed' || filterStatus === 'Cancelled') {
+      // Completed / Cancelled filtered view: latest finished first
+      return [...filtered].sort((a, b) => getBookingScheduledTimestampMillis(b) - getBookingScheduledTimestampMillis(a));
+    }
+
+    if (filterStatus !== 'All' && activeStatuses.includes(filterStatus)) {
+      // Active status filtered view: nearest scheduled date & time slot first (ASCENDING)
+      return [...filtered].sort((a, b) => getBookingScheduledTimestampMillis(a) - getBookingScheduledTimestampMillis(b));
+    }
+
+    // All View: Active upcoming bookings first (ASCENDING by nearest date/time), followed by completed/cancelled (DESCENDING)
+    const active = filtered.filter(b => b.status !== 'Completed' && b.status !== 'Cancelled' && b.status !== 'ProviderRejected');
+    const finished = filtered.filter(b => b.status === 'Completed' || b.status === 'Cancelled' || b.status === 'ProviderRejected');
+
+    active.sort((a, b) => getBookingScheduledTimestampMillis(a) - getBookingScheduledTimestampMillis(b));
+    finished.sort((a, b) => getBookingScheduledTimestampMillis(b) - getBookingScheduledTimestampMillis(a));
+
+    return [...active, ...finished];
   }, [bookings, filterStatus, searchTerm]);
 
   const handleStatusChange = async (booking: FirestoreBooking, newStatus: BookingStatus, additionalCharges?: {name: string, amount: number}[], finalizedPaymentMethod?: string) => {
@@ -552,6 +577,11 @@ export default function AdminBookingsPage() {
     }
     setIsUpdatingStatus(bookingId);
     try {
+      const currentBooking = bookings.find(b => b.id === bookingId);
+      if (currentBooking && currentBooking.providerId && currentBooking.providerId !== providerId) {
+        revertProviderBookingEarningsAction(bookingId, currentBooking.providerId).catch(err => console.error("Revert earnings error:", err));
+      }
+
       const updateData = { 
         providerId, 
         status: "AssignedToProvider" as BookingStatus, 
@@ -592,6 +622,10 @@ export default function AdminBookingsPage() {
     }
     setIsUpdatingStatus(booking.id);
     try {
+      if (booking.providerId) {
+        revertProviderBookingEarningsAction(booking.id, booking.providerId).catch(err => console.error("Revert earnings error:", err));
+      }
+
       const updateData = { 
         providerId: deleteField(), 
         status: "Confirmed" as BookingStatus, 
