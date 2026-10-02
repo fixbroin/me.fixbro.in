@@ -51,10 +51,15 @@ export async function verifyRequest(req: NextRequest | Request): Promise<Request
           role = adminData.role;
         }
       } else {
-        // Check if user has an approved provider application
-        const providerDoc = await adminDb.collection('providerApplications').doc(uid).get();
-        if (providerDoc.exists && providerDoc.data()?.status === 'approved') {
-          role = 'provider';
+        const userDoc = await adminDb.collection('users').doc(uid).get();
+        if (userDoc.exists && userDoc.data()?.role) {
+          role = userDoc.data()?.role;
+        } else {
+          // Check if user has an approved provider application
+          const providerDoc = await adminDb.collection('providerApplications').doc(uid).get();
+          if (providerDoc.exists && providerDoc.data()?.status === 'approved') {
+            role = 'provider';
+          }
         }
       }
     } catch (dbErr) {

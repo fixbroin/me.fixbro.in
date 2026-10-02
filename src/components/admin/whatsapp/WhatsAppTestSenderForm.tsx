@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Loader2, SendHorizonal, Trash2, PlusCircle, AlertTriangle, Check, ChevronsUpDown, Search } from "lucide-react"; 
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const testSenderFormSchema = z.object({
@@ -32,6 +33,7 @@ const approvedTemplates = [
 ];
 
 export default function WhatsAppTestSenderForm() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [isSending, setIsSending] = useState(false);
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
@@ -89,9 +91,19 @@ export default function WhatsAppTestSenderForm() {
     toast({ title: "Sending Test Message..." });
     
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          headers['Authorization'] = `Bearer ${token}`;
+        } catch (authErr) {
+          console.error("Error retrieving ID token:", authErr);
+        }
+      }
+
       const response = await fetch('/api/whatsapp/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           to: data.phoneNumber,
           templateName: data.templateName,
