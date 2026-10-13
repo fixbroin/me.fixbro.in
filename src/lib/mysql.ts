@@ -85,7 +85,8 @@ const TABLES = [
   'adminCoupons',
   'services',
   'adminTaxes',
-  'adminCustomImages'
+  'adminCustomImages',
+  'checkoutDrafts'
 ];
 
 /**

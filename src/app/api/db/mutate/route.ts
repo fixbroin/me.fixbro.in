@@ -45,19 +45,48 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Financial & Booking Security Rules (Issue 4):
-    // Direct client cannot delete bookings or elevate booking status to Confirmed/Completed
-    if (!isAdmin && path === 'bookings') {
-      if (action === 'deleteDoc') {
-        return NextResponse.json({ success: false, error: 'Forbidden: Bookings cannot be deleted directly by clients.' }, { status: 403 });
+    // Direct client cannot create, overwrite, delete bookings, or tamper with booking status/payment fields
+    if (!isAdmin && (path === 'bookings' || fullPath.startsWith('bookings/'))) {
+      if (action === 'deleteDoc' || action === 'addDoc' || action === 'setDoc') {
+        return NextResponse.json({
+          success: false,
+          error: 'Forbidden: Bookings must be created or managed through authoritative server endpoints.',
+        }, { status: 403 });
       }
 
       if (cleanData && typeof cleanData === 'object') {
-        // Prevent client from setting status to Confirmed without server payment verification
-        if (cleanData.status === 'Confirmed' || cleanData.status === 'Completed') {
+        // Non-admin clients may only set status to 'Cancelled' (when cancelling their own booking)
+        if (cleanData.status !== undefined && cleanData.status !== 'Cancelled') {
           return NextResponse.json({ 
             success: false, 
-            error: 'Forbidden: Confirmed and Completed booking states must be processed via authoritative payment verification endpoints.' 
+            error: 'Forbidden: Booking status changes must be processed via authoritative server endpoints.' 
           }, { status: 403 });
+        }
+
+        // Prevent non-admin clients from tampering with payment or pricing fields
+        const protectedBookingFields = [
+          'paymentMethod',
+          'razorpayPaymentId',
+          'razorpayOrderId',
+          'razorpaySignature',
+          'stripeSessionId',
+          'stripePaymentIntent',
+          'totalAmount',
+          'subTotal',
+          'taxAmount',
+          'visitingCharge',
+          'platformFeeTotal',
+          'appliedPlatformFees',
+          'discountAmount',
+          'discountCode',
+          'bookingNumber',
+          'bookingId',
+          'providerId',
+        ];
+        for (const field of protectedBookingFields) {
+          if (field in cleanData) {
+            delete cleanData[field];
+          }
         }
       }
     }

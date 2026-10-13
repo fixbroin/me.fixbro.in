@@ -73,7 +73,22 @@ function calculateServerCancellationFee(bookingData: any, appConfig: any) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { type, amount, currency = 'INR', bookingId, providerId, successUrl, cancelUrl } = await req.json();
+    const body = await req.json();
+    const {
+      type,
+      amount,
+      currency = 'INR',
+      bookingId,
+      providerId,
+      successUrl,
+      cancelUrl,
+      cartEntries: bodyCartEntries,
+      promoCode,
+      categoryId,
+      customerInfo,
+      schedule,
+      userId,
+    } = body;
 
     if (!amount || typeof amount !== 'number' || amount <= 0) {
       return NextResponse.json({ success: false, error: 'Invalid amount provided.' }, { status: 400 });
@@ -83,6 +98,7 @@ export async function POST(req: NextRequest) {
     const appConfig = appConfigSnap.exists ? appConfigSnap.data() as any : null;
 
     let reconciledAmount = amount;
+    let parsedCartForDraft: any[] | null = null;
 
     if (bookingId && (type === 'booking' || type === 'cancellation_fee')) {
       const bookingDoc = await adminDb.collection('bookings').doc(bookingId).get();
@@ -122,6 +138,18 @@ export async function POST(req: NextRequest) {
       } else if (type === 'cancellation_fee') {
         reconciledAmount = calculateServerCancellationFee(bookingData, appConfig);
       }
+    } else if (type === 'booking' && bodyCartEntries) {
+      const parsedCart = typeof bodyCartEntries === 'string' ? JSON.parse(bodyCartEntries) : bodyCartEntries;
+      if (!Array.isArray(parsedCart) || parsedCart.length === 0) {
+        return NextResponse.json({ success: false, error: 'Cart entries are required for booking.' }, { status: 400 });
+      }
+      parsedCartForDraft = parsedCart;
+      const calculation = await calculateServerBookingTotal({
+        cartEntries: parsedCart,
+        promoCode,
+        categoryId,
+      });
+      reconciledAmount = calculation.totalAmount;
     } else if (type === 'wallet_topup' && providerId) {
       const minDeposit = appConfig?.minDepositAmount || 500;
       const maxDeposit = appConfig?.maxDepositAmount || 10000;
@@ -154,7 +182,9 @@ export async function POST(req: NextRequest) {
                 ? 'Provider Wallet Top Up' 
                 : type === 'cancellation_fee' 
                 ? `Cancellation Fee (Booking #${bookingId})` 
-                : `Service Booking Payment (#${bookingId})`,
+                : bookingId
+                ? `Service Booking Payment (#${bookingId})`
+                : 'Service Booking Payment',
             },
             unit_amount: stripeAmount,
           },
@@ -174,6 +204,27 @@ export async function POST(req: NextRequest) {
 
     if (!session || !session.url) {
       return NextResponse.json({ success: false, error: 'Failed to create checkout session.' }, { status: 500 });
+    }
+
+    if (type === 'booking' && parsedCartForDraft) {
+      try {
+        await adminDb.collection('checkoutDrafts').doc(session.id).set({
+          gateway: 'stripe',
+          sessionId: session.id,
+          cartEntries: parsedCartForDraft,
+          customerInfo: customerInfo || {},
+          schedule: schedule || {},
+          workCategoryId: categoryId || null,
+          promoCode: promoCode || null,
+          userId: userId || null,
+          reconciledAmount,
+          currency,
+          status: 'pending',
+          createdAt: new Date(),
+        });
+      } catch (draftErr) {
+        console.warn('Could not save checkoutDraft for Stripe session:', draftErr);
+      }
     }
 
     return NextResponse.json({ success: true, url: session.url, sessionId: session.id });

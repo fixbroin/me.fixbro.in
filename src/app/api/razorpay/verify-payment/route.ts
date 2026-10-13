@@ -1,8 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import Razorpay from 'razorpay';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
 import { Timestamp } from '@/lib/mysqlDbAdmin';
+import { fulfillCheckoutDraft } from '@/lib/bookingPricingServer';
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,6 +28,7 @@ export async function POST(req: NextRequest) {
     const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
     const appConfig = appConfigSnap.exists ? (appConfigSnap.data() as any) : null;
 
+    const razorpayKeyId = appConfig?.razorpayKeyId || process.env.RAZORPAY_KEY_ID;
     const razorpayKeySecret = appConfig?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
 
     if (!razorpayKeySecret) {
@@ -46,7 +49,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid payment signature.' }, { status: 400 });
     }
 
-    // Signature is cryptographically verified!
+    // Direct Razorpay Server API Verification: confirm payment exists on Razorpay and is captured/authorized
+    if (razorpayKeyId) {
+      try {
+        const instance = new Razorpay({
+          key_id: razorpayKeyId,
+          key_secret: razorpayKeySecret,
+        });
+        const rzpPayment: any = await instance.payments.fetch(razorpay_payment_id);
+        if (!rzpPayment || rzpPayment.order_id !== razorpay_order_id) {
+          return NextResponse.json(
+            { success: false, error: 'Payment order mismatch on Razorpay server.' },
+            { status: 400 }
+          );
+        }
+        if (rzpPayment.status !== 'captured' && rzpPayment.status !== 'authorized') {
+          return NextResponse.json(
+            { success: false, error: `Payment is not completed (status: ${rzpPayment.status}).` },
+            { status: 400 }
+          );
+        }
+      } catch (rzpErr: any) {
+        console.error('Error fetching payment from Razorpay API in verify-payment:', rzpErr);
+        return NextResponse.json(
+          { success: false, error: 'Could not verify payment with Razorpay server.' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Signature and server payment are cryptographically verified!
     let updatedBooking: any = null;
 
     if (bookingId) {
@@ -142,6 +174,25 @@ export async function POST(req: NextRequest) {
         } else {
           updatedBooking = { ...bookingData, id: bookingId };
         }
+      }
+    } else if (!isCancellationFee) {
+      // Fulfill from server-side checkoutDraft (if present)
+      try {
+        const fulfilled = await fulfillCheckoutDraft({
+          draftId: razorpay_order_id,
+          gateway: 'razorpay',
+          paymentDetails: {
+            razorpayPaymentId: razorpay_payment_id,
+            razorpayOrderId: razorpay_order_id,
+            razorpaySignature: razorpay_signature,
+          },
+          triggerSource: 'razorpay_checkout_verify',
+        });
+        if (fulfilled) {
+          updatedBooking = fulfilled.booking;
+        }
+      } catch (fulfillErr) {
+        console.warn('Could not fulfill checkoutDraft in verify-payment (will fall back to create-cash):', fulfillErr);
       }
     }
 

@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
 import { Timestamp } from '@/lib/mysqlDbAdmin';
+import { fulfillCheckoutDraft } from '@/lib/bookingPricingServer';
 
 export async function GET(req: NextRequest) {
   try {
@@ -100,6 +101,20 @@ export async function GET(req: NextRequest) {
           } else {
             updatedBooking = { ...bookingData, id: bookingId };
           }
+        }
+      } else if (session.metadata?.type !== 'cancellation_fee' && session.metadata?.type !== 'wallet_topup') {
+        const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.id;
+        const fulfilled = await fulfillCheckoutDraft({
+          draftId: session.id,
+          gateway: 'stripe',
+          paymentDetails: {
+            stripeSessionId: session.id,
+            stripePaymentIntent: paymentIntentId,
+          },
+          triggerSource: 'stripe_checkout_verify',
+        });
+        if (fulfilled) {
+          updatedBooking = fulfilled.booking;
         }
       }
 

@@ -39,6 +39,21 @@ export async function POST(request: Request) {
     let isCancelled = currentStatus === 'Cancelled';
     let isRescheduled = currentStatus === 'Rescheduled';
 
+    // Guard: Do not post-process or auto-dispatch an unpaid Online booking
+    const isUnpaidOnlineBooking =
+      booking.paymentMethod === 'Online' &&
+      currentStatus === 'Pending Payment' &&
+      !booking.razorpayPaymentId &&
+      !booking.stripePaymentIntent &&
+      !booking.stripeSessionId;
+
+    if (isUnpaidOnlineBooking) {
+      return NextResponse.json(
+        { error: 'Cannot post-process an unpaid online booking before payment verification.' },
+        { status: 400 }
+      );
+    }
+
     // 2. Fetch App Settings for Email/WhatsApp/Dispatch
     const [appConfigDoc, marketingConfigDoc, seoSettingsDoc] = await Promise.all([
         adminDb.collection('webSettings').doc('applicationConfig').get(),

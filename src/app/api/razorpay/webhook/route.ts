@@ -5,6 +5,7 @@ import { depositProviderWalletAction } from '@/app/actions/providerWalletActions
 import { db } from '@/lib/mysqlDb';
 import { doc, getDoc, updateDoc, Timestamp, addDoc, collection, query, where, getDocs, limit } from '@/lib/mysqlDb';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
+import { fulfillCheckoutDraft } from '@/lib/bookingPricingServer';
 import { triggerPushNotification } from '@/lib/fcmUtils';
 import { ADMIN_EMAIL } from '@/contexts/AuthContext';
 import type { FirestoreNotification } from '@/types/firestore';
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Retrieve notes
-      const notes = order.notes || {};
+      const notes = order.notes || payload.payload.order?.entity?.notes || {};
       const { type, bookingId, providerId, amount: amountStr } = notes;
 
       if (type === 'booking' && bookingId) {
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
           const bookingData = bookingSnap.data() as any;
           if (bookingData.status === 'Pending Payment') {
             const orderId = order.order_id || order.id;
-            const paymentId = order.id;
+            const paymentId = payload.payload.payment?.entity?.id || order.id;
             const nextBookingNumber = await assignNewBookingNumber();
 
             await updateDoc(bookingRef, {
@@ -129,6 +130,18 @@ export async function POST(req: NextRequest) {
             }
           }
         }
+      } else if (type === 'booking' && !bookingId) {
+        const orderId = order.order_id || order.id;
+        const paymentId = payload.payload.payment?.entity?.id || order.id;
+        await fulfillCheckoutDraft({
+          draftId: orderId,
+          gateway: 'razorpay',
+          paymentDetails: {
+            razorpayPaymentId: paymentId,
+            razorpayOrderId: orderId,
+          },
+          triggerSource: 'razorpay_webhook',
+        });
       } else if (type === 'wallet_topup' && providerId && amountStr) {
         const parsedAmount = parseFloat(amountStr);
         const orderId = order.order_id || order.id;

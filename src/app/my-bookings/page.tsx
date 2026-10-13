@@ -154,10 +154,21 @@ export default function MyBookingsPage() {
     const userEmail = user.email ? user.email.toLowerCase().trim() : null;
 
     const processAndSetBookings = async (docs: any[]) => {
-      const fetchedBookings = docs.map(docSnap => ({ 
-        ...docSnap.data(),
-        id: docSnap.id, 
-      } as FirestoreBooking));
+      const fetchedBookings = docs
+        .map(docSnap => ({ 
+          ...docSnap.data(),
+          id: docSnap.id, 
+        } as FirestoreBooking))
+        .filter(b => {
+          // Hide any legacy abandoned online payment drafts that were never paid
+          const isUnpaidOnlineDraft =
+            (b.paymentMethod || '').toLowerCase().trim() === 'online' &&
+            b.status === 'Pending Payment' &&
+            !(b as any).razorpayPaymentId &&
+            !(b as any).stripePaymentIntent &&
+            !(b as any).stripeSessionId;
+          return !isUnpaidOnlineDraft;
+        });
 
       // Auto-link any matching email booking missing userId
       if (user.uid) {

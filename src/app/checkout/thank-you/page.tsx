@@ -326,7 +326,10 @@ export default function ThankYouPage() {
       }
       
       const cartEntriesFromStorage = getActiveCheckoutEntries();
-      if (cartEntriesFromStorage.length === 0) {
+      const stripeBookingId = searchParams.get('bookingId') || (typeof window !== 'undefined' ? localStorage.getItem('pendingBookingDocId') : null);
+      const isStripeBooking = stripePaymentMethod === 'stripe' && !isProcessingCancellationFee;
+
+      if (cartEntriesFromStorage.length === 0 && !isStripeBooking) {
         toast({ title: "Booking Processed", description: "Redirecting to My Bookings.", variant: "default" });
         router.push('/my-bookings');
         setIsLoadingPage(false);
@@ -334,27 +337,32 @@ export default function ThankYouPage() {
       }
 
       // --- 2. Handle Regular Booking Confirmation ---
-      const stripeBookingId = searchParams.get('bookingId') || (typeof window !== 'undefined' ? localStorage.getItem('pendingBookingDocId') : null);
-      const isStripeBooking = stripePaymentMethod === 'stripe' && !isProcessingCancellationFee;
-
       if (isStripeBooking) {
-        if (!stripeSessionId || !stripeBookingId) {
+        if (!stripeSessionId) {
             toast({ title: "Verification Failed", description: "Payment details are missing. Please contact support if you were charged.", variant: "destructive" });
             router.push('/cart'); setIsLoadingPage(false); return;
         }
         try {
-            const verifyRes = await fetch(`/api/stripe/verify-session?session_id=${stripeSessionId}&bookingId=${stripeBookingId}`);
+            const verifyUrl = `/api/stripe/verify-session?session_id=${stripeSessionId}${stripeBookingId ? `&bookingId=${stripeBookingId}` : ''}`;
+            const verifyRes = await fetch(verifyUrl);
             const verifyData = await verifyRes.json();
             if (!verifyData.success) {
                 throw new Error(verifyData.error || "Stripe payment verification failed.");
             }
             toast({ title: "Payment Verified", description: "Your payment has been successfully verified." });
 
-            const bookingRef = doc(db, 'bookings', stripeBookingId);
-            const bookingSnap = await getDoc(bookingRef);
+            let bookingData: FirestoreBooking | null = verifyData.booking || null;
+            let resolvedDocId = verifyData.booking?.id || stripeBookingId || '';
 
-            if (bookingSnap.exists() || verifyData.booking) {
-                const bookingData = (verifyData.booking || (bookingSnap.exists() ? bookingSnap.data() : {})) as FirestoreBooking;
+            if (!bookingData && stripeBookingId) {
+              const bookingRef = doc(db, 'bookings', stripeBookingId);
+              const bookingSnap = await getDoc(bookingRef);
+              if (bookingSnap.exists()) {
+                bookingData = bookingSnap.data() as FirestoreBooking;
+              }
+            }
+
+            if (bookingData) {
                 const finalBookingNum = bookingData.bookingNumber;
                 const servicesSummary = (bookingData.services || []).map(s => `${s.name} (x${s.quantity})`).join(', ');
 
@@ -362,7 +370,7 @@ export default function ThankYouPage() {
                   'newBooking',
                   {
                     bookingId: bookingData.bookingId,
-                    bookingDocId: stripeBookingId,
+                    bookingDocId: resolvedDocId,
                     totalAmount: bookingData.totalAmount,
                     paymentMethod: 'Online',
                     customerName: bookingData.customerName,
@@ -375,7 +383,7 @@ export default function ThankYouPage() {
                 );
                 setBookingDetailsForDisplay({ 
                     ...bookingData, 
-                    id: stripeBookingId, 
+                    id: resolvedDocId, 
                     bookingNumber: finalBookingNum,
                     servicesSummary, 
                     createdAt: (() => {

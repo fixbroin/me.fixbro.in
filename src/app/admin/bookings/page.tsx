@@ -90,17 +90,24 @@ const getCoverageBadge = (booking: FirestoreBooking) => {
 
 const getPaymentBadgeClass = (method: string | undefined, status: string, booking?: any) => {
     if (status === 'Completed') return 'bg-green-50 text-green-700 border-green-200 hover:bg-green-50';
-    const isOnline = (method || '').toLowerCase().trim() === 'online' || !!booking?.razorpayPaymentId || !!booking?.stripePaymentIntent || !!booking?.stripeSessionId;
-    if (!isOnline) return 'bg-red-50 text-red-700 border-red-200 hover:bg-red-50';
+    const hasVerifiedPaymentId = !!booking?.razorpayPaymentId || !!booking?.stripePaymentIntent || !!booking?.stripeSessionId;
+    const isOnlineMethod = (method || '').toLowerCase().trim() === 'online' || hasVerifiedPaymentId;
+    if (!isOnlineMethod) return 'bg-red-50 text-red-700 border-red-200 hover:bg-red-50';
+    if (!hasVerifiedPaymentId) return 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-50';
     return 'bg-green-50 text-green-700 border-green-200 hover:bg-green-50';
 };
 
 const getPaymentLabel = (method: string | undefined, status: string, booking?: any) => {
-    const isOnline = (method || '').toLowerCase().trim() === 'online' || !!booking?.razorpayPaymentId || !!booking?.stripePaymentIntent || !!booking?.stripeSessionId;
-    const label = isOnline ? 'Online' : 'Pay After Service';
-    if (status !== 'Completed') return label;
-    if (!isOnline) return "Paid (Pay After Service)";
-    return `Paid (Online)`;
+    const hasVerifiedPaymentId = !!booking?.razorpayPaymentId || !!booking?.stripePaymentIntent || !!booking?.stripeSessionId;
+    const isOnlineMethod = (method || '').toLowerCase().trim() === 'online' || hasVerifiedPaymentId;
+    if (!isOnlineMethod) {
+        return status === 'Completed' ? 'Paid (Pay After Service)' : 'Pay After Service';
+    }
+    if (!hasVerifiedPaymentId && status !== 'Completed') {
+        return 'Online (Unpaid)';
+    }
+    if (status === 'Completed') return 'Paid (Online)';
+    return 'Online';
 };
 
 const PAGE_SIZE = 10;

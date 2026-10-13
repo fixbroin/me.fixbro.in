@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import Razorpay from 'razorpay';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { calculateServerBookingTotal } from '@/lib/bookingPricingServer';
 import { assignNewBookingNumber } from '@/lib/webServerUtils';
@@ -87,6 +88,7 @@ export async function POST(req: NextRequest) {
 
       const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
       const appConfig = appConfigSnap.exists ? (appConfigSnap.data() as any) : null;
+      const razorpayKeyId = appConfig?.razorpayKeyId || process.env.RAZORPAY_KEY_ID;
       const razorpayKeySecret = appConfig?.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET;
 
       if (!razorpayKeySecret) {
@@ -107,6 +109,58 @@ export async function POST(req: NextRequest) {
           { success: false, error: 'Invalid online payment signature.' },
           { status: 400 }
         );
+      }
+
+      // Direct Razorpay Server API Verification: confirm payment exists, belongs to order, and is captured/authorized
+      if (razorpayKeyId) {
+        try {
+          const instance = new Razorpay({
+            key_id: razorpayKeyId,
+            key_secret: razorpayKeySecret,
+          });
+          const rzpPayment: any = await instance.payments.fetch(razorpayPaymentId);
+          if (!rzpPayment || rzpPayment.order_id !== razorpayOrderId) {
+            return NextResponse.json(
+              { success: false, error: 'Payment order mismatch on Razorpay server.' },
+              { status: 400 }
+            );
+          }
+          if (rzpPayment.status !== 'captured' && rzpPayment.status !== 'authorized') {
+            return NextResponse.json(
+              { success: false, error: `Payment is not completed (status: ${rzpPayment.status}).` },
+              { status: 400 }
+            );
+          }
+          const expectedPaise = Math.round(pricing.totalAmount * 100);
+          if (Math.abs(Number(rzpPayment.amount) - expectedPaise) > 100) {
+            return NextResponse.json(
+              { success: false, error: 'Payment amount does not match authoritative booking total.' },
+              { status: 400 }
+            );
+          }
+        } catch (rzpErr: any) {
+          console.error('Error fetching payment from Razorpay API in create-cash:', rzpErr);
+          return NextResponse.json(
+            { success: false, error: 'Could not verify payment with Razorpay server.' },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Idempotency Check: if webhook or verify-payment already created this booking, return it
+      const pool = await getPool();
+      const existingBookings = await getDocsInternal(pool, 'bookings', [
+        { type: 'where', field: 'razorpayOrderId', op: '==', value: razorpayOrderId },
+        { type: 'limit', value: 1 },
+      ]);
+      if (existingBookings && existingBookings.length > 0) {
+        const existing = existingBookings[0];
+        return NextResponse.json({
+          success: true,
+          bookingId: existing.bookingId,
+          bookingDocId: existing.id,
+          booking: existing,
+        });
       }
 
       finalPaymentMethod = 'Online';
@@ -160,6 +214,23 @@ export async function POST(req: NextRequest) {
     };
 
     const docRef = await adminDb.collection('bookings').add(newBookingData);
+
+    if (finalPaymentMethod === 'Online' && onlinePaymentFields.razorpayOrderId) {
+      try {
+        const draftRef = adminDb.collection('checkoutDrafts').doc(onlinePaymentFields.razorpayOrderId);
+        const draftSnap = await draftRef.get();
+        if (draftSnap.exists) {
+          await draftRef.update({
+            status: 'completed',
+            bookingDocId: docRef.id,
+            bookingId: newBookingId,
+            updatedAt: Timestamp.now(),
+          });
+        }
+      } catch (draftUpdateErr) {
+        console.warn('Could not update checkoutDraft status in create-cash:', draftUpdateErr);
+      }
+    }
 
     // 5. Trigger Server-Side Post Processing (Notifications, Dispatch, WhatsApp)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3006';

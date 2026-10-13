@@ -68,7 +68,18 @@ function calculateServerCancellationFee(bookingData: any, appConfig: any) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { amount, currency = 'INR', notes } = await req.json();
+    const body = await req.json();
+    const {
+      amount,
+      currency = 'INR',
+      notes,
+      cartEntries: bodyCartEntries,
+      promoCode: bodyPromoCode,
+      categoryId: bodyCategoryId,
+      customerInfo,
+      schedule,
+      userId,
+    } = body;
 
     if (!amount || typeof amount !== 'number' || amount < 100) { // Razorpay minimum is 1 INR (100 paise)
       return NextResponse.json({ success: false, error: 'Invalid amount provided.' }, { status: 400 });
@@ -77,11 +88,14 @@ export async function POST(req: NextRequest) {
     const appConfigSnap = await adminDb.collection('webSettings').doc('applicationConfig').get();
     const appConfig = appConfigSnap.exists ? appConfigSnap.data() as any : null;
 
-    const type = notes?.type;
+    const type = notes?.type || body.type;
     const bookingId = notes?.bookingId;
     const providerId = notes?.providerId;
 
     let reconciledBaseAmount = amount / 100;
+    let parsedCartForDraft: any[] | null = null;
+    const effectivePromoCode = bodyPromoCode ?? notes?.promoCode;
+    const effectiveCategoryId = bodyCategoryId ?? notes?.categoryId;
 
     if (bookingId && (type === 'booking' || type === 'cancellation_fee')) {
       const bookingDoc = await adminDb.collection('bookings').doc(bookingId).get();
@@ -121,17 +135,23 @@ export async function POST(req: NextRequest) {
       } else if (type === 'cancellation_fee') {
         reconciledBaseAmount = calculateServerCancellationFee(bookingData, appConfig);
       }
-    } else if (type === 'booking' && notes?.cartEntries) {
+    } else if (type === 'booking' && (bodyCartEntries || notes?.cartEntries)) {
       try {
-        const parsedCart = typeof notes.cartEntries === 'string' ? JSON.parse(notes.cartEntries) : notes.cartEntries;
+        const rawCart = bodyCartEntries || notes.cartEntries;
+        const parsedCart = typeof rawCart === 'string' ? JSON.parse(rawCart) : rawCart;
+        if (!Array.isArray(parsedCart) || parsedCart.length === 0) {
+          return NextResponse.json({ success: false, error: 'Cart entries are required for booking.' }, { status: 400 });
+        }
+        parsedCartForDraft = parsedCart;
         const calculation = await calculateServerBookingTotal({
           cartEntries: parsedCart,
-          promoCode: notes.promoCode,
-          categoryId: notes.categoryId,
+          promoCode: effectivePromoCode,
+          categoryId: effectiveCategoryId,
         });
         reconciledBaseAmount = calculation.totalAmount;
       } catch (err) {
         console.error('Error calculating direct cart entries in Razorpay order:', err);
+        return NextResponse.json({ success: false, error: 'Failed to calculate authoritative booking total.' }, { status: 400 });
       }
     } else if (type === 'wallet_topup' && providerId) {
       const minDeposit = appConfig?.minDepositAmount || 500;
@@ -156,20 +176,51 @@ export async function POST(req: NextRequest) {
       key_secret: razorpayKeySecret,
     });
 
+    // Keep Razorpay notes concise (Razorpay limits each note value to 256 chars)
+    const sanitizedNotes: Record<string, string> = {};
+    if (notes && typeof notes === 'object') {
+      for (const [k, v] of Object.entries(notes)) {
+        if (k === 'cartEntries') continue;
+        if (v !== undefined && v !== null) {
+          sanitizedNotes[k] = String(v).slice(0, 250);
+        }
+      }
+    }
+    sanitizedNotes.amount = reconciledBaseAmount.toString();
+
     const options = {
       amount: reconciledAmountPaise, // amount in the smallest currency unit (paise)
       currency: currency,
       receipt: `receipt_${nanoid()}`,
-      notes: {
-        ...(notes || {}),
-        amount: reconciledBaseAmount.toString()
-      },
+      notes: sanitizedNotes,
     };
 
     const order = await instance.orders.create(options);
 
     if (!order) {
       return NextResponse.json({ success: false, error: 'Failed to create order with Razorpay.' }, { status: 500 });
+    }
+
+    // Store server-side checkout draft keyed by Razorpay order.id (NOT in bookings table)
+    if (type === 'booking' && parsedCartForDraft) {
+      try {
+        await adminDb.collection('checkoutDrafts').doc(order.id).set({
+          gateway: 'razorpay',
+          orderId: order.id,
+          cartEntries: parsedCartForDraft,
+          customerInfo: customerInfo || {},
+          schedule: schedule || {},
+          workCategoryId: effectiveCategoryId || null,
+          promoCode: effectivePromoCode || null,
+          userId: userId || null,
+          reconciledAmount: reconciledBaseAmount,
+          currency,
+          status: 'pending',
+          createdAt: new Date(),
+        });
+      } catch (draftErr) {
+        console.warn('Could not save checkoutDraft for Razorpay order:', draftErr);
+      }
     }
     
     return NextResponse.json({ success: true, ...order });

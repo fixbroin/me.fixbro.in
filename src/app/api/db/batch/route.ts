@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getPool, setDocInternal, updateDocInternal, deleteDocInternal } from '@/lib/mysql';
-import { verifyRequest, validateAccess } from '@/lib/dbSecurity';
+import { verifyRequest, validateAccess, isUserAdmin, isFieldProtectedFromCustomerMutation } from '@/lib/dbSecurity';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,13 +18,74 @@ export async function POST(request: NextRequest) {
     }
 
     const { operations = [] } = await request.json();
+    const isAdmin = isUserAdmin(user);
 
-    // Verify access for all operations in the batch first
+    // Verify access and field-level security for all operations in the batch first
     for (const op of operations) {
       const pathToCheck = op.collection ? `${op.collection}/${op.id || ''}` : op.id || '';
       const isAllowed = validateAccess(user, pathToCheck, 'write');
       if (!isAllowed) {
         return NextResponse.json({ success: false, error: `Forbidden: No write access to "${pathToCheck}".` }, { status: 403 });
+      }
+
+      if (!isAdmin) {
+        if (op.collection === 'users' || pathToCheck.startsWith('users/')) {
+          if (op.data && typeof op.data === 'object') {
+            for (const key of Object.keys(op.data)) {
+              if (isFieldProtectedFromCustomerMutation(key)) {
+                delete op.data[key];
+              }
+            }
+          }
+        }
+
+        if (op.collection === 'bookings' || pathToCheck.startsWith('bookings/')) {
+          if (op.action === 'deleteDoc' || op.action === 'setDoc') {
+            return NextResponse.json({
+              success: false,
+              error: 'Forbidden: Bookings cannot be created, overwritten, or deleted in client batch operations.',
+            }, { status: 403 });
+          }
+          if (op.data && typeof op.data === 'object') {
+            if (op.data.status !== undefined && op.data.status !== 'Cancelled') {
+              return NextResponse.json({
+                success: false,
+                error: 'Forbidden: Booking status changes must be processed via authoritative server endpoints.',
+              }, { status: 403 });
+            }
+            const protectedBookingFields = [
+              'paymentMethod',
+              'razorpayPaymentId',
+              'razorpayOrderId',
+              'razorpaySignature',
+              'stripeSessionId',
+              'stripePaymentIntent',
+              'totalAmount',
+              'subTotal',
+              'taxAmount',
+              'visitingCharge',
+              'platformFeeTotal',
+              'appliedPlatformFees',
+              'discountAmount',
+              'discountCode',
+              'bookingNumber',
+              'bookingId',
+              'providerId',
+            ];
+            for (const field of protectedBookingFields) {
+              if (field in op.data) {
+                delete op.data[field];
+              }
+            }
+          }
+        }
+
+        if (op.collection === 'withdrawalRequests' || pathToCheck.startsWith('withdrawalRequests/')) {
+          return NextResponse.json({
+            success: false,
+            error: 'Forbidden: Withdrawal requests cannot be modified in client batch operations.',
+          }, { status: 403 });
+        }
       }
     }
 

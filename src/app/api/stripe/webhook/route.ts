@@ -4,6 +4,7 @@ import { adminDb } from '@/lib/firebaseAdmin';
 import { depositProviderWalletAction } from '@/app/actions/providerWalletActions';
 import { db } from '@/lib/mysqlDb';
 import { doc, getDoc, updateDoc, addDoc, collection, Timestamp, query, where, getDocs } from '@/lib/mysqlDb';
+import { fulfillCheckoutDraft } from '@/lib/bookingPricingServer';
 
 export async function POST(req: NextRequest) {
   let rawBody = '';
@@ -52,42 +53,48 @@ export async function POST(req: NextRequest) {
 
       if (type === 'booking') {
         if (!bookingId) {
-          console.error("Stripe booking payment completed but bookingId is missing from metadata.");
-          return NextResponse.json({ success: false, error: 'bookingId is missing from metadata.' }, { status: 400 });
-        }
-
-        // Fetch the booking document
-        const bookingRef = doc(db, 'bookings', bookingId);
-        const bookingSnap = await getDoc(bookingRef);
-
-        if (bookingSnap.exists()) {
-          const bookingData = bookingSnap.data();
-          if (bookingData.status === 'Pending Payment') {
-            // Update booking status to Confirmed and store Stripe Session ID
-            await updateDoc(bookingRef, {
-              status: 'Confirmed',
+          await fulfillCheckoutDraft({
+            draftId: session.id,
+            gateway: 'stripe',
+            paymentDetails: {
               stripeSessionId: session.id,
               stripePaymentIntent: typeof session.payment_intent === 'string' ? session.payment_intent : null,
-              paymentMethod: 'Online',
-              updatedAt: Timestamp.now(),
-            });
-
-            console.log(`Stripe Webhook confirmed Booking ID: ${bookingId}. Triggering post-process.`);
-
-            // Trigger server-side post-process internally
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3006';
-            fetch(`${appUrl}/api/bookings/post-process`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ bookingDocId: bookingId, triggerSource: 'stripe_webhook' })
-            }).catch(err => console.error("Error triggering post-process from Stripe Webhook:", err));
-          } else {
-            console.log(`Booking ID ${bookingId} already processed (Status: ${bookingData.status}).`);
-          }
+            },
+            triggerSource: 'stripe_webhook',
+          });
         } else {
-          console.error(`Booking ID ${bookingId} not found in database.`);
-        }
+          // Fetch the booking document
+          const bookingRef = doc(db, 'bookings', bookingId);
+          const bookingSnap = await getDoc(bookingRef);
 
+          if (bookingSnap.exists()) {
+            const bookingData = bookingSnap.data();
+            if (bookingData.status === 'Pending Payment') {
+              // Update booking status to Confirmed and store Stripe Session ID
+              await updateDoc(bookingRef, {
+                status: 'Confirmed',
+                stripeSessionId: session.id,
+                stripePaymentIntent: typeof session.payment_intent === 'string' ? session.payment_intent : null,
+                paymentMethod: 'Online',
+                updatedAt: Timestamp.now(),
+              });
+
+              console.log(`Stripe Webhook confirmed Booking ID: ${bookingId}. Triggering post-process.`);
+
+              // Trigger server-side post-process internally
+              const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3006';
+              fetch(`${appUrl}/api/bookings/post-process`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bookingDocId: bookingId, triggerSource: 'stripe_webhook' })
+              }).catch(err => console.error("Error triggering post-process from Stripe Webhook:", err));
+            } else {
+              console.log(`Booking ID ${bookingId} already processed (Status: ${bookingData.status}).`);
+            }
+          } else {
+            console.error(`Booking ID ${bookingId} not found in database.`);
+          }
+        }
       } else if (type === 'cancellation_fee') {
         if (!bookingId) {
           console.error("Stripe cancellation fee completed but bookingId is missing from metadata.");

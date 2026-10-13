@@ -1,6 +1,9 @@
 // src/lib/bookingPricingServer.ts
 import { adminDb } from '@/lib/firebaseAdmin';
-import { calculateIncrementalTotalPriceForItem, getBasePriceForInvoice } from './bookingUtils';
+import { calculateIncrementalTotalPriceForItem, getBasePriceForInvoice, generateBookingId } from './bookingUtils';
+import { assignNewBookingNumber } from './webServerUtils';
+import { Timestamp } from './mysqlDbAdmin';
+import { getPool, getDocsInternal } from './mysql';
 import type { FirestoreService, FirestorePromoCode, AppliedPlatformFeeItem } from '@/types/firestore';
 
 export interface CartInputItem {
@@ -236,3 +239,212 @@ export async function calculateServerBookingTotal(
     currency,
   };
 }
+
+export interface FulfillDraftOptions {
+  draftId: string;
+  gateway: 'razorpay' | 'stripe';
+  paymentDetails: {
+    razorpayPaymentId?: string;
+    razorpayOrderId?: string;
+    razorpaySignature?: string;
+    stripeSessionId?: string;
+    stripePaymentIntent?: string | null;
+  };
+  triggerSource: string;
+}
+
+/**
+ * Idempotently creates a Confirmed online booking from a server-side checkoutDraft
+ * once payment has been cryptographically verified.
+ */
+export async function fulfillCheckoutDraft(options: FulfillDraftOptions): Promise<{
+  booking: any;
+  bookingDocId: string;
+  bookingId: string;
+  alreadyExisted: boolean;
+} | null> {
+  const { draftId, gateway, paymentDetails, triggerSource } = options;
+  const pool = await getPool();
+
+  // 1. Check idempotency in bookings table first
+  if (gateway === 'razorpay' && paymentDetails.razorpayOrderId) {
+    const existing = await getDocsInternal(pool, 'bookings', [
+      { type: 'where', field: 'razorpayOrderId', op: '==', value: paymentDetails.razorpayOrderId },
+      { type: 'limit', value: 1 },
+    ]);
+    if (existing && existing.length > 0) {
+      return {
+        booking: existing[0],
+        bookingDocId: existing[0].id,
+        bookingId: existing[0].bookingId,
+        alreadyExisted: true,
+      };
+    }
+  } else if (gateway === 'stripe' && paymentDetails.stripeSessionId) {
+    const existing = await getDocsInternal(pool, 'bookings', [
+      { type: 'where', field: 'stripeSessionId', op: '==', value: paymentDetails.stripeSessionId },
+      { type: 'limit', value: 1 },
+    ]);
+    if (existing && existing.length > 0) {
+      return {
+        booking: existing[0],
+        bookingDocId: existing[0].id,
+        bookingId: existing[0].bookingId,
+        alreadyExisted: true,
+      };
+    }
+  }
+
+  // 2. Look up the checkoutDraft document
+  const draftRef = adminDb.collection('checkoutDrafts').doc(draftId);
+  const draftSnap = await draftRef.get();
+  if (!draftSnap.exists) {
+    return null;
+  }
+
+  const draft = draftSnap.data() as any;
+
+  // If draft was already marked completed with a bookingDocId, return that booking
+  if (draft.bookingDocId) {
+    const existingSnap = await adminDb.collection('bookings').doc(draft.bookingDocId).get();
+    if (existingSnap.exists) {
+      const existingData = existingSnap.data() as any;
+      return {
+        booking: { ...existingData, id: existingSnap.id },
+        bookingDocId: existingSnap.id,
+        bookingId: existingData.bookingId,
+        alreadyExisted: true,
+      };
+    }
+  }
+
+  if (!Array.isArray(draft.cartEntries) || draft.cartEntries.length === 0) {
+    return null;
+  }
+
+  const customerInfo = draft.customerInfo || {};
+  const schedule = draft.schedule || {};
+  const workCategoryId = draft.workCategoryId || undefined;
+  const promoCode = draft.promoCode || undefined;
+
+  let resolvedUserId: string | undefined =
+    typeof draft.userId === 'string' && draft.userId.trim() ? draft.userId.trim() : undefined;
+
+  const emailToMatch = (customerInfo.email || '').toLowerCase().trim();
+  if (!resolvedUserId && emailToMatch) {
+    try {
+      const matchingUsers = await getDocsInternal(pool, 'users', [
+        { type: 'where', field: 'email', op: '==', value: emailToMatch },
+        { type: 'limit', value: 1 },
+      ]);
+      if (matchingUsers && matchingUsers.length > 0) {
+        resolvedUserId = matchingUsers[0].id;
+      }
+    } catch (e) {
+      console.warn('Could not look up user by email in fulfillCheckoutDraft:', e);
+    }
+  }
+
+  // 3. Calculate authoritative server price
+  const pricing = await calculateServerBookingTotal({
+    cartEntries: draft.cartEntries,
+    promoCode,
+    categoryId: workCategoryId,
+  });
+
+  // 4. Generate sequential booking number & booking ID
+  const nextBookingNumber = await assignNewBookingNumber();
+  const newBookingId = generateBookingId();
+
+  const onlineFields: Record<string, any> =
+    gateway === 'razorpay'
+      ? {
+          razorpayPaymentId: paymentDetails.razorpayPaymentId,
+          razorpayOrderId: paymentDetails.razorpayOrderId,
+          ...(paymentDetails.razorpaySignature && { razorpaySignature: paymentDetails.razorpaySignature }),
+        }
+      : {
+          stripeSessionId: paymentDetails.stripeSessionId,
+          ...(paymentDetails.stripePaymentIntent && { stripePaymentIntent: paymentDetails.stripePaymentIntent }),
+        };
+
+  const newBookingData: Record<string, any> = {
+    bookingId: newBookingId,
+    bookingNumber: nextBookingNumber,
+    ...(resolvedUserId && { userId: resolvedUserId }),
+    customerName: customerInfo.fullName || customerInfo.name || 'Guest User',
+    customerEmail: customerInfo.email || '',
+    customerPhone: customerInfo.phone || 'N/A',
+    addressLine1: customerInfo.addressLine1 || 'N/A',
+    ...(customerInfo.addressLine2 && { addressLine2: customerInfo.addressLine2 }),
+    city: customerInfo.city || 'N/A',
+    state: customerInfo.state || 'N/A',
+    pincode: customerInfo.pincode || 'N/A',
+    ...(customerInfo.latitude !== undefined && customerInfo.latitude !== null && { latitude: customerInfo.latitude }),
+    ...(customerInfo.longitude !== undefined && customerInfo.longitude !== null && { longitude: customerInfo.longitude }),
+    scheduledDate: schedule.scheduledDate || new Date().toISOString().split('T')[0],
+    scheduledTimeSlot: schedule.scheduledTimeSlot || '10:00 AM',
+    ...(schedule.estimatedEndTime && { estimatedEndTime: schedule.estimatedEndTime }),
+    interveningBreaks: schedule.interveningBreaks || [],
+    dailyTimeline: schedule.dailyTimeline || [],
+    services: pricing.services,
+    subTotal: pricing.subTotal,
+    ...(pricing.visitingCharge > 0 && { visitingCharge: pricing.visitingCharge }),
+    taxAmount: pricing.taxAmount,
+    totalAmount: pricing.totalAmount,
+    platformFeeTotal: pricing.platformFeeTotal,
+    ...(pricing.appliedPlatformFees.length > 0 && { appliedPlatformFees: pricing.appliedPlatformFees }),
+    ...(pricing.discountCode && { discountCode: pricing.discountCode }),
+    ...(pricing.discountAmount > 0 && { discountAmount: pricing.discountAmount }),
+    paymentMethod: 'Online',
+    status: 'Confirmed',
+    ...onlineFields,
+    createdAt: Timestamp.now(),
+    isReviewedByCustomer: false,
+    ...(workCategoryId && { workCategoryId }),
+  };
+
+  const docRef = await adminDb.collection('bookings').add(newBookingData);
+
+  await draftRef.update({
+    status: 'completed',
+    bookingDocId: docRef.id,
+    bookingId: newBookingId,
+    updatedAt: Timestamp.now(),
+  });
+
+  // Trigger Server-Side Post Processing (Notifications, Dispatch, WhatsApp)
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3006';
+  fetch(`${appUrl}/api/bookings/post-process`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      bookingDocId: docRef.id,
+      triggerSource,
+    }),
+  }).catch((err) => console.error('Error triggering post-process from fulfillCheckoutDraft:', err));
+
+  if (resolvedUserId) {
+    try {
+      await adminDb.collection('userNotifications').add({
+        userId: resolvedUserId,
+        title: 'Booking Confirmed!',
+        message: `Your booking ${newBookingId} has been successfully placed. We'll assign a provider shortly.`,
+        type: 'success',
+        href: '/my-bookings',
+        read: false,
+        createdAt: Timestamp.now(),
+      });
+    } catch (notifyErr) {
+      console.error('Error sending in-app notification in fulfillCheckoutDraft:', notifyErr);
+    }
+  }
+
+  return {
+    booking: { ...newBookingData, id: docRef.id },
+    bookingDocId: docRef.id,
+    bookingId: newBookingId,
+    alreadyExisted: false,
+  };
+}
+
